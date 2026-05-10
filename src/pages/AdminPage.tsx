@@ -187,7 +187,7 @@ export default function AdminPage() {
           {tab === "events" && <AdminEvents state={state} onUpdate={update} />}
           {tab === "tickets" && <AdminTickets state={state} />}
           {tab === "operations" && <AdminOperations state={state} />}
-          {tab === "reports" && <AdminReports />}
+          {tab === "reports" && <AdminReports state={state} />}
         </main>
       </div>
 
