@@ -8,24 +8,24 @@ export default function DemoPage() {
 
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen overflow-x-hidden text-left"
       style={{
         background:
-          "radial-gradient(ellipse 1100px 600px at 30% -10%, rgba(99,102,241,0.18), transparent 60%), radial-gradient(ellipse 900px 500px at 80% 20%, rgba(139,92,246,0.12), transparent 55%), radial-gradient(ellipse 600px 400px at 50% 100%, rgba(14,165,233,0.08), transparent 50%), #06080E",
-        color: "#F1F5F9",
+          "linear-gradient(180deg, rgba(234,241,255,0.9) 0%, rgba(245,247,251,0.96) 34%, #F5F7FB 100%)",
+        color: "#111827",
       }}
     >
       <Sonner
-        theme="dark"
+        theme="light"
         toastOptions={{
           style: {
-            background: "#111827",
-            border: "1px solid rgba(255,255,255,0.08)",
-            color: "#F1F5F9",
+            background: "#FFFFFF",
+            border: "1px solid #D9E2EC",
+            color: "#111827",
           },
         }}
       />
-      <main className="mx-auto max-w-[1280px] px-5 md:px-8 py-0">
+      <main className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8">
         <B2CView state={state} onUpdate={update} />
       </main>
     </div>
