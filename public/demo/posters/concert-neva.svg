@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="675" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0f172a"/>
+      <stop offset="0.54" stop-color="#164e63"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#fde68a" stop-opacity="0.76"/>
+      <stop offset="1" stop-color="#fde68a" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <path d="M0 525 C180 470 300 560 455 512 C610 463 730 412 900 468 C1015 506 1110 516 1200 474 V675 H0 Z" fill="#020617" opacity="0.7"/>
+  <path d="M128 0 L306 675 H220 L58 0 Z" fill="url(#beam)" opacity="0.42"/>
+  <path d="M920 0 L720 675 H620 L835 0 Z" fill="url(#beam)" opacity="0.32"/>
+  <circle cx="990" cy="130" r="82" fill="#fef3c7" opacity="0.92"/>
+  <circle cx="990" cy="130" r="130" fill="#fef3c7" opacity="0.14"/>
+  <g fill="none" stroke="#e0f2fe" stroke-width="7" opacity="0.9">
+    <path d="M285 435 C360 365 436 365 512 435"/>
+    <path d="M350 432 V258"/>
+    <path d="M446 432 V258"/>
+    <path d="M332 258 H464"/>
+  </g>
+  <text x="74" y="116" fill="#f8fafc" font-family="Arial, sans-serif" font-size="48" font-weight="800">Огни Невы</text>
+  <text x="78" y="164" fill="#bae6fd" font-family="Arial, sans-serif" font-size="24" font-weight="600">симфо-поп концерт</text>
+  <text x="78" y="586" fill="#fef3c7" font-family="Arial, sans-serif" font-size="28" font-weight="700">Минск · Космос Арена</text>
+</svg>

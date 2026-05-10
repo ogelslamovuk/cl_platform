@@ -8,6 +8,7 @@ import AdminEventComplianceApplications from "@/components/admin/AdminEventCompl
 import AdminEvents from "@/components/admin/AdminEvents";
 import AdminTickets from "@/components/admin/AdminTickets";
 import AdminOperations from "@/components/admin/AdminOperations";
+import AdminResellers from "@/components/admin/AdminResellers";
 import AdminControl from "@/components/admin/AdminControl";
 import AdminCalendar from "@/components/admin/AdminCalendar";
 import AdminDecisionLog from "@/components/admin/AdminDecisionLog";
@@ -16,13 +17,13 @@ import AdminReports from "@/components/admin/AdminReports";
 import AdminRegistryEvents from "@/components/admin/AdminRegistryEvents";
 import {
   LayoutDashboard, FileText, Calendar, ShieldAlert, BookOpen, Building2, MapPin,
-  Globe, Ticket, Activity, BarChart3, Bell, Zap,
+  Globe, Ticket, Activity, BarChart3, Bell, Zap, Network,
 } from "lucide-react";
 
 type AdminTab =
   | "dashboard" | "calendar" | "control" | "decisions"
   | "organizerApplications" | "eventComplianceApplications"
-  | "orgRegistry" | "venueRegistry" | "registryEvents" | "events" | "tickets" | "operations" | "reports";
+  | "orgRegistry" | "venueRegistry" | "registryEvents" | "events" | "tickets" | "operations" | "resellers" | "reports";
 
 const sidebarSections: { label?: string; items: { key: AdminTab; label: string; icon: React.ElementType }[] }[] = [
   {
@@ -34,7 +35,7 @@ const sidebarSections: { label?: string; items: { key: AdminTab; label: string; 
     label: "Регулятор",
     items: [
       { key: "organizerApplications", label: "Заявки организаторов", icon: FileText },
-      { key: "eventComplianceApplications", label: "Заявки мероприятий", icon: FileText },
+      { key: "eventComplianceApplications", label: "Заявки на проведение мероприятий", icon: FileText },
       { key: "calendar", label: "Календарь", icon: Calendar },
       { key: "control", label: "Контроль", icon: ShieldAlert },
       { key: "decisions", label: "Журнал решений", icon: BookOpen },
@@ -54,6 +55,7 @@ const sidebarSections: { label?: string; items: { key: AdminTab; label: string; 
       { key: "events", label: "События", icon: Globe },
       { key: "tickets", label: "Билеты", icon: Ticket },
       { key: "operations", label: "Операции", icon: Activity },
+      { key: "resellers", label: "Реселлеры", icon: Network },
     ],
   },
   {
@@ -66,7 +68,7 @@ const sidebarSections: { label?: string; items: { key: AdminTab; label: string; 
 const tabTitles: Record<AdminTab, string> = {
   dashboard: "Дашборд",
   organizerApplications: "Заявки организаторов",
-  eventComplianceApplications: "Заявки мероприятий",
+  eventComplianceApplications: "Заявки на проведение мероприятий",
   calendar: "Календарь мероприятий",
   control: "Контроль и нарушения",
   decisions: "Журнал решений",
@@ -76,6 +78,7 @@ const tabTitles: Record<AdminTab, string> = {
   events: "Реестр событий",
   tickets: "Реестр билетов",
   operations: "Журнал операций",
+  resellers: "Реселлеры",
   reports: "Отчёты",
 };
 
@@ -187,6 +190,7 @@ export default function AdminPage() {
           {tab === "events" && <AdminEvents state={state} onUpdate={update} />}
           {tab === "tickets" && <AdminTickets state={state} />}
           {tab === "operations" && <AdminOperations state={state} />}
+          {tab === "resellers" && <AdminResellers state={state} onUpdate={update} />}
           {tab === "reports" && <AdminReports state={state} />}
         </main>
       </div>

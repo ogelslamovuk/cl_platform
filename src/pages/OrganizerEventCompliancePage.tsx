@@ -16,6 +16,24 @@ import {
   selectMyEventComplianceApplications,
 } from "@/lib/organizerSelectors";
 
+const DEMO_POSTERS = [
+  { path: "/demo/posters/concert-neva.svg", title: "Концерт «Огни Невы»" },
+  { path: "/demo/posters/theatre-night.svg", title: "Театральная ночь" },
+  { path: "/demo/posters/family-planet.svg", title: "Семейная планета" },
+  { path: "/demo/posters/summer-festival.svg", title: "Летний фестиваль" },
+  { path: "/demo/posters/jazz-city.svg", title: "Город и джаз" },
+  { path: "/demo/posters/open-air-lights.svg", title: "Open-air lights" },
+];
+
+const COMPLIANCE_FEE_TOOLTIP = "Размер госпошлины рассчитывается по проектной вместимости площадки или количеству заявленных билетов: 1–150 — 3 БВ, 151–300 — 10 БВ, 301–500 — 30 БВ, 501–1000 — 50 БВ, 1001–1500 — 80 БВ, 1501–2000 — 100 БВ, 2001–3000 — 150 БВ, свыше 3000 — 200 БВ. Для отдельных категорий может применяться освобождение от пошлины.";
+
+function resolvePublicAsset(path: string): string {
+  if (!path) return "";
+  if (/^(https?:|data:|blob:)/.test(path)) return path;
+  const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 export default function OrganizerEventCompliancePage() {
   const { state, update } = useStorageSync();
   const [searchParams] = useSearchParams();
@@ -139,8 +157,8 @@ export default function OrganizerEventCompliancePage() {
       <div className="mx-auto max-w-5xl rounded-2xl border p-6 space-y-6" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
         <div className="flex justify-between items-start gap-4">
           <div>
-            <h1 className="text-2xl font-bold mb-2">Заявка на согласование мероприятия</h1>
-            <p className="text-sm" style={{ color: "rgba(245,247,250,0.72)" }}>Надстройка над существующим процессом. После одобрения заявка уйдёт в основной конвейер.</p>
+            <h1 className="text-2xl font-bold mb-2">Заявка на проведение мероприятия</h1>
+            <p className="text-sm" style={{ color: "rgba(245,247,250,0.72)" }}>Согласование, госпошлина и выдача удостоверения.</p>
           </div>
           <div className="inline-flex items-center gap-1">
             <Link to="/organizer" className="px-3 h-9 inline-flex items-center rounded border">Назад в кабинет</Link>
@@ -179,6 +197,43 @@ export default function OrganizerEventCompliancePage() {
           <div className="relative">
             <textarea className="w-full min-h-20 rounded px-3 py-2 pr-9 bg-[#0F1620] border" placeholder="Программа" value={form.program} onChange={(e) => setForm((p) => ({ ...p, program: e.target.value }))} />
             <div className="absolute right-2 top-3"><HelpTooltip text="Опишите программу мероприятия." /></div>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-semibold">Постер мероприятия</h2>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              {DEMO_POSTERS.map((poster) => {
+                const selected = form.posterPath === poster.path;
+                return (
+                  <button
+                    key={poster.path}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, posterPath: poster.path }))}
+                    className="overflow-hidden rounded-xl border p-2 text-left transition"
+                    style={{
+                      borderColor: selected ? "#F2C94C" : "rgba(255,255,255,0.12)",
+                      background: selected ? "rgba(242,201,76,0.12)" : "#0F1620",
+                      boxShadow: selected ? "0 0 0 3px rgba(242,201,76,0.16)" : "none",
+                    }}
+                  >
+                    <img src={resolvePublicAsset(poster.path)} alt={poster.title} className="aspect-[16/10] w-full rounded-lg object-cover" />
+                    <div className="mt-2 text-xs font-medium">{poster.title}</div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
+              <div className="mb-2 text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>Предпросмотр</div>
+              {form.posterPath ? (
+                <img src={resolvePublicAsset(form.posterPath)} alt="Выбранный постер" className="aspect-[16/10] w-full rounded-lg object-cover" />
+              ) : (
+                <div className="flex aspect-[16/10] items-center justify-center rounded-lg border text-sm" style={{ borderColor: "rgba(255,255,255,0.12)", color: "rgba(245,247,250,0.55)" }}>
+                  Постер не выбран
+                </div>
+              )}
+            </div>
           </div>
         </section>
 
@@ -317,12 +372,11 @@ export default function OrganizerEventCompliancePage() {
             <h3 className="font-semibold">Материалы мероприятия</h3>
             <div className="flex gap-2 flex-wrap">
               <div className="inline-flex items-center gap-1"><button type="button" className="px-3 py-2 rounded bg-[#1d2a3b]">Загрузить программу мероприятия (тестовый файл)</button><HelpTooltip text="Демонстрационная загрузка программы мероприятия. В MVP файл не сохраняется." /></div>
-              <div className="inline-flex items-center gap-1"><button type="button" className="px-3 py-2 rounded bg-[#1d2a3b]">Загрузить постер (тестовый файл)</button><HelpTooltip text="Демонстрационная загрузка постера мероприятия. В MVP файл не сохраняется." /></div>
               <div className="inline-flex items-center gap-1"><button type="button" className="px-3 py-2 rounded bg-[#1d2a3b]">Загрузить видео (тестовый файл)</button><HelpTooltip text="Демонстрационная загрузка видеоматериала мероприятия. В MVP файл не сохраняется." /></div>
               <div className="inline-flex items-center gap-1"><button type="button" className="px-3 py-2 rounded bg-[#1d2a3b]">Загрузить аудио (тестовый файл)</button><HelpTooltip text="Демонстрационная загрузка аудиоматериала мероприятия. В MVP файл не сохраняется." /></div>
               <div className="inline-flex items-center gap-1"><button type="button" className="px-3 py-2 rounded bg-[#1d2a3b]">Загрузить рекламные материалы (тестовый файл)</button><HelpTooltip text="Демонстрационная загрузка рекламных материалов мероприятия. В MVP файл не сохраняется." /></div>
             </div>
-            <p className="text-xs" style={{ color: "rgba(245,247,250,0.65)" }}>Программа мероприятия: PDF, DOC или DOCX. Постер: JPG, PNG или WEBP. Видео: MP4 или AVI, до 100 ГБ. Аудио: MP3 или WAV. Рекламные материалы: PDF, JPG или PNG.</p>
+            <p className="text-xs" style={{ color: "rgba(245,247,250,0.65)" }}>Программа мероприятия: PDF, DOC или DOCX. Видео: MP4 или AVI, до 100 ГБ. Аудио: MP3 или WAV. Рекламные материалы: PDF, JPG или PNG.</p>
           </div>
           <p className="text-xs" style={{ color: "rgba(245,247,250,0.65)" }}>Демонстрационный блок. В MVP файлы не загружаются и используются только для визуализации процесса подачи заявки.</p>
         </section>
@@ -336,7 +390,7 @@ export default function OrganizerEventCompliancePage() {
           <div className="inline-flex items-center gap-1"><p className="text-xs" style={{ color: "#F2C94C" }}>Документы на удостоверение должны быть поданы заранее, не позднее чем за 10 рабочих дней до начала реализации билетов.</p><HelpTooltip text="Срок подачи нужен для проверки соблюдения регламентного срока до старта продаж." /></div>
           {form.approvalMode === "certificate_required" && (
             <div className="rounded-xl border p-4 space-y-2" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
-              <div className="inline-flex items-center gap-1">Расчёт пошлины: <b>{fee} БВ</b><HelpTooltip text="Расчёт госпошлины основан на вместимости площадки и количестве заявленных билетов." /></div>
+              <div className="inline-flex items-center gap-1">Расчёт пошлины: <b>{fee} БВ</b><HelpTooltip text={COMPLIANCE_FEE_TOOLTIP} /></div>
               <label className="flex items-center gap-2"><input type="checkbox" checked={form.feeExempt} onChange={(e) => setForm((p) => ({ ...p, feeExempt: e.target.checked }))} /> Освобождён от пошлины <HelpTooltip text="Отметьте, если госпошлина не требуется по закону." /></label>
               <div className="relative">
                 <input className="h-10 w-full rounded px-3 pr-9 bg-[#111A24] border" placeholder="Основание освобождения" value={form.feeExemptReason} onChange={(e) => setForm((p) => ({ ...p, feeExemptReason: e.target.value }))} />
@@ -350,14 +404,20 @@ export default function OrganizerEventCompliancePage() {
 
         <section className="space-y-2 text-sm">
           <label className="flex items-center gap-2"><input type="checkbox" checked={form.adRestrictionConfirmed} onChange={(e) => setForm((p) => ({ ...p, adRestrictionConfirmed: e.target.checked }))} /> Подтверждаю ограничение на рекламу до получения удостоверения <HelpTooltip text="Отметьте, что реклама не будет размещаться до получения удостоверения." /></label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={form.cancelled} onChange={(e) => setForm((p) => ({ ...p, cancelled: e.target.checked }))} /> Мероприятие отменено <HelpTooltip text="Отметьте, если мероприятие отменено." /></label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={form.changesDeclared} onChange={(e) => setForm((p) => ({ ...p, changesDeclared: e.target.checked }))} /> Изменены дата / место / состав участников <HelpTooltip text="Отметьте, если параметры мероприятия были изменены." /></label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={form.executiveCommitteeNotified} onChange={(e) => setForm((p) => ({ ...p, executiveCommitteeNotified: e.target.checked }))} /> Исполком уведомлён <HelpTooltip text="Отметьте, если исполком уведомлён об изменениях." /></label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={form.citizensNotified} onChange={(e) => setForm((p) => ({ ...p, citizensNotified: e.target.checked }))} /> Граждане уведомлены <HelpTooltip text="Отметьте, если граждане уведомлены об изменениях." /></label>
-          <div className="inline-flex items-center gap-1"><button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => addMockAttachment("notify-proof", "notificationsAttachment")}>Подтверждение уведомления (тестовый файл)</button><HelpTooltip text="Загрузите подтверждение уведомления." /></div>
+          {form.approvalMode === "notice_only" && (
+            <>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={form.executiveCommitteeNotified} onChange={(e) => setForm((p) => ({ ...p, executiveCommitteeNotified: e.target.checked }))} />
+                Уполномоченный орган уведомлён
+                <HelpTooltip text="Используется для сценариев, где удостоверение не требуется, но требуется уведомление уполномоченного органа." />
+              </label>
+              <div className="inline-flex items-center gap-1"><button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => addMockAttachment("notify-proof", "notificationsAttachment")}>Подтверждение уведомления (тестовый файл)</button><HelpTooltip text="Загрузите подтверждение уведомления." /></div>
+            </>
+          )}
           <div className="relative">
             <textarea className="w-full min-h-16 rounded px-3 py-2 pr-9 bg-[#0F1620] border" placeholder="Комментарий" value={form.cancellationComment} onChange={(e) => setForm((p) => ({ ...p, cancellationComment: e.target.value }))} />
-            <div className="absolute right-2 top-3"><HelpTooltip text="Укажите комментарий по изменениям или отмене мероприятия." /></div>
+            <div className="absolute right-2 top-3"><HelpTooltip text="Укажите комментарий по изменениям или уведомлению." /></div>
           </div>
         </section>
 

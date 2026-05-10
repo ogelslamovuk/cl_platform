@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="675">
+      <stop stop-color="#111827"/>
+      <stop offset="0.5" stop-color="#4c0519"/>
+      <stop offset="1" stop-color="#1f2937"/>
+    </linearGradient>
+    <radialGradient id="spot" cx="50%" cy="35%" r="55%">
+      <stop stop-color="#fecdd3" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fecdd3" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <rect x="120" y="72" width="960" height="532" rx="18" fill="#0f172a" opacity="0.58" stroke="#fecdd3" stroke-opacity="0.25"/>
+  <ellipse cx="600" cy="300" rx="470" ry="310" fill="url(#spot)"/>
+  <path d="M230 108 C322 182 336 430 230 582 V108 Z" fill="#be123c" opacity="0.75"/>
+  <path d="M970 108 C878 182 864 430 970 582 V108 Z" fill="#be123c" opacity="0.75"/>
+  <g fill="none" stroke="#fff7ed" stroke-width="8" stroke-linecap="round">
+    <path d="M483 272 C522 242 578 244 615 272"/>
+    <path d="M585 276 C623 246 678 247 716 276"/>
+    <path d="M493 323 C548 374 649 373 706 323"/>
+  </g>
+  <text x="360" y="135" fill="#fff7ed" font-family="Arial, sans-serif" font-size="44" font-weight="800" text-anchor="middle">Ночной проспект</text>
+  <text x="360" y="177" fill="#fecdd3" font-family="Arial, sans-serif" font-size="24" font-weight="600" text-anchor="middle">современная городская драма</text>
+  <text x="600" y="572" fill="#fff7ed" font-family="Arial, sans-serif" font-size="30" font-weight="700" text-anchor="middle">Театр драмы</text>
+</svg>

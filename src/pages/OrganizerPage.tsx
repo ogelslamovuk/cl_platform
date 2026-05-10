@@ -85,6 +85,15 @@ const T = {
   btnSecondaryHover: "rgba(255,255,255,0.04)",
 };
 
+const EVENT_POSTER_FALLBACK = "/placeholder.svg";
+
+function resolvePublicAsset(path: string): string {
+  const assetPath = path || EVENT_POSTER_FALLBACK;
+  if (/^(https?:|data:|blob:)/.test(assetPath)) return assetPath;
+  const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+  return `${base}${assetPath.startsWith("/") ? assetPath : `/${assetPath}`}`;
+}
+
 function fmtDateTime(v: string): string {
   return v?.replace("T", " ").slice(0, 16) || "—";
 }
@@ -241,7 +250,7 @@ export default function OrganizerPage() {
         >
           Новая заявка
         </button>
-        <HelpTooltip text="Создать новую заявку на согласование мероприятия." />
+        <HelpTooltip text="Создать новую заявку на проведение мероприятия." />
       </div>
 
       <aside className="w-60 min-h-screen border-r flex-shrink-0 flex flex-col" style={{ background: T.sidebarBg, borderColor: T.border }}>
@@ -275,7 +284,6 @@ export default function OrganizerPage() {
 
         <button
           onClick={() => setProfileCardOpen(true)}
-          title="Открыть профиль организатора или выйти из кабинета."
           className="px-5 py-4 border-t flex items-center gap-3 text-left transition-colors"
           style={{ borderColor: T.border }}
           onMouseEnter={(e) => { e.currentTarget.style.background = T.btnSecondaryHover; }}
@@ -299,18 +307,17 @@ export default function OrganizerPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={openUnpCheck}
-              title="Проверить УНП и статус регистрации организатора в реестре." className="h-9 px-4 rounded-xl border text-[13px] font-semibold flex items-center gap-2 transition-colors"
+              className="h-9 px-4 rounded-xl border text-[13px] font-semibold flex items-center gap-2 transition-colors"
               style={{ borderColor: T.btnSecondaryBorder, color: T.textSecondary, background: "transparent" }}
             >
               <ShieldCheck size={14} /> Проверить УНП
             </button>
-            <button title="Перейти к форме создания заявки на согласование мероприятия." onClick={() => navigate("/organizer/compliance")} className="h-9 px-4 rounded-xl text-[13px] font-semibold flex items-center gap-2 org-btn-primary" style={{ background: "#111111", color: "#FFF" }}>
+            <button onClick={() => navigate("/organizer/compliance")} className="h-9 px-4 rounded-xl text-[13px] font-semibold flex items-center gap-2 org-btn-primary" style={{ background: "#111111", color: "#FFF" }}>
               <Plus size={14} /> Создать заявку
             </button>
             <div className="relative">
               <button
                 onClick={() => setProfileOpen((v) => !v)}
-                title="Открыть меню профиля организатора."
                 className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
                 style={{ background: T.goldBg, color: T.gold }}
               >
@@ -328,7 +335,7 @@ export default function OrganizerPage() {
                     <p><span style={{ color: T.textMuted }}>Электронная почта:</span> {organizer.email}</p>
                     <p><span style={{ color: T.textMuted }}>Телефон:</span> {organizer.phone}</p>
                   </div>
-                  <button title="Выйти из кабинета организатора." onClick={handleLogout} className="mt-3 w-full h-9 rounded-lg text-sm font-semibold" style={{ background: "rgba(239,68,68,0.18)", color: "#EF4444" }}>
+                  <button onClick={handleLogout} className="mt-3 w-full h-9 rounded-lg text-sm font-semibold" style={{ background: "rgba(239,68,68,0.18)", color: "#EF4444" }}>
                     Выйти
                   </button>
                 </div>
@@ -425,7 +432,7 @@ export default function OrganizerPage() {
                         <div className="text-[14px] font-semibold mb-1">{tile.label}</div>
                         <div className="text-[12px]" style={{ color: T.textSecondary }}>{tile.desc}</div>
                       </button>
-                      <CardHelp text={tile.label === "Новая заявка" ? "Создать новую заявку на согласование мероприятия." : tile.label === "Мои заявки" ? "Перейти к списку всех отправленных и черновых заявок." : tile.label === "Отчетность" ? "Просмотреть отчёты и финансовые показатели." : tile.label === "Маркетинг" ? "Раздел временно недоступен и будет расширен позже." : tile.label === "Документы" ? "Перейти к реестру документов и удостоверений." : "Контакты и каналы связи со службой поддержки."} />
+                      <CardHelp text={tile.label === "Новая заявка" ? "Создать новую заявку на проведение мероприятия." : tile.label === "Мои заявки" ? "Перейти к списку всех отправленных и черновых заявок." : tile.label === "Отчетность" ? "Просмотреть отчёты и финансовые показатели." : tile.label === "Маркетинг" ? "Раздел временно недоступен и будет расширен позже." : tile.label === "Документы" ? "Перейти к реестру документов и удостоверений." : "Контакты и каналы связи со службой поддержки."} />
                       </div>
                     ))}
                   </div>
@@ -548,7 +555,7 @@ function ApplicationsTable({
 
   return (
     <div className="rounded-[18px] border p-6 relative" style={{ background: T.cardBg, borderColor: T.border, boxShadow: T.cardShadow }}>
-      <CardHelp text="Список заявок на согласование мероприятий и их текущих статусов." />
+      <CardHelp text="Список заявок на проведение мероприятий и их текущих статусов." />
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-lg font-semibold" style={{ color: T.textPrimary }}>Мои заявки</h2>
         <div className="flex items-center gap-3">
@@ -587,7 +594,7 @@ function ApplicationsTable({
           <button onClick={onCreateNew} className="h-9 px-4 rounded-xl text-[13px] font-semibold flex items-center gap-2 org-btn-primary" style={{ background: "#111111", color: "#FFF" }}>
             <Plus size={14} /> Создать
           </button>
-          <HelpTooltip text="Создать новую заявку на согласование мероприятия." />
+          <HelpTooltip text="Создать новую заявку на проведение мероприятия." />
           </div>
         </div>
       </div>
@@ -667,6 +674,7 @@ function EventsSection({ rows, sort, setSort }: {
           <table className="w-full text-[13px]">
             <thead>
               <tr style={{ background: T.tableHeaderBg }}>
+                <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>Постер</th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>ID мероприятия</th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}><SortableHeader label="Название" active={sort?.key === "title"} direction={sort?.key === "title" ? sort.dir : null} onClick={() => setColumnSort("title")} /></th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>Площадка</th>
@@ -680,6 +688,9 @@ function EventsSection({ rows, sort, setSort }: {
             <tbody>
               {rows.map((e) => (
                 <tr key={e.eventId} className="border-b" style={{ borderColor: T.border }}>
+                  <td className="py-2.5 px-3">
+                    <img src={resolvePublicAsset(e.poster)} alt={e.title} className="h-12 w-20 rounded-lg object-cover" />
+                  </td>
                   <td className="py-2.5 px-3 font-mono text-xs" style={{ color: T.textSecondary }}>{e.eventId}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>{e.title}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.venue}</td>
@@ -707,6 +718,7 @@ function EventsTable({ rows, compact = false }: { rows: EventRecord[]; compact?:
       <table className="w-full text-[13px]">
         <thead>
           <tr style={{ background: T.tableHeaderBg }}>
+            <th className="py-2.5 px-3 text-left font-semibold">Постер</th>
             <th className="py-2.5 px-3 text-left font-semibold">ID мероприятия</th>
             <th className="py-2.5 px-3 text-left font-semibold">Название</th>
             <th className="py-2.5 px-3 text-left font-semibold">Дата и время</th>
@@ -718,6 +730,9 @@ function EventsTable({ rows, compact = false }: { rows: EventRecord[]; compact?:
         <tbody>
           {rows.map((e) => (
             <tr key={e.eventId} className="border-b" style={{ borderColor: T.border }}>
+              <td className="py-2.5 px-3">
+                <img src={resolvePublicAsset(e.poster)} alt={e.title} className="h-11 w-16 rounded-lg object-cover" />
+              </td>
               <td className="py-2.5 px-3 font-mono text-xs" style={{ color: T.textSecondary }}>{e.eventId}</td>
               <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>{e.title}</td>
               <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{fmtDateTime(e.dateTime)}</td>

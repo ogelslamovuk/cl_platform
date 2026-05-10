@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="675">
+      <stop stop-color="#eff6ff"/>
+      <stop offset="0.52" stop-color="#a7f3d0"/>
+      <stop offset="1" stop-color="#fde68a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <circle cx="880" cy="186" r="142" fill="#38bdf8" opacity="0.7"/>
+  <circle cx="880" cy="186" r="88" fill="#ffffff" opacity="0.58"/>
+  <path d="M0 512 C145 480 276 536 426 508 C596 476 694 398 866 434 C1008 464 1076 528 1200 494 V675 H0 Z" fill="#047857" opacity="0.82"/>
+  <g transform="translate(244 268)">
+    <circle cx="92" cy="78" r="58" fill="#2563eb"/>
+    <circle cx="220" cy="46" r="42" fill="#f97316"/>
+    <circle cx="330" cy="96" r="54" fill="#e11d48"/>
+    <path d="M53 190 C134 128 278 128 372 190" fill="none" stroke="#0f172a" stroke-width="12" stroke-linecap="round"/>
+  </g>
+  <text x="82" y="118" fill="#0f172a" font-family="Arial, sans-serif" font-size="50" font-weight="800">Планета игр</text>
+  <text x="86" y="164" fill="#075985" font-family="Arial, sans-serif" font-size="25" font-weight="700">семейное интерактивное шоу</text>
+  <text x="84" y="586" fill="#0f172a" font-family="Arial, sans-serif" font-size="28" font-weight="800">для детей и родителей</text>
+</svg>

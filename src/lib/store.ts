@@ -8,6 +8,8 @@ export type EventStatus = "approved" | "published";
 export type TicketStatus = "issued" | "sold" | "refunded" | "redeemed";
 export type OpType = "sell" | "refund" | "redeem" | "verify";
 export type OpResult = "ok" | "error";
+export type ResellerStatus = "active" | "disabled";
+export type ResellerContractStatus = "Active" | "Suspended" | "Draft";
 
 export interface PriceTier {
   name: string;
@@ -63,6 +65,17 @@ export interface Ticket {
   soldByChannel?: string;
   soldToUserId?: string;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface Reseller {
+  resellerId: string;
+  name: string;
+  code: string;
+  status: ResellerStatus;
+  apiConnected: boolean;
+  contractStatus: ResellerContractStatus;
+  commissionPercent: number;
   updatedAt: string;
 }
 
@@ -187,6 +200,7 @@ export interface EventComplianceData {
   eventType: string;
   shortDescription: string;
   program: string;
+  posterPath: string;
   dateSlots: string[];
   venueName: string;
   venueAddress: string;
@@ -252,6 +266,7 @@ export interface AppState {
   organizerRegistry: OrganizerRegistryRecord[];
   events: EventRecord[];
   tickets: Ticket[];
+  resellers: Reseller[];
   demoPurchases: DemoPurchaseTicket[];
   ops: OpRecord[];
   users: DemoUser[];
@@ -264,6 +279,36 @@ export interface AppState {
 const STORAGE_KEY = "ticket_hub_state_v1";
 const LEGACY_DEFAULT_ORGANIZER_ID = "org_demo_1";
 let suppressPersistence = false;
+
+const DEFAULT_RESELLERS: Omit<Reseller, "updatedAt">[] = [
+  {
+    resellerId: "reseller_bycard",
+    name: "ByCard",
+    code: "ByCard",
+    status: "active",
+    apiConnected: true,
+    contractStatus: "Active",
+    commissionPercent: 8,
+  },
+  {
+    resellerId: "reseller_ticketpro",
+    name: "TicketPro",
+    code: "TicketPro",
+    status: "active",
+    apiConnected: true,
+    contractStatus: "Active",
+    commissionPercent: 10,
+  },
+  {
+    resellerId: "reseller_legacy_seller",
+    name: "Legacy Seller",
+    code: "LegacySeller",
+    status: "disabled",
+    apiConnected: false,
+    contractStatus: "Suspended",
+    commissionPercent: 6,
+  },
+];
 
 const ORGANIZER_DOCUMENT_TEMPLATES: Omit<OrganizerDocument, "organizerId" | "updatedAt">[] = [
   { documentId: "DOC-001", title: "Выписка из реестра организаторов", type: "реестр", status: "доступен" },
@@ -283,8 +328,9 @@ export function genId(prefix: string, counter: number): string {
 }
 
 export function defaultState(): AppState {
+  const createdAt = new Date().toISOString();
   const state: AppState = {
-    meta: { version: "v3", updatedAt: new Date().toISOString() },
+    meta: { version: "v4", updatedAt: createdAt },
     counters: { app: 1, lic: 1, evt: 1, tck: 1, op: 1 },
     applications: [],
     organizerApplications: [],
@@ -292,6 +338,7 @@ export function defaultState(): AppState {
     organizerRegistry: [],
     events: [],
     tickets: [],
+    resellers: DEFAULT_RESELLERS.map((reseller) => ({ ...reseller, updatedAt: createdAt })),
     demoPurchases: [],
     ops: [],
     users: [{ userId: "demo_user_1", name: "Демо пользователь" }],
@@ -301,6 +348,26 @@ export function defaultState(): AppState {
     ui: { selectedRole: "organizer", selectedChannel: "ByCard" },
   };
   return state;
+}
+
+export function ensureDefaultResellers(state: AppState): void {
+  if (!Array.isArray(state.resellers)) state.resellers = [];
+  const now = new Date().toISOString();
+  for (const seed of DEFAULT_RESELLERS) {
+    const existing = state.resellers.find((reseller) => reseller.resellerId === seed.resellerId || reseller.code === seed.code);
+    if (!existing) {
+      state.resellers.push({ ...seed, updatedAt: now });
+      continue;
+    }
+    existing.resellerId ||= seed.resellerId;
+    existing.name ||= seed.name;
+    existing.code ||= seed.code;
+    if (existing.status !== "active" && existing.status !== "disabled") existing.status = seed.status;
+    if (typeof existing.apiConnected !== "boolean") existing.apiConnected = seed.apiConnected;
+    if (!["Active", "Suspended", "Draft"].includes(existing.contractStatus)) existing.contractStatus = seed.contractStatus;
+    if (!Number.isFinite(existing.commissionPercent)) existing.commissionPercent = seed.commissionPercent;
+    existing.updatedAt ||= now;
+  }
 }
 
 function ensureOrganizerDocuments(state: AppState): void {
@@ -333,6 +400,7 @@ function migrateState(parsed: Partial<AppState>): AppState {
       organizerRegistry: Array.isArray(parsed.organizerRegistry) ? parsed.organizerRegistry : [],
       events: Array.isArray(parsed.events) ? parsed.events : [],
       tickets: Array.isArray(parsed.tickets) ? parsed.tickets : [],
+      resellers: Array.isArray(parsed.resellers) ? parsed.resellers : [],
       demoPurchases: Array.isArray(parsed.demoPurchases) ? parsed.demoPurchases : [],
       ops: Array.isArray(parsed.ops) ? parsed.ops : [],
       users: Array.isArray(parsed.users) ? parsed.users : [{ userId: "demo_user_1", name: "Демо пользователь" }],
@@ -366,12 +434,14 @@ function migrateState(parsed: Partial<AppState>): AppState {
       const tiers = normalizeComplianceTicketTiers(app.data);
       app.data.ticketTiers = tiers;
       app.data.plannedTicketsForSale = sumTierQuantity(tiers);
+      app.data.posterPath ||= "";
     }
     if (state.currentOrganizerId && !knownOrganizerIds.has(state.currentOrganizerId)) {
       state.currentOrganizerId = null;
     }
+    ensureDefaultResellers(state);
     ensureOrganizerDocuments(state);
-    state.meta.version = "v3";
+    state.meta.version = "v4";
     return state;
   } finally {
     suppressPersistence = false;
@@ -532,6 +602,7 @@ export function defaultEventComplianceData(): EventComplianceData {
     eventType: "",
     shortDescription: "",
     program: "",
+    posterPath: "",
     dateSlots: [""],
     venueName: "",
     venueAddress: "",
@@ -778,6 +849,7 @@ export function setEventComplianceReview(
     const dateTime = app.data.dateSlots.find(Boolean) || "";
     const normalizedTiers = normalizeComplianceTicketTiers(app.data);
     const capacity = sumTierQuantity(normalizedTiers);
+    const posterPath = app.data.posterPath || existing?.poster || "";
     const nextEvent: EventRecord = existing || {
       eventId: nextId(state, "evt", "EVT"),
       organizerId: app.organizerId,
@@ -792,8 +864,8 @@ export function setEventComplianceReview(
       city: "",
       category: "",
       description: "",
-      poster: "",
-      status: "approved",
+      poster: posterPath,
+      status: "published",
       remaining: 0,
       createdAt: now,
       updatedAt: now,
@@ -808,14 +880,17 @@ export function setEventComplianceReview(
     nextEvent.city = "";
     nextEvent.category = app.data.eventType || "Иное";
     nextEvent.description = app.data.shortDescription;
-    nextEvent.poster = "";
-    nextEvent.status = "approved";
+    nextEvent.poster = posterPath;
+    nextEvent.status = existing?.status || "published";
     nextEvent.remaining = existing ? state.tickets.filter((ticket) => ticket.eventId === existing.eventId && ticket.status === "issued").length : 0;
     nextEvent.updatedAt = now;
     if (!existing) {
       state.events.push(nextEvent);
     }
     app.linkedEventId = nextEvent.eventId;
+    if (nextEvent.status === "published" && !state.tickets.some((ticket) => ticket.eventId === nextEvent.eventId)) {
+      issueMarks(state, nextEvent.eventId);
+    }
   } else {
     app.certificateNumber = "";
     app.certificateDate = "";
@@ -948,12 +1023,72 @@ export function issueMarks(state: AppState, eventId: string): number {
   return totalToIssue;
 }
 
+export function setResellerStatus(state: AppState, resellerId: string, status: ResellerStatus): boolean {
+  const reseller = state.resellers.find((item) => item.resellerId === resellerId);
+  if (!reseller) return false;
+  reseller.status = status;
+  reseller.updatedAt = nowIso();
+  saveState(state);
+  return true;
+}
+
+export function setResellerCommission(state: AppState, resellerId: string, commissionPercent: number): boolean {
+  const reseller = state.resellers.find((item) => item.resellerId === resellerId);
+  if (!reseller) return false;
+  const nextValue = Math.max(0, Math.min(100, Number.isFinite(commissionPercent) ? commissionPercent : 0));
+  reseller.commissionPercent = Number(nextValue.toFixed(2));
+  reseller.updatedAt = nowIso();
+  saveState(state);
+  return true;
+}
+
 export interface OpOutcome {
   ok: boolean;
   reason?: string;
   ticketId?: string;
   status?: TicketStatus;
   op: OpRecord;
+}
+
+export interface ResellerSellOutcome {
+  ok: boolean;
+  reason?: string;
+  ticketIds: string[];
+}
+
+export function sellTicketsByReseller(
+  state: AppState,
+  data: { resellerCode: string; eventId: string; tierName: string; quantity: number; buyerName: string }
+): ResellerSellOutcome {
+  const reseller = state.resellers.find((item) => item.code === data.resellerCode);
+  if (!reseller || reseller.status === "disabled") {
+    return { ok: false, reason: "Реселлер отключён в Центре Управления. Demo-продажа недоступна.", ticketIds: [] };
+  }
+  const safeQuantity = Math.max(1, Math.floor(data.quantity || 1));
+  const tickets = state.tickets.filter(
+    (ticket) => ticket.eventId === data.eventId && ticket.tier === data.tierName && ticket.status === "issued"
+  );
+  if (tickets.length < safeQuantity) {
+    return { ok: false, reason: "Недостаточно доступных билетов по выбранному тарифу.", ticketIds: [] };
+  }
+
+  const soldTicketIds: string[] = [];
+  const now = nowIso();
+  const buyer = data.buyerName.trim() || "Demo Buyer";
+  tickets.slice(0, safeQuantity).forEach((ticket) => {
+    ticket.status = "sold";
+    ticket.soldByChannel = reseller.code;
+    ticket.soldToUserId = buyer;
+    ticket.updatedAt = now;
+    soldTicketIds.push(ticket.ticketId);
+    addOp(state, { type: "sell", ticketId: ticket.ticketId, eventId: data.eventId, channel: reseller.code, result: "ok" });
+  });
+  reseller.updatedAt = now;
+  recalcRemaining(state, data.eventId);
+  const event = state.events.find((item) => item.eventId === data.eventId);
+  if (event) event.updatedAt = now;
+  saveState(state);
+  return { ok: true, ticketIds: soldTicketIds };
 }
 
 export function sell(state: AppState, eventId: string, tierName: string, channel: string, userId?: string): OpOutcome {
@@ -1145,15 +1280,15 @@ export interface OrganizerSaleRecord {
   quantity: number;
   unitPrice: number;
   amount: number;
-  channel: "B2C";
-  status: "подтверждена";
+  channel: string;
+  status: "подтверждена" | "возврат" | "погашена";
   priceCategory: string;
 }
 
 export function getMySales(state: AppState): OrganizerSaleRecord[] {
   const organizer = getCurrentOrganizer(state);
   if (!organizer) return [];
-  return state.demoPurchases
+  const b2cSales = state.demoPurchases
     .map((purchase) => {
       const event = state.events.find((e) => e.eventId === purchase.eventId);
       if (!event || event.organizerId !== organizer.organizerId) return null;
@@ -1172,8 +1307,36 @@ export function getMySales(state: AppState): OrganizerSaleRecord[] {
         priceCategory: purchase.selectedPriceCategory,
       };
     })
-    .filter((row): row is OrganizerSaleRecord => row !== null)
-    .sort((a, b) => b.soldAt.localeCompare(a.soldAt));
+    .filter((row): row is OrganizerSaleRecord => row !== null);
+
+  const resellerSales = state.tickets
+    .map((ticket) => {
+      if (!ticket.soldByChannel || ticket.soldByChannel === "B2C" || ticket.status === "issued") return null;
+      const event = state.events.find((e) => e.eventId === ticket.eventId);
+      if (!event || event.organizerId !== organizer.organizerId) return null;
+      const tierPrice = event.tiers.find((tier) => tier.name === ticket.tier)?.price ?? 0;
+      const soldOp = state.ops.find((op) => op.ticketId === ticket.ticketId && op.type === "sell" && op.result === "ok");
+      const status =
+        ticket.status === "refunded" ? "возврат" :
+        ticket.status === "redeemed" ? "погашена" :
+        "подтверждена";
+      return {
+        saleId: ticket.ticketId,
+        eventId: event.eventId,
+        organizerId: organizer.organizerId,
+        eventTitle: event.title,
+        soldAt: soldOp?.ts || ticket.updatedAt,
+        quantity: 1,
+        unitPrice: tierPrice,
+        amount: tierPrice,
+        channel: ticket.soldByChannel,
+        status,
+        priceCategory: ticket.tier,
+      };
+    })
+    .filter((row): row is OrganizerSaleRecord => row !== null);
+
+  return [...b2cSales, ...resellerSales].sort((a, b) => b.soldAt.localeCompare(a.soldAt));
 }
 
 export function getMyOrganizerDocuments(state: AppState): OrganizerDocument[] {

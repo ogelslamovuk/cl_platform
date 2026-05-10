@@ -29,6 +29,16 @@ const approvalModeLabel: Record<string, string> = {
   certificate_not_required: "Удостоверение не требуется",
 };
 
+function getApplicationFeatures(row: AppState["eventComplianceApplications"][number]): string[] {
+  const features: string[] = [];
+  if (row.data.approvalMode === "notice_only") features.push("уведомление");
+  if (row.data.approvalMode === "certificate_not_required") features.push("без удостоверения");
+  if (row.data.hasForeignPerformers) features.push("иностранные исполнители");
+  if (row.data.feeExempt) features.push("освобождение от пошлины");
+  if (row.data.posterPath) features.push("постер выбран");
+  return features;
+}
+
 export default function AdminEventComplianceApplications({ state, onUpdate }: Props) {
   const [comment, setComment] = useState<Record<string, string>>({});
   const [confirmFee, setConfirmFee] = useState<Record<string, boolean>>({});
@@ -58,11 +68,15 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-1.5">
-        <h2 className="text-sm" style={{ color: A.textSecondary }}>Заявки на согласование мероприятий</h2>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold" style={{ color: A.textPrimary }}>Заявки на проведение мероприятий</h2>
+          <p className="mt-1 text-xs" style={{ color: A.textSecondary }}>Согласование, госпошлина и выдача удостоверения.</p>
+        </div>
+        <HelpTooltip text="Заявки проходят рассмотрение в Центре Управления; после одобрения создаётся мероприятие и присваивается удостоверение, если оно требуется." />
       </div>
       <div style={{ background: A.cardBg, border: `1px solid ${A.border}`, borderRadius: 12 }} className="relative overflow-hidden">
-        <CardHelp text="Список заявок на согласование конкретных мероприятий. При одобрении удостоверение присваивается автоматически." />
+        <CardHelp text="Список заявок на проведение конкретных мероприятий. При одобрении удостоверение присваивается автоматически, если оно требуется." />
         <table className="w-full text-sm">
           <thead>
             <tr style={{ background: A.tableHeaderBg }}>
@@ -73,6 +87,7 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                 "Дата",
                 "Площадка",
                 "Режим",
+                "Особенности",
                 "Пошлина",
                 "Статус",
                 "Действия",
@@ -88,6 +103,7 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
               const fee = r.data.approvalMode === "certificate_required"
                 ? `${calculateComplianceFee(r.data.projectedCapacity, r.data.plannedTicketsForSale, r.data.ticketTiers)} БВ`
                 : "—";
+              const features = getApplicationFeatures(r);
               return (
                 <tr key={r.eventComplianceApplicationId} style={{ borderTop: `1px solid ${A.border}` }}>
                   <td className="py-2 px-3 font-mono text-xs">{r.eventComplianceApplicationId}</td>
@@ -96,6 +112,7 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                   <td className="py-2 px-3">{r.data.dateSlots[0]?.replace("T", " ") || "—"}</td>
                   <td className="py-2 px-3">{r.data.venueName}</td>
                   <td className="py-2 px-3">{approvalModeLabel[r.data.approvalMode] || r.data.approvalMode}</td>
+                  <td className="py-2 px-3 text-xs" style={{ color: A.textSecondary }}>{features.length ? features.join(", ") : "—"}</td>
                   <td className="py-2 px-3">{fee}</td>
                   <td className="py-2 px-3">{statusLabel[r.status] || r.status}</td>
                   <td className="py-2 px-3 space-y-2">
@@ -150,7 +167,7 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                       </span>
                       <span className="inline-flex items-center gap-1">
                         <button disabled={r.status !== "submitted"} className="px-2 py-1 rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: A.statusErrorBg, color: A.statusError }} onClick={() => applyDecision(r.eventComplianceApplicationId, "rejected")}>Отклонить</button>
-                        <HelpTooltip text="Отклонить заявку на согласование мероприятия с указанием причины." />
+                        <HelpTooltip text="Отклонить заявку на проведение мероприятия с указанием причины." />
                       </span>
                     </div>
                   </td>
@@ -159,7 +176,7 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
             })}
             {rows.length === 0 && (
               <tr>
-                <td className="py-6 px-3 text-center" colSpan={9} style={{ color: A.textMuted }}>Пока нет заявок на согласование мероприятий</td>
+                <td className="py-6 px-3 text-center" colSpan={10} style={{ color: A.textMuted }}>Пока нет заявок на проведение мероприятий</td>
               </tr>
             )}
           </tbody>

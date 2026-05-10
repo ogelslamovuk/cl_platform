@@ -8,6 +8,7 @@ import {
   BarChart3,
   ChevronRight,
   CircleDollarSign,
+  Handshake,
   Landmark,
   Percent,
   RotateCcw,
@@ -57,6 +58,23 @@ type ChannelReportRow = {
   share: number;
 };
 
+type ResellerReportRow = {
+  resellerId: string;
+  name: string;
+  code: string;
+  status: string;
+  commissionPercent: number;
+  salesTurnover: number;
+  commissionAmount: number;
+  ministryShare: number;
+  platformShare: number;
+  resellerNetShare: number;
+  soldTickets: number;
+  refunds: number;
+  redeems: number;
+  errors: number;
+};
+
 type FinancialSummary = {
   totalEvents: number;
   totalIssued: number;
@@ -69,7 +87,7 @@ type FinancialSummary = {
   topEvent: EventReportRow | null;
 };
 
-type ReportKey = "events" | "organizers" | "channels" | "finance";
+type ReportKey = "events" | "organizers" | "channels" | "resellers" | "finance";
 
 type ReportChoice = {
   key: ReportKey;
@@ -87,6 +105,8 @@ const channelLabels: Record<string, string> = {
   SellerPOS: "SellerPOS",
   "Не указан": "Не указан",
 };
+
+const SALES_TURNOVER_TOOLTIP = "GMV — общая сумма продаж билетов до вычета комиссий, возвратов и выплат организаторам.";
 
 function CardHelp({ text }: { text: string }) {
   return (
@@ -349,6 +369,37 @@ function buildChannelRows(state: AppState): ChannelReportRow[] {
     .sort((a, b) => b.salesAmount - a.salesAmount || b.sales - a.sales || a.channel.localeCompare(b.channel, "ru"));
 }
 
+function buildResellerRows(state: AppState): ResellerReportRow[] {
+  const eventById = new Map(state.events.map((event) => [event.eventId, event]));
+
+  return state.resellers
+    .map((reseller) => {
+      const tickets = state.tickets.filter((ticket) => ticket.soldByChannel === reseller.code && ticket.status !== "issued");
+      const salesTurnover = tickets.reduce((acc, ticket) => acc + getTicketPrice(ticket, eventById.get(ticket.eventId)), 0);
+      const commissionAmount = salesTurnover * reseller.commissionPercent / 100;
+      const ministryShare = commissionAmount * 0.25;
+      const platformShare = commissionAmount * 0.125;
+      const resellerNetShare = commissionAmount - ministryShare - platformShare;
+      return {
+        resellerId: reseller.resellerId,
+        name: reseller.name,
+        code: reseller.code,
+        status: reseller.status,
+        commissionPercent: reseller.commissionPercent,
+        salesTurnover,
+        commissionAmount,
+        ministryShare,
+        platformShare,
+        resellerNetShare,
+        soldTickets: tickets.length,
+        refunds: tickets.filter((ticket) => ticket.status === "refunded").length,
+        redeems: tickets.filter((ticket) => ticket.status === "redeemed").length,
+        errors: state.ops.filter((op) => op.channel === reseller.code && op.result === "error").length,
+      };
+    })
+    .sort((a, b) => b.salesTurnover - a.salesTurnover || b.soldTickets - a.soldTickets || a.name.localeCompare(b.name, "ru"));
+}
+
 function buildFinancialSummary(state: AppState, eventRows: EventReportRow[]): FinancialSummary {
   const topEvent = [...eventRows].sort((a, b) => b.sold - a.sold || b.revenue - a.revenue)[0] || null;
 
@@ -474,7 +525,7 @@ function TopEventSpotlight({ topEvent }: { topEvent: EventReportRow | null }) {
           {topEvent ? (
             <>
               <span>Продано: {formatNumber(topEvent.sold)}</span>
-              <span>Выручка: {formatMoney(topEvent.revenue)}</span>
+              <span>Оборот продаж: {formatMoney(topEvent.revenue)}</span>
               <span>Реализация: {formatPercent(topEvent.realization)}</span>
             </>
           ) : (
@@ -560,12 +611,14 @@ export default function AdminReports({ state }: Props) {
   const eventRows = useMemo(() => buildEventRows(state), [state]);
   const organizerRows = useMemo(() => buildOrganizerRows(state, eventRows), [state, eventRows]);
   const channelRows = useMemo(() => buildChannelRows(state), [state]);
+  const resellerRows = useMemo(() => buildResellerRows(state), [state]);
   const summary = useMemo(() => buildFinancialSummary(state, eventRows), [state, eventRows]);
 
   const hasAnalyticsData =
     state.events.length > 0 ||
     state.tickets.length > 0 ||
     state.ops.length > 0 ||
+    state.resellers.length > 0 ||
     state.organizers.length > 0 ||
     state.organizerApplications.length > 0 ||
     state.demoPurchases.length > 0;
@@ -613,9 +666,9 @@ export default function AdminReports({ state }: Props) {
       accent: A.blue,
     },
     {
-      label: "Общая расчётная выручка",
+      label: "Оборот продаж",
       value: formatMoney(summary.revenue),
-      hint: "Сумма цен реализованных билетов. Если тариф не найден, билет считается с ценой 0.",
+      hint: SALES_TURNOVER_TOOLTIP,
       icon: CircleDollarSign,
       accent: A.statusOk,
     },
@@ -631,7 +684,7 @@ export default function AdminReports({ state }: Props) {
     {
       key: "events",
       heading: "Продажи по мероприятиям",
-      description: "Вместимость, выпуск, продажи, возвраты, погашения и расчётная выручка по каждому мероприятию.",
+      description: "Вместимость, выпуск, продажи, возвраты, погашения и оборот продаж по каждому мероприятию.",
       metric: `${formatNumber(eventRows.length)} мероприятий`,
       icon: BarChart3,
       accent: A.cyan,
@@ -639,7 +692,7 @@ export default function AdminReports({ state }: Props) {
     {
       key: "organizers",
       heading: "Эффективность организаторов",
-      description: "Сравнение организаторов по количеству мероприятий, продажам, выручке и средней реализации.",
+      description: "Сравнение организаторов по количеству мероприятий, продажам, обороту продаж и средней реализации.",
       metric: `${formatNumber(organizerRows.length)} организаторов`,
       icon: Users,
       accent: A.blue,
@@ -653,9 +706,17 @@ export default function AdminReports({ state }: Props) {
       accent: A.gold,
     },
     {
+      key: "resellers",
+      heading: "Реселлеры",
+      description: "Оборот продаж, комиссия реселлера, доли Минкульта и платформы, возвраты, погашения и ошибки.",
+      metric: `${formatNumber(resellerRows.length)} реселлеров`,
+      icon: Handshake,
+      accent: A.statusOk,
+    },
+    {
       key: "finance",
       heading: "Финансово-операционная сводка",
-      description: "Единый срез по выпуску, реализации, остаткам, выручке, проблемным операциям и лидеру продаж.",
+      description: "Единый срез по выпуску, реализации, остаткам, обороту продаж, проблемным операциям и лидеру продаж.",
       metric: formatMoney(summary.revenue),
       icon: Landmark,
       accent: A.violet,
@@ -700,7 +761,7 @@ export default function AdminReports({ state }: Props) {
       {selectedReport === "events" && (
         <ReportSection
         heading="Продажи по мероприятиям"
-        description="Сводит вместимость, выпуск, продажи, возвраты, погашения и расчётную выручку по каждому мероприятию."
+        description="Сводит вместимость, выпуск, продажи, возвраты, погашения и оборот продаж по каждому мероприятию."
         icon={BarChart3}
         accent={A.cyan}
         tooltip="Процент реализации считается от выпущенных билетов, а если выпуска ещё не было — от вместимости мероприятия."
@@ -712,7 +773,7 @@ export default function AdminReports({ state }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["Мероприятие", "Организатор", "Вместимость / выпущено", "Продано", "Возвращено", "Погашено", "Остаток", "Реализация", "Расчётная выручка"].map((header) => (
+                  {["Мероприятие", "Организатор", "Вместимость / выпущено", "Продано", "Возвращено", "Погашено", "Остаток", "Реализация", "Оборот продаж"].map((header) => (
                     <th key={header} className="px-4 py-3 text-left text-xs font-medium" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
                       {header}
                     </th>
@@ -751,7 +812,7 @@ export default function AdminReports({ state }: Props) {
       {selectedReport === "organizers" && (
         <ReportSection
         heading="Эффективность организаторов"
-        description="Показывает, как организаторы конвертируют выпущенные билеты в продажи и выручку."
+        description="Показывает, как организаторы конвертируют выпущенные билеты в продажи и оборот."
         icon={Users}
         accent={A.blue}
         tooltip="Средний процент реализации считается как среднее значение реализации по мероприятиям организатора."
@@ -763,7 +824,7 @@ export default function AdminReports({ state }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["Организатор", "Мероприятий", "Всего билетов", "Продано билетов", "Выручка", "Возвраты", "Средняя реализация"].map((header) => (
+                  {["Организатор", "Мероприятий", "Всего билетов", "Продано билетов", "Оборот продаж", "Возвраты", "Средняя реализация"].map((header) => (
                     <th key={header} className="px-4 py-3 text-left text-xs font-medium" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
                       {header}
                     </th>
@@ -812,7 +873,7 @@ export default function AdminReports({ state }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["Канал", "Количество продаж", "Сумма продаж", "Возвраты", "Погашения", "Ошибки операций", "Доля в продажах"].map((header) => (
+                  {["Канал", "Количество продаж", "Оборот продаж", "Возвраты", "Погашения", "Ошибки операций", "Доля в продажах"].map((header) => (
                     <th key={header} className="px-4 py-3 text-left text-xs font-medium" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
                       {header}
                     </th>
@@ -843,10 +904,56 @@ export default function AdminReports({ state }: Props) {
       </ReportSection>
       )}
 
+      {selectedReport === "resellers" && (
+        <ReportSection
+        heading="Реселлеры"
+        description="Показывает комиссионную модель по каждому demo-реселлеру без расчёта налогов и выплат."
+        icon={Handshake}
+        accent={A.statusOk}
+        tooltip={SALES_TURNOVER_TOOLTIP}
+      >
+        {resellerRows.length === 0 ? (
+          <EmptyState icon={Handshake} text="Нет реселлеров для отчёта. После инициализации demo-данных здесь появится комиссионная аналитика." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1120px] text-sm">
+              <thead>
+                <tr style={{ background: A.tableHeaderBg }}>
+                  {["Реселлер", "Код", "Статус", "Оборот продаж", "Комиссия реселлера", "Доля Минкульта", "Доля платформы", "Остаток комиссии реселлера", "Продано билетов", "Возвраты", "Погашения", "Ошибки"].map((header) => (
+                    <th key={header} className="px-4 py-3 text-left text-xs font-medium" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {resellerRows.map((row) => (
+                  <tr key={row.resellerId} className="transition-colors" style={{ borderBottom: `1px solid ${A.border}` }}>
+                    <td className="px-4 py-3 font-medium" style={{ color: A.textPrimary }}>{row.name}</td>
+                    <td className="px-4 py-3 font-mono text-xs" style={{ color: A.cyan }}>{row.code}</td>
+                    <td className="px-4 py-3" style={{ color: row.status === "active" ? A.statusOk : A.statusError }}>{row.status === "active" ? "Активен" : "Отключён"}</td>
+                    <td className="px-4 py-3 font-semibold" style={{ color: A.statusOk }}>{formatMoney(row.salesTurnover)}</td>
+                    <td className="px-4 py-3" style={{ color: A.textPrimary }}>{formatMoney(row.commissionAmount)} · {row.commissionPercent}%</td>
+                    <td className="px-4 py-3" style={{ color: A.textSecondary }}>{formatMoney(row.ministryShare)}</td>
+                    <td className="px-4 py-3" style={{ color: A.textSecondary }}>{formatMoney(row.platformShare)}</td>
+                    <td className="px-4 py-3 font-semibold" style={{ color: A.gold }}>{formatMoney(row.resellerNetShare)}</td>
+                    <td className="px-4 py-3" style={{ color: A.textPrimary }}>{formatNumber(row.soldTickets)}</td>
+                    <td className="px-4 py-3" style={{ color: A.statusWarn }}>{formatNumber(row.refunds)}</td>
+                    <td className="px-4 py-3" style={{ color: A.violet }}>{formatNumber(row.redeems)}</td>
+                    <td className="px-4 py-3" style={{ color: row.errors > 0 ? A.statusError : A.textSecondary }}>{formatNumber(row.errors)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </ReportSection>
+      )}
+
       {selectedReport === "finance" && (
         <ReportSection
         heading="Финансово-операционная сводка"
-        description="Ключевые показатели по всему Центру Управления: выпуск, реализация, возвраты, остаток, выручка и проблемные операции."
+        description="Ключевые показатели по всему Центру Управления: выпуск, реализация, возвраты, остаток, оборот продаж и проблемные операции."
         icon={Landmark}
         accent={A.violet}
         tooltip="Сводка построена из текущих мероприятий, билетов и операций без изменения бизнес-логики продажи или возврата."
@@ -869,7 +976,7 @@ export default function AdminReports({ state }: Props) {
                 {summary.topEvent && (
                   <>
                     <span>Продано: {formatNumber(summary.topEvent.sold)}</span>
-                    <span>Выручка: {formatMoney(summary.topEvent.revenue)}</span>
+                    <span>Оборот продаж: {formatMoney(summary.topEvent.revenue)}</span>
                     <span>Реализация: {formatPercent(summary.topEvent.realization)}</span>
                   </>
                 )}

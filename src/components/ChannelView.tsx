@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { AppState, Channel } from "@/lib/store";
+import type { AppState } from "@/lib/store";
+import { sellTicketsByReseller } from "@/lib/store";
 import PartnerModuleDrawer, { ModuleDrawerContent } from "@/components/channel/PartnerModuleDrawer";
 
 interface Props {
@@ -17,7 +18,7 @@ interface PartnerModule {
   group: string;
 }
 
-const partnerChannel: Channel = "ByCard";
+const defaultResellerCode = "ByCard";
 
 function formatDate(value?: string) {
   if (!value) return "—";
@@ -30,7 +31,7 @@ function formatDate(value?: string) {
   });
 }
 
-function channelId(channel: Channel) {
+function channelId(channel: string) {
   return `CH-${channel.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8)}`;
 }
 
@@ -143,21 +144,33 @@ const partnerModules: PartnerModule[] = [
   { key: "finance-summary", title: "Финансовая сводка", group: "Аналитика" },
 ];
 
-export default function ChannelView({ state }: Props) {
+export default function ChannelView({ state, onUpdate }: Props) {
   const [selectedEventId, setSelectedEventId] = useState("");
+  const [sandboxEventId, setSandboxEventId] = useState("");
+  const [sandboxTier, setSandboxTier] = useState("");
+  const [sandboxQuantity, setSandboxQuantity] = useState(1);
+  const [buyerName, setBuyerName] = useState("Demo Buyer");
+  const [selectedResellerCode, setSelectedResellerCode] = useState(defaultResellerCode);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<EventStatusFilter>("all");
   const [dateFilter, setDateFilter] = useState("");
   const [organizerFilter, setOrganizerFilter] = useState("all");
   const [activeModule, setActiveModule] = useState<PartnerModule | null>(null);
 
-  const channelOps = useMemo(
-    () => state.ops.filter((op) => op.channel === partnerChannel).sort((a, b) => b.ts.localeCompare(a.ts)),
-    [state.ops],
-  );
-
   const organizerMap = useMemo(() => new Map(state.organizers.map((org) => [org.organizerId, org.name])), [state.organizers]);
-  const issuedEventIds = useMemo(() => new Set(state.tickets.map((ticket) => ticket.eventId)), [state.tickets]);
+  const selectedReseller = useMemo(
+    () => state.resellers.find((reseller) => reseller.code === selectedResellerCode) || state.resellers[0] || null,
+    [selectedResellerCode, state.resellers],
+  );
+  const activeResellerCode = selectedReseller?.code || defaultResellerCode;
+  const channelOps = useMemo(
+    () => state.ops.filter((op) => op.channel === activeResellerCode).sort((a, b) => b.ts.localeCompare(a.ts)),
+    [activeResellerCode, state.ops],
+  );
+  const issuedEventIds = useMemo(
+    () => new Set(state.tickets.filter((ticket) => ticket.status === "issued").map((ticket) => ticket.eventId)),
+    [state.tickets],
+  );
 
   const events = useMemo(() => {
     return state.events
@@ -177,6 +190,13 @@ export default function ChannelView({ state }: Props) {
       .sort((a, b) => a.dateTime.localeCompare(b.dateTime));
   }, [dateFilter, issuedEventIds, organizerFilter, organizerMap, search, state.events, statusFilter]);
 
+  const sandboxEvents = useMemo(() => {
+    return state.events
+      .filter((event) => event.status === "published")
+      .filter((event) => state.tickets.some((ticket) => ticket.eventId === event.eventId && ticket.status === "issued"))
+      .sort((a, b) => a.dateTime.localeCompare(b.dateTime));
+  }, [state.events, state.tickets]);
+
   const organizerOptions = useMemo(() => {
     const set = new Set<string>();
     events.forEach((event) => set.add(organizerMap.get(event.organizerId) || `Организатор ${event.organizerId}`));
@@ -187,8 +207,42 @@ export default function ChannelView({ state }: Props) {
     () => state.events.find((e) => e.eventId === selectedEventId) || null,
     [selectedEventId, state.events],
   );
+  const sandboxEvent = useMemo(
+    () => state.events.find((event) => event.eventId === sandboxEventId) || null,
+    [sandboxEventId, state.events],
+  );
   const tierRemaining = (eventId: string, tierName: string) =>
     state.tickets.filter((ticket) => ticket.eventId === eventId && ticket.tier === tierName && ticket.status === "issued").length;
+
+  const sandboxTiers = useMemo(() => {
+    if (!sandboxEvent) return [];
+    return sandboxEvent.tiers.filter((tier) => tierRemaining(sandboxEvent.eventId, tier.name) > 0);
+  }, [sandboxEvent, state.tickets]);
+
+  useEffect(() => {
+    if (selectedReseller || state.resellers.length === 0) return;
+    setSelectedResellerCode(state.resellers[0].code);
+  }, [selectedReseller, state.resellers]);
+
+  useEffect(() => {
+    if (sandboxEvents.length === 0) {
+      setSandboxEventId("");
+      return;
+    }
+    if (!sandboxEvents.some((event) => event.eventId === sandboxEventId)) {
+      setSandboxEventId(sandboxEvents[0].eventId);
+    }
+  }, [sandboxEventId, sandboxEvents]);
+
+  useEffect(() => {
+    if (sandboxTiers.length === 0) {
+      setSandboxTier("");
+      return;
+    }
+    if (!sandboxTiers.some((tier) => tier.name === sandboxTier)) {
+      setSandboxTier(sandboxTiers[0].name);
+    }
+  }, [sandboxTier, sandboxTiers]);
 
   const today = new Date().toISOString().slice(0, 10);
   const todayOps = channelOps.filter((op) => op.ts.startsWith(today));
@@ -198,11 +252,11 @@ export default function ChannelView({ state }: Props) {
   const webhookDeliveries = todayOps.length;
 
   const commissionAccrued = state.tickets
-    .filter((ticket) => ticket.soldByChannel === partnerChannel && ticket.status !== "issued")
+    .filter((ticket) => ticket.soldByChannel === activeResellerCode && ticket.status !== "issued")
     .reduce((acc, ticket) => {
       const event = state.events.find((e) => e.eventId === ticket.eventId);
       const tier = event?.tiers.find((item) => item.name === ticket.tier);
-      return acc + (tier?.price || 0) * 0.08;
+      return acc + (tier?.price || 0) * ((selectedReseller?.commissionPercent || 0) / 100);
     }, 0);
 
   const webhookRows = useMemo(() => {
@@ -215,35 +269,92 @@ export default function ChannelView({ state }: Props) {
         id: op.opId,
         time: formatDate(op.ts),
         event: eventsFeed[idx % eventsFeed.length],
-        endpoint: `https://api.bycard.example/webhooks/${idx % 2 === 0 ? "events" : "tickets"}`,
+        endpoint: `https://api.${activeResellerCode.toLowerCase()}.example/webhooks/${idx % 2 === 0 ? "events" : "tickets"}`,
         status: webhookStatus,
         code: webhookStatus === "Доставлено" ? "200" : webhookStatus === "В очереди" ? "202" : "500",
         retries: webhookStatus === "Ошибка" ? "2" : "0",
       };
     });
-  }, [channelOps]);
+  }, [activeResellerCode, channelOps]);
 
   const kpi = [
     { label: "Активные события", value: activeEvents.length.toString(), hint: "в публикации" },
     { label: "Доступно билетов", value: ticketsAvailable.toString(), hint: "активный остаток" },
-    { label: "API requests today", value: todayOps.length.toString(), hint: "по каналу BYCARD" },
-    { label: "Failed requests", value: failedRequests.toString(), hint: "требуют проверки" },
-    { label: "Webhook deliveries", value: webhookDeliveries.toString(), hint: "за сегодня" },
-    { label: "Начислено комиссии", value: `${Math.round(commissionAccrued).toLocaleString("ru-RU")} ₽`, hint: "ставка 8%" },
+    { label: "API-запросы сегодня", value: todayOps.length.toString(), hint: `по каналу ${activeResellerCode}` },
+    { label: "Ошибки запросов", value: failedRequests.toString(), hint: "требуют проверки" },
+    { label: "Доставки webhook", value: webhookDeliveries.toString(), hint: "за сегодня" },
+    { label: "Начислено комиссии", value: `${Math.round(commissionAccrued).toLocaleString("ru-RU")} BYN`, hint: `ставка ${selectedReseller?.commissionPercent || 0}%` },
     { label: "Последняя синхронизация", value: formatDate(state.meta.updatedAt), hint: "состояние TicketHub" },
   ];
 
   const apiCardRows = [
-    { left: "Environment", right: "Sandbox" },
-    { left: "Auth type", right: "API Key" },
-    { left: "API key status", right: "Активен" },
-    { left: "API version", right: "v2.1" },
-    { left: "Signature validation", right: "Включена" },
-    { left: "Rate limit", right: "1200 req/мин" },
-    { left: "Allowed operations", right: "sell, refund, redeem, verify" },
-    { left: "Last successful request", right: formatDate(todayOps.find((op) => op.result === "ok")?.ts || state.meta.updatedAt) },
-    { left: "Last successful sync", right: formatDate(state.meta.updatedAt) },
+    { left: "Среда", right: "Sandbox" },
+    { left: "Тип авторизации", right: "API Key" },
+    { left: "Статус API key", right: selectedReseller?.apiConnected ? "Активен" : "Отключён" },
+    { left: "Версия API", right: "v2.1" },
+    { left: "Проверка подписи", right: "Включена" },
+    { left: "Лимит запросов", right: "1200 req/мин" },
+    { left: "Доступные операции", right: "sell, refund, redeem, verify" },
+    { left: "Последний успешный запрос", right: formatDate(todayOps.find((op) => op.result === "ok")?.ts || state.meta.updatedAt) },
+    { left: "Последняя синхронизация", right: formatDate(state.meta.updatedAt) },
   ];
+
+  const recentResellerSales = useMemo(() => {
+    const eventById = new Map(state.events.map((event) => [event.eventId, event]));
+    const ticketById = new Map(state.tickets.map((ticket) => [ticket.ticketId, ticket]));
+    return state.ops
+      .filter((op) => op.type === "sell" && op.result === "ok" && op.channel === activeResellerCode && op.ticketId)
+      .sort((a, b) => b.ts.localeCompare(a.ts))
+      .slice(0, 8)
+      .map((op) => {
+        const ticket = op.ticketId ? ticketById.get(op.ticketId) : undefined;
+        const event = eventById.get(op.eventId);
+        const tier = event?.tiers.find((item) => item.name === ticket?.tier);
+        return {
+          opId: op.opId,
+          time: formatDate(op.ts),
+          eventTitle: event?.title || op.eventId,
+          tier: ticket?.tier || "—",
+          ticketId: op.ticketId || "—",
+          buyer: ticket?.soldToUserId || "—",
+          amount: tier?.price || 0,
+          status: ticket?.status === "sold" ? "Продан" : ticket?.status === "redeemed" ? "Погашен" : ticket?.status === "refunded" ? "Возврат" : "—",
+        };
+      });
+  }, [activeResellerCode, state.events, state.ops, state.tickets]);
+
+  const handleSandboxSale = () => {
+    if (!selectedReseller) {
+      toast.error("Реселлер не найден");
+      return;
+    }
+    if (selectedReseller.status === "disabled") {
+      toast.error("Реселлер отключён в Центре Управления. Demo-продажа недоступна.");
+      return;
+    }
+    if (!sandboxEventId || !sandboxTier) {
+      toast.error("Выберите мероприятие и тариф");
+      return;
+    }
+    const available = tierRemaining(sandboxEventId, sandboxTier);
+    if (available < sandboxQuantity) {
+      toast.error("Недостаточно билетов по выбранному тарифу.");
+      return;
+    }
+    const outcome = sellTicketsByReseller(state, {
+      resellerCode: selectedReseller.code,
+      eventId: sandboxEventId,
+      tierName: sandboxTier,
+      quantity: sandboxQuantity,
+      buyerName,
+    });
+    if (!outcome.ok) {
+      toast.error(outcome.reason || "Demo-продажа не выполнена");
+      return;
+    }
+    onUpdate({ ...state });
+    toast.success(`Продано demo-билетов: ${outcome.ticketIds.length}`);
+  };
 
   const activeModuleContent = activeModule ? buildModuleContent(activeModule, formatDate(state.meta.updatedAt)) : null;
 
@@ -252,20 +363,22 @@ export default function ChannelView({ state }: Props) {
       <section className="rounded-2xl border border-white/15 bg-slate-900/85 p-5 shadow-[0_18px_46px_rgba(2,8,23,0.5)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Канал продаж / BYCARD</p>
-            <h1 className="mt-2 text-2xl font-semibold text-white">Seller Partnership Console</h1>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Канал продаж / {activeResellerCode}</p>
+            <h1 className="mt-2 text-2xl font-semibold text-white">Партнёрская консоль продаж</h1>
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full border border-emerald-300/40 bg-emerald-500/10 px-2 py-1 text-emerald-200">Подключён</span>
+              <span className={`rounded-full border px-2 py-1 ${selectedReseller?.status === "active" ? "border-emerald-300/40 bg-emerald-500/10 text-emerald-200" : "border-rose-300/40 bg-rose-500/10 text-rose-200"}`}>
+                {selectedReseller?.status === "active" ? "Активен" : "Отключён"}
+              </span>
               <span className="rounded-full border border-cyan-300/40 bg-cyan-500/10 px-2 py-1 text-cyan-100">Sandbox</span>
-              <span className="rounded-full border border-indigo-300/40 bg-indigo-500/10 px-2 py-1 text-indigo-100">Connected to TicketHub: Да</span>
-              <span className="rounded-full border border-violet-300/40 bg-violet-500/10 px-2 py-1 text-violet-100">Договор: Active</span>
+              <span className="rounded-full border border-indigo-300/40 bg-indigo-500/10 px-2 py-1 text-indigo-100">Connected to TicketHub: {selectedReseller?.apiConnected ? "Да" : "Нет"}</span>
+              <span className="rounded-full border border-violet-300/40 bg-violet-500/10 px-2 py-1 text-violet-100">Договор: {selectedReseller?.contractStatus || "—"}</span>
             </div>
           </div>
 
           <div className="grid w-full gap-2 text-sm text-slate-200 lg:w-auto lg:min-w-[420px] lg:grid-cols-2">
-            <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Channel ID</p><p className="mt-1 font-mono">{channelId(partnerChannel)}</p></div>
-            <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Статус API key</p><p className="mt-1">Активен</p></div>
-            <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Комиссия</p><p className="mt-1">8%</p></div>
+            <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">ID канала</p><p className="mt-1 font-mono">{channelId(activeResellerCode)}</p></div>
+            <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Статус API key</p><p className="mt-1">{selectedReseller?.apiConnected ? "Активен" : "Отключён"}</p></div>
+            <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Комиссия</p><p className="mt-1">{selectedReseller?.commissionPercent || 0}%</p></div>
             <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Следующая выплата</p><p className="mt-1">18.04.2026</p></div>
             <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2 lg:col-span-2"><p className="text-xs text-slate-400">Менеджер партнёра</p><p className="mt-1">Ирина Ковалева · partner@tickethub.example</p></div>
           </div>
@@ -349,32 +462,153 @@ export default function ChannelView({ state }: Props) {
           )}
         </article>
 
-        <article className="xl:col-span-5 rounded-xl border border-white/10 bg-slate-900/85 p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">API интеграция</h2>
-          <div className="mt-3 space-y-2 text-sm">
-            {apiCardRows.map((row) => (
-              <div key={row.left} className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2">
-                <span className="text-slate-400">{row.left}</span>
-                <span className="text-slate-100">{row.right}</span>
+        <div className="xl:col-span-5 space-y-4">
+          <article className="rounded-xl border border-white/10 bg-slate-900/85 p-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">API интеграция</h2>
+            <div className="mt-3 space-y-2 text-sm">
+              {apiCardRows.map((row) => (
+                <div key={row.left} className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2">
+                  <span className="text-slate-400">{row.left}</span>
+                  <span className="text-slate-100">{row.right}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+              <button onClick={() => toast.info("API-ключ тестовой среды: ********")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">Показать ключ</button>
+              <button onClick={() => toast.info("Открываем документацию партнёра")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">Документация</button>
+              <button onClick={() => toast.info("Открываем OpenAPI")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">OpenAPI</button>
+              <button onClick={() => toast.info("Настройки webhook")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">Webhook</button>
+              <button onClick={() => toast.info("Учётные данные обновлены")} className="col-span-2 h-10 rounded-lg bg-cyan-400 font-medium text-slate-950 hover:bg-cyan-300">Учётные данные</button>
+            </div>
+          </article>
+
+          <article className="rounded-xl border border-cyan-300/20 bg-slate-900/85 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">API Sandbox / Тестовая продажа</h2>
+                <p className="mt-1 text-xs text-slate-400">Demo-продажа меняет статусы билетов и создаёт операцию sell.</p>
               </div>
-            ))}
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-            <button onClick={() => toast.info("API-ключ тестовой среды: ********")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">Показать ключ</button>
-            <button onClick={() => toast.info("Открываем документацию партнёра")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">Документация</button>
-            <button onClick={() => toast.info("Открываем OpenAPI")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">OpenAPI</button>
-            <button onClick={() => toast.info("Настройки webhook")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">Webhook</button>
-            <button onClick={() => toast.info("Учетные данные обновлены")} className="col-span-2 h-10 rounded-lg bg-cyan-400 font-medium text-slate-950 hover:bg-cyan-300">Учетные данные</button>
-          </div>
-        </article>
+              <select
+                value={activeResellerCode}
+                onChange={(event) => setSelectedResellerCode(event.target.value)}
+                className="h-9 rounded-lg border border-white/15 bg-slate-950 px-3 text-xs text-slate-100 outline-none"
+              >
+                {state.resellers.map((reseller) => (
+                  <option key={reseller.resellerId} value={reseller.code}>{reseller.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><span className="text-slate-400">Connected to TicketHub</span><div className="mt-1 text-slate-100">{selectedReseller?.apiConnected ? "Да" : "Нет"}</div></div>
+              <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><span className="text-slate-400">Договор</span><div className="mt-1 text-slate-100">{selectedReseller?.contractStatus || "—"}</div></div>
+              <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><span className="text-slate-400">Комиссия</span><div className="mt-1 text-slate-100">{selectedReseller?.commissionPercent || 0}%</div></div>
+              <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><span className="text-slate-400">Статус</span><div className={selectedReseller?.status === "active" ? "mt-1 text-emerald-200" : "mt-1 text-rose-200"}>{selectedReseller?.status === "active" ? "Активен" : "Отключён"}</div></div>
+            </div>
+
+            {selectedReseller?.status === "disabled" && (
+              <div className="mt-3 rounded-lg border border-rose-300/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+                Реселлер отключён в Центре Управления. Demo-продажа недоступна.
+              </div>
+            )}
+
+            <div className="mt-4 grid gap-3">
+              <label className="block">
+                <span className="mb-1 block text-xs text-slate-400">Мероприятие</span>
+                <select
+                  value={sandboxEventId}
+                  onChange={(event) => setSandboxEventId(event.target.value)}
+                  className="h-10 w-full rounded-lg border border-white/15 bg-slate-950 px-3 text-sm text-slate-100 outline-none"
+                >
+                  {sandboxEvents.length === 0 && <option value="">Нет событий с доступными билетами</option>}
+                  {sandboxEvents.map((event) => (
+                    <option key={event.eventId} value={event.eventId}>{event.title}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px]">
+                <label className="block">
+                  <span className="mb-1 block text-xs text-slate-400">Тариф</span>
+                  <select
+                    value={sandboxTier}
+                    onChange={(event) => setSandboxTier(event.target.value)}
+                    className="h-10 w-full rounded-lg border border-white/15 bg-slate-950 px-3 text-sm text-slate-100 outline-none"
+                  >
+                    {sandboxTiers.length === 0 && <option value="">Нет доступных тарифов</option>}
+                    {sandboxTiers.map((tier) => (
+                      <option key={tier.name} value={tier.name}>{tier.name} · {tier.price} BYN · {tierRemaining(sandboxEventId, tier.name)} шт.</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-slate-400">Количество</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={sandboxQuantity}
+                    onChange={(event) => setSandboxQuantity(Math.max(1, Math.floor(Number(event.target.value) || 1)))}
+                    className="h-10 w-full rounded-lg border border-white/15 bg-slate-950 px-3 text-sm text-slate-100 outline-none"
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="mb-1 block text-xs text-slate-400">Покупатель</span>
+                <input
+                  value={buyerName}
+                  onChange={(event) => setBuyerName(event.target.value)}
+                  className="h-10 w-full rounded-lg border border-white/15 bg-slate-950 px-3 text-sm text-slate-100 outline-none"
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={handleSandboxSale}
+                disabled={!selectedReseller || selectedReseller.status === "disabled" || !sandboxEventId || !sandboxTier}
+                className="h-11 rounded-lg bg-cyan-400 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+              >
+                Продать demo-билет через реселлера
+              </button>
+            </div>
+          </article>
+
+          <article className="rounded-xl border border-white/10 bg-slate-950/85 p-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">Последние demo-продажи реселлера</h2>
+            {recentResellerSales.length === 0 ? (
+              <p className="mt-3 text-sm text-slate-500">Продаж через выбранного реселлера пока нет.</p>
+            ) : (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-xs">
+                  <thead className="uppercase tracking-wide text-slate-500">
+                    <tr className="border-b border-white/10"><th className="px-2 py-2">Время</th><th className="px-2 py-2">Мероприятие</th><th className="px-2 py-2">Тариф</th><th className="px-2 py-2">TicketID</th><th className="px-2 py-2">Покупатель</th><th className="px-2 py-2">Сумма</th><th className="px-2 py-2">Статус</th></tr>
+                  </thead>
+                  <tbody>
+                    {recentResellerSales.map((sale) => (
+                      <tr key={sale.opId} className="border-b border-white/5">
+                        <td className="px-2 py-2 text-slate-300">{sale.time}</td>
+                        <td className="px-2 py-2 text-slate-100">{sale.eventTitle}</td>
+                        <td className="px-2 py-2 text-slate-300">{sale.tier}</td>
+                        <td className="px-2 py-2 font-mono text-cyan-100">{sale.ticketId}</td>
+                        <td className="px-2 py-2 text-slate-300">{sale.buyer}</td>
+                        <td className="px-2 py-2 text-slate-100">{sale.amount} BYN</td>
+                        <td className="px-2 py-2 text-emerald-200">{sale.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </article>
+        </div>
       </section>
 
       <section className="rounded-xl border border-white/10 bg-slate-950/85 p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-200">Webhook Deliveries</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-200">Доставки webhook</h2>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[920px] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-slate-400">
-              <tr className="border-b border-white/10"><th className="px-2 py-2">Время</th><th className="px-2 py-2">Event</th><th className="px-2 py-2">Endpoint</th><th className="px-2 py-2">Status</th><th className="px-2 py-2">Code</th><th className="px-2 py-2">Retries</th></tr>
+              <tr className="border-b border-white/10"><th className="px-2 py-2">Время</th><th className="px-2 py-2">Событие API</th><th className="px-2 py-2">Endpoint</th><th className="px-2 py-2">Статус</th><th className="px-2 py-2">Код</th><th className="px-2 py-2">Повторы</th></tr>
             </thead>
             <tbody>
               {webhookRows.map((row) => (
