@@ -4,8 +4,8 @@ import { toast } from "sonner";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import { useStorageSync } from "@/hooks/useStorageSync";
-import type { Application, EventComplianceApplicationRecord, EventRecord, OrganizerDocument, OrganizerSaleRecord } from "@/lib/store";
-import { logoutOrganizer } from "@/lib/store";
+import type { EventComplianceApplicationRecord, EventRecord, OrganizerDocument, OrganizerSaleRecord } from "@/lib/store";
+import { calculateComplianceFee, getSalesChannelLabel, logoutOrganizer } from "@/lib/store";
 import {
   DEMO_VAT_RATE,
   selectCurrentOrganizer,
@@ -116,7 +116,7 @@ export default function OrganizerPage() {
   const organizer = selectCurrentOrganizer(state);
 
   const [activeSection, setActiveSection] = useState<Section>("dashboard");
-  const [drawerApp, setDrawerApp] = useState<Application | null>(null);
+  const [drawerApp, setDrawerApp] = useState<EventComplianceApplicationRecord | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileCardOpen, setProfileCardOpen] = useState(false);
 
@@ -413,7 +413,7 @@ export default function OrganizerPage() {
                 <div className="rounded-[18px] border p-6 relative" style={{ background: T.cardBg, borderColor: T.border, boxShadow: T.cardShadow }}>
                   <CardHelp text="Показывает ближайшие одобренные мероприятия организатора." />
                   <h2 className="text-lg font-semibold mb-4" style={{ color: T.textPrimary }}>Ближайшие мероприятия</h2>
-                  <EventsTable rows={upcomingEvents} compact />
+                  <EventsTable rows={upcomingEvents} state={state} compact />
                 </div>
 
                 <div>
@@ -456,7 +456,7 @@ export default function OrganizerPage() {
             )}
 
             {activeSection === "events" && (
-              <EventsSection rows={filteredEvents} sort={eventSort} setSort={setEventSort} />
+              <EventsSection rows={filteredEvents} state={state} sort={eventSort} setSort={setEventSort} />
             )}
 
             {activeSection === "sales" && (
@@ -483,7 +483,7 @@ export default function OrganizerPage() {
       </div>
 
       {drawerApp && (
-        <ApplicationDetailsDrawer app={drawerApp} onClose={() => setDrawerApp(null)} />
+        <ApplicationDetailsDrawer app={drawerApp} state={state} onClose={() => setDrawerApp(null)} />
       )}
 
       {profileCardOpen && (
@@ -541,7 +541,7 @@ function ApplicationsTable({
   setAppFilter: (f: AppFilter) => void;
   sort: { key: "title" | "city" | "dateTime" | "capacity" | "status"; dir: SortDirection } | null;
   setSort: (s: { key: "title" | "city" | "dateTime" | "capacity" | "status"; dir: SortDirection } | null) => void;
-  onOpen: (a: Application | null) => void;
+  onOpen: (a: EventComplianceApplicationRecord) => void;
   onCreateNew: () => void;
   onEdit: (id: string) => void;
 }) {
@@ -628,7 +628,7 @@ function ApplicationsTable({
                   <td className="py-2.5 px-3 text-xs" style={{ color: T.textSecondary }}>{a.adminComment || "—"}</td>
                   <td className="py-2.5 px-3 space-x-2 whitespace-nowrap">
                     <span className="inline-flex items-center gap-1">
-                      <button onClick={() => onOpen(null)} className="h-7 px-3 rounded-lg border text-[12px]" style={{ borderColor: T.btnSecondaryBorder, color: T.textSecondary }}>Просмотр</button>
+                      <button onClick={() => onOpen(a)} className="h-7 px-3 rounded-lg border text-[12px]" style={{ borderColor: T.btnSecondaryBorder, color: T.textSecondary }}>Просмотр</button>
                       <HelpTooltip text="Открыть карточку заявки для просмотра подробностей." />
                     </span>
                     {(a.status === "draft" || a.status === "needs_rework") && (
@@ -650,8 +650,9 @@ function ApplicationsTable({
   );
 }
 
-function EventsSection({ rows, sort, setSort }: {
+function EventsSection({ rows, state, sort, setSort }: {
   rows: EventRecord[];
+  state: ReturnType<typeof useStorageSync>["state"];
   sort: { key: "title" | "city" | "dateTime" | "capacity" | "status"; dir: SortDirection } | null;
   setSort: (s: { key: "title" | "city" | "dateTime" | "capacity" | "status"; dir: SortDirection } | null) => void;
 }) {
@@ -680,6 +681,7 @@ function EventsSection({ rows, sort, setSort }: {
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>Площадка</th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}><SortableHeader label="Город" active={sort?.key === "city"} direction={sort?.key === "city" ? sort.dir : null} onClick={() => setColumnSort("city")} /></th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>Категория</th>
+                <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>Каналы продаж</th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}><SortableHeader label="Дата" active={sort?.key === "dateTime"} direction={sort?.key === "dateTime" ? sort.dir : null} onClick={() => setColumnSort("dateTime")} /></th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}><SortableHeader label="Вместимость" active={sort?.key === "capacity"} direction={sort?.key === "capacity" ? sort.dir : null} onClick={() => setColumnSort("capacity")} /></th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}><SortableHeader label="Статус" active={sort?.key === "status"} direction={sort?.key === "status" ? sort.dir : null} onClick={() => setColumnSort("status")} /></th>
@@ -696,6 +698,7 @@ function EventsSection({ rows, sort, setSort }: {
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.venue}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.city || "—"}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.category || "—"}</td>
+                  <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{(e.salesChannels?.length ? e.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code)).join(", ")}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{fmtDateTime(e.dateTime)}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.capacity}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.status === "published" ? "Опубликовано" : "Одобрено"}</td>
@@ -709,7 +712,7 @@ function EventsSection({ rows, sort, setSort }: {
   );
 }
 
-function EventsTable({ rows, compact = false }: { rows: EventRecord[]; compact?: boolean }) {
+function EventsTable({ rows, state, compact = false }: { rows: EventRecord[]; state: ReturnType<typeof useStorageSync>["state"]; compact?: boolean }) {
   if (rows.length === 0) {
     return <SimpleEmpty title="Нет мероприятий" desc="Создайте заявку, чтобы добавить мероприятие." />;
   }
@@ -723,6 +726,7 @@ function EventsTable({ rows, compact = false }: { rows: EventRecord[]; compact?:
             <th className="py-2.5 px-3 text-left font-semibold">Название</th>
             <th className="py-2.5 px-3 text-left font-semibold">Дата и время</th>
             {!compact && <th className="py-2.5 px-3 text-left font-semibold">Площадка</th>}
+            {!compact && <th className="py-2.5 px-3 text-left font-semibold">Каналы продаж</th>}
             <th className="py-2.5 px-3 text-left font-semibold">Статус</th>
             <th className="py-2.5 px-3 text-left font-semibold">Осталось</th>
           </tr>
@@ -737,6 +741,7 @@ function EventsTable({ rows, compact = false }: { rows: EventRecord[]; compact?:
               <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>{e.title}</td>
               <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{fmtDateTime(e.dateTime)}</td>
               {!compact && <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.venue}</td>}
+              {!compact && <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{(e.salesChannels?.length ? e.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code)).join(", ")}</td>}
               <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.status === "published" ? "Опубликовано" : "Одобрено"}</td>
               <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.remaining}/{e.capacity}</td>
             </tr>
@@ -1024,29 +1029,64 @@ function OrganizerProfileCard({ organizer, onClose }: { organizer: NonNullable<R
   );
 }
 
-function ApplicationDetailsDrawer({ app, onClose }: { app: Application; onClose: () => void }) {
+const approvalModeLabel: Record<string, string> = {
+  certificate_required: "Требуется удостоверение",
+  notice_only: "Требуется только уведомление",
+  certificate_not_required: "Удостоверение не требуется",
+};
+
+function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianceApplicationRecord; state: ReturnType<typeof useStorageSync>["state"]; onClose: () => void }) {
+  const fee = app.data.approvalMode === "certificate_required"
+    ? `${calculateComplianceFee(app.data.projectedCapacity, app.data.plannedTicketsForSale, app.data.ticketTiers)} БВ`
+    : "—";
+  const salesChannels = (app.data.salesChannels?.length ? app.data.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code));
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
       <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.55)" }} />
-      <div className="relative w-full max-w-md h-full overflow-y-auto" style={{ background: T.cardBg, boxShadow: "-10px 0 50px rgba(0,0,0,0.4)" }} onClick={(e) => e.stopPropagation()}>
+      <div className="relative w-full max-w-xl h-full overflow-y-auto" style={{ background: T.cardBg, boxShadow: "-10px 0 50px rgba(0,0,0,0.4)" }} onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex justify-between items-center px-6 py-4 border-b" style={{ background: T.cardBg, borderColor: T.border }}>
           <h3 className="text-lg font-semibold" style={{ color: T.textPrimary }}>Карточка заявки</h3>
           <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center"><X size={18} /></button>
         </div>
-        <div className="p-6">
+        <div className="space-y-5 p-6">
           <div className="mb-4"><span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={statusStyle[app.status]}>{statusLabel[app.status]}</span></div>
           <dl className="space-y-3 text-[13px]">
-            <Item k="ID заявки" v={app.appId} />
+            <Item k="ID заявки" v={app.eventComplianceApplicationId} />
             <Item k="ID организатора" v={app.organizerId} />
-            <Item k="Название" v={app.title} />
-            <Item k="Площадка" v={app.venue} />
-            <Item k="Город" v={app.city || "—"} />
-            <Item k="Категория" v={app.category || "—"} />
-            <Item k="Дата и время" v={fmtDateTime(app.dateTime)} />
-            <Item k="Вместимость" v={String(app.capacity)} />
-            {app.licenseId && <Item k="ID лицензии" v={app.licenseId} />}
-            {app.eventId && <Item k="ID мероприятия" v={app.eventId} />}
+            <Item k="Название" v={app.data.title || "—"} />
+            <Item k="Статус" v={statusLabel[app.status] || app.status} />
+            <Item k="Дата подачи" v={fmtDateTime(app.submittedAt || app.createdAt)} />
+            <Item k="Площадка" v={app.data.venueName || "—"} />
+            <Item k="Дата мероприятия" v={fmtDateTime(app.data.dateSlots[0] || "")} />
+            <Item k="Каналы продаж" v={salesChannels.join(", ")} />
+            <Item k="Режим согласования" v={approvalModeLabel[app.data.approvalMode] || app.data.approvalMode} />
+            <Item k="Госпошлина" v={fee} />
+            <Item k="Комментарий администратора" v={app.adminComment || "—"} />
+            {app.certificateNumber && <Item k="Номер удостоверения" v={app.certificateNumber} />}
+            {app.certificateDate && <Item k="Дата удостоверения" v={app.certificateDate} />}
           </dl>
+          <section className="rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
+            <div className="mb-2 text-xs" style={{ color: T.textSecondary }}>Тарифы</div>
+            <div className="space-y-1">
+              {(app.data.ticketTiers || []).map((tier, index) => (
+                <div key={`${tier.name}-${index}`} className="flex justify-between gap-3 text-[13px]">
+                  <span style={{ color: T.textPrimary }}>{tier.name || "—"}</span>
+                  <span style={{ color: T.textSecondary }}>{tier.quantity || 0} × {tier.price || 0} BYN</span>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
+            <div className="mb-2 text-xs" style={{ color: T.textSecondary }}>Постер</div>
+            {app.data.posterPath ? (
+              <img src={resolvePublicAsset(app.data.posterPath)} alt={app.data.title || "Постер заявки"} className="aspect-[16/10] w-full rounded-lg object-cover" />
+            ) : (
+              <div className="flex aspect-[16/10] items-center justify-center rounded-lg border text-sm" style={{ borderColor: T.border, color: T.textMuted }}>
+                Постер не выбран
+              </div>
+            )}
+          </section>
         </div>
       </div>
     </div>

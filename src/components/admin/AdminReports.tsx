@@ -88,6 +88,17 @@ type FinancialSummary = {
 };
 
 type ReportKey = "events" | "organizers" | "channels" | "resellers" | "finance";
+type SortDirection = "asc" | "desc";
+type EventReportSortKey =
+  | "title"
+  | "organizerName"
+  | "capacityIssued"
+  | "sold"
+  | "refunded"
+  | "redeemed"
+  | "remaining"
+  | "realization"
+  | "revenue";
 
 type ReportChoice = {
   key: ReportKey;
@@ -99,6 +110,7 @@ type ReportChoice = {
 };
 
 const channelLabels: Record<string, string> = {
+  OWN: "Свой канал",
   B2C: "B2C-витрина",
   ByCard: "ByCard",
   TicketPro: "TicketPro",
@@ -233,6 +245,43 @@ function buildEventRows(state: AppState): EventReportRow[] {
       };
     })
     .sort((a, b) => b.revenue - a.revenue || b.sold - a.sold || a.title.localeCompare(b.title, "ru"));
+}
+
+const numericEventSortKeys = new Set<EventReportSortKey>([
+  "capacityIssued",
+  "sold",
+  "refunded",
+  "redeemed",
+  "remaining",
+  "realization",
+  "revenue",
+]);
+
+function compareEventRows(a: EventReportRow, b: EventReportRow, key: EventReportSortKey): number {
+  if (key === "title") return a.title.localeCompare(b.title, "ru");
+  if (key === "organizerName") return a.organizerName.localeCompare(b.organizerName, "ru");
+  if (key === "capacityIssued") return (a.capacity - b.capacity) || (a.issued - b.issued);
+  return Number(a[key]) - Number(b[key]);
+}
+
+function SortableTableHeader({
+  label,
+  sortKey,
+  activeSort,
+  onSort,
+}: {
+  label: string;
+  sortKey: EventReportSortKey;
+  activeSort: { key: EventReportSortKey; dir: SortDirection };
+  onSort: (key: EventReportSortKey) => void;
+}) {
+  const active = activeSort.key === sortKey;
+  return (
+    <button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-1 text-left">
+      <span>{label}</span>
+      <span style={{ opacity: active ? 1 : 0.35 }}>{active ? (activeSort.dir === "asc" ? "↑" : "↓") : "↕"}</span>
+    </button>
+  );
 }
 
 function buildOrganizerRows(state: AppState, eventRows: EventReportRow[]): OrganizerReportRow[] {
@@ -608,11 +657,27 @@ function ReportDetailHeader({ report, onBack }: { report: ReportChoice; onBack: 
 
 export default function AdminReports({ state }: Props) {
   const [selectedReport, setSelectedReport] = useState<ReportKey | null>(null);
+  const [eventSort, setEventSort] = useState<{ key: EventReportSortKey; dir: SortDirection }>({ key: "revenue", dir: "desc" });
   const eventRows = useMemo(() => buildEventRows(state), [state]);
+  const sortedEventRows = useMemo(() => {
+    return [...eventRows].sort((a, b) => {
+      const base = compareEventRows(a, b, eventSort.key);
+      const directed = eventSort.dir === "asc" ? base : -base;
+      return directed || b.revenue - a.revenue || b.sold - a.sold || a.title.localeCompare(b.title, "ru");
+    });
+  }, [eventRows, eventSort]);
   const organizerRows = useMemo(() => buildOrganizerRows(state, eventRows), [state, eventRows]);
   const channelRows = useMemo(() => buildChannelRows(state), [state]);
   const resellerRows = useMemo(() => buildResellerRows(state), [state]);
   const summary = useMemo(() => buildFinancialSummary(state, eventRows), [state, eventRows]);
+  const setEventColumnSort = (key: EventReportSortKey) => {
+    setEventSort((prev) => {
+      if (prev.key !== key) {
+        return { key, dir: numericEventSortKeys.has(key) ? "desc" : "asc" };
+      }
+      return { key, dir: prev.dir === "asc" ? "desc" : "asc" };
+    });
+  };
 
   const hasAnalyticsData =
     state.events.length > 0 ||
@@ -773,15 +838,25 @@ export default function AdminReports({ state }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["Мероприятие", "Организатор", "Вместимость / выпущено", "Продано", "Возвращено", "Погашено", "Остаток", "Реализация", "Оборот продаж"].map((header) => (
-                    <th key={header} className="px-4 py-3 text-left text-xs font-medium" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
-                      {header}
+                  {[
+                    ["Мероприятие", "title"],
+                    ["Организатор", "organizerName"],
+                    ["Вместимость / выпущено", "capacityIssued"],
+                    ["Продано", "sold"],
+                    ["Возвращено", "refunded"],
+                    ["Погашено", "redeemed"],
+                    ["Остаток", "remaining"],
+                    ["Реализация", "realization"],
+                    ["Оборот продаж", "revenue"],
+                  ].map(([header, key]) => (
+                    <th key={key} className="px-4 py-3 text-left text-xs font-medium" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
+                      <SortableTableHeader label={header} sortKey={key as EventReportSortKey} activeSort={eventSort} onSort={setEventColumnSort} />
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {eventRows.map((row) => (
+                {sortedEventRows.map((row) => (
                   <tr key={row.eventId} className="transition-colors" style={{ borderBottom: `1px solid ${A.border}` }}>
                     <td className="px-4 py-3">
                       <div className="font-medium" style={{ color: A.textPrimary }}>{row.title}</div>

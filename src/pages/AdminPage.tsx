@@ -47,6 +47,7 @@ const sidebarSections: { label?: string; items: { key: AdminTab; label: string; 
       { key: "orgRegistry", label: "Организаторы", icon: Building2 },
       { key: "venueRegistry", label: "Площадки", icon: MapPin },
       { key: "registryEvents", label: "Мероприятия", icon: Calendar },
+      { key: "resellers", label: "Реселлеры", icon: Network },
     ],
   },
   {
@@ -55,7 +56,6 @@ const sidebarSections: { label?: string; items: { key: AdminTab; label: string; 
       { key: "events", label: "События", icon: Globe },
       { key: "tickets", label: "Билеты", icon: Ticket },
       { key: "operations", label: "Операции", icon: Activity },
-      { key: "resellers", label: "Реселлеры", icon: Network },
     ],
   },
   {

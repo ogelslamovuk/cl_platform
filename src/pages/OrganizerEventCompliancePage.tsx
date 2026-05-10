@@ -6,8 +6,10 @@ import HelpTooltip from "@/components/ui/help-tooltip";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import {
   calculateComplianceFee,
+  buildDefaultSalesChannels,
   createEventComplianceApplication,
   defaultEventComplianceData,
+  getSalesChannelLabel,
   updateEventComplianceApplication,
 } from "@/lib/store";
 import {
@@ -26,6 +28,8 @@ const DEMO_POSTERS = [
 ];
 
 const COMPLIANCE_FEE_TOOLTIP = "Размер госпошлины рассчитывается по проектной вместимости площадки или количеству заявленных билетов: 1–150 — 3 БВ, 151–300 — 10 БВ, 301–500 — 30 БВ, 501–1000 — 50 БВ, 1001–1500 — 80 БВ, 1501–2000 — 100 БВ, 2001–3000 — 150 БВ, свыше 3000 — 200 БВ. Для отдельных категорий может применяться освобождение от пошлины.";
+const POSTER_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
+const POSTER_MAX_SIZE = 5 * 1024 * 1024;
 
 function resolvePublicAsset(path: string): string {
   if (!path) return "";
@@ -40,9 +44,14 @@ export default function OrganizerEventCompliancePage() {
   const organizer = useMemo(() => selectCurrentOrganizer(state), [state]);
   const approved = useMemo(() => selectIsCurrentOrganizerApproved(state), [state]);
   const myApps = useMemo(() => selectMyEventComplianceApplications(state), [state]);
-  const [form, setForm] = useState(defaultEventComplianceData());
+  const makeDefaultForm = () => ({
+    ...defaultEventComplianceData(),
+    salesChannels: buildDefaultSalesChannels(state),
+  });
+  const [form, setForm] = useState(makeDefaultForm);
   const [tierErrors, setTierErrors] = useState<number[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const activeResellers = useMemo(() => state.resellers.filter((reseller) => reseller.status === "active"), [state.resellers]);
   const complianceStatusLabel: Record<string, string> = {
     draft: "Черновик",
     submitted: "На рассмотрении",
@@ -58,9 +67,10 @@ export default function OrganizerEventCompliancePage() {
     setEditingId(editId);
     setForm({
       ...editingApplication.data,
+      salesChannels: editingApplication.data.salesChannels?.length ? editingApplication.data.salesChannels : buildDefaultSalesChannels(state),
       ticketTiers: editingApplication.data.ticketTiers?.length ? editingApplication.data.ticketTiers : [{ name: "Стандарт", quantity: 0, price: 0 }],
     });
-  }, [approved, editId, editingApplication, organizer]);
+  }, [approved, editId, editingApplication, organizer, state]);
 
   if (!organizer) return <Navigate to="/organizer/login" replace />;
   if (!approved) return <Navigate to="/organizer" replace />;
@@ -97,6 +107,7 @@ export default function OrganizerEventCompliancePage() {
       dateSlots: [firstDateSlot, ...form.dateSlots.slice(1)],
       ticketTiers: normalizedTiers,
       plannedTicketsForSale: normalizedTiers.reduce((acc, tier) => acc + tier.quantity, 0),
+      salesChannels: Array.from(new Set(["OWN", ...(form.salesChannels || [])])),
     };
   };
 
@@ -123,6 +134,42 @@ export default function OrganizerEventCompliancePage() {
     setForm((prev) => ({ ...prev, [target]: [...prev[target], file] }));
   };
 
+  const toggleSalesChannel = (code: string, checked: boolean) => {
+    if (code === "OWN") return;
+    setForm((prev) => {
+      const current = new Set(["OWN", ...(prev.salesChannels || [])]);
+      if (checked) current.add(code);
+      else current.delete(code);
+      return { ...prev, salesChannels: Array.from(current) };
+    });
+  };
+
+  const handlePosterUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!POSTER_ALLOWED_TYPES.includes(file.type)) {
+      toast.error("Можно загрузить только JPG, PNG, WEBP или SVG.");
+      return;
+    }
+    if (file.size > POSTER_MAX_SIZE) {
+      toast.error("Размер постера не должен превышать 5 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (!result) {
+        toast.error("Не удалось прочитать файл постера.");
+        return;
+      }
+      setForm((prev) => ({ ...prev, posterPath: result }));
+      toast.success("Постер загружен для предпросмотра.");
+    };
+    reader.onerror = () => toast.error("Не удалось прочитать файл постера.");
+    reader.readAsDataURL(file);
+  };
+
   const save = (submit: boolean) => {
     if (submit && !validateTicketTiers()) {
       toast.error("Заполните тарифы билетов: название, количество и стоимость.");
@@ -146,7 +193,7 @@ export default function OrganizerEventCompliancePage() {
     toast.success(submit ? "Заявка отправлена." : "Черновик сохранён.");
     if (submit) {
       setEditingId(null);
-      setForm(defaultEventComplianceData());
+      setForm(makeDefaultForm());
       setTierErrors([]);
     }
   };
@@ -233,6 +280,15 @@ export default function OrganizerEventCompliancePage() {
                   Постер не выбран
                 </div>
               )}
+              <div className="mt-3 space-y-2">
+                <label className="inline-flex h-9 cursor-pointer items-center rounded-lg px-3 text-sm font-semibold" style={{ background: "#1d2a3b", color: "#F5F7FA" }}>
+                  Загрузить свой постер
+                  <input type="file" accept={POSTER_ALLOWED_TYPES.join(",")} className="hidden" onChange={handlePosterUpload} />
+                </label>
+                <p className="text-xs leading-relaxed" style={{ color: "rgba(245,247,250,0.65)" }}>
+                  JPG, PNG, WEBP или SVG, до 5 MB. Рекомендуемый размер — 1200×750 px.
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -331,6 +387,29 @@ export default function OrganizerEventCompliancePage() {
               <HelpTooltip text="Добавить ещё одну ценовую категорию." />
             </div>
             <div className="inline-flex items-center gap-1 text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>Итого планируемых билетов: {totalPlannedTickets}<HelpTooltip text="Общее количество билетов, заявленных по всем тарифам." /></div>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-semibold">Каналы продаж</h2>
+          <p className="text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>
+            Выберите каналы, через которые организатор планирует распространять билеты. Свой канал включён всегда.
+          </p>
+          <div className="grid gap-2 md:grid-cols-2">
+            <label className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
+              <input type="checkbox" checked disabled />
+              Свой канал
+            </label>
+            {activeResellers.map((reseller) => (
+              <label key={reseller.resellerId} className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
+                <input
+                  type="checkbox"
+                  checked={(form.salesChannels || []).includes(reseller.code)}
+                  onChange={(event) => toggleSalesChannel(reseller.code, event.target.checked)}
+                />
+                {getSalesChannelLabel(state, reseller.code)}
+              </label>
+            ))}
           </div>
         </section>
 

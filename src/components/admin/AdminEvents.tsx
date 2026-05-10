@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { AppState, EventRecord } from "@/lib/store";
-import { publishEvent, issueMarks } from "@/lib/store";
+import { getEventSalesChannels, getSalesChannelLabel, publishEvent, issueMarks } from "@/lib/store";
 import { toast } from "sonner";
 import { A, statusChip } from "./adminStyles";
 import { Calendar, Search, X, Ticket, Globe } from "lucide-react";
@@ -104,13 +104,13 @@ export default function AdminEvents({ state, onUpdate }: Props) {
                         {e.status === "approved" && (
                           <button onClick={() => handlePublish(e.eventId)} className="text-xs font-medium px-2.5 py-1 rounded-lg transition-colors"
                             style={{ background: A.statusInfoBg, color: A.statusInfo }}>
-                            <Globe size={12} className="inline mr-1" />Опубликовать
+                            <Globe size={12} className="inline mr-1" />Опубликовать мероприятие
                           </button>
                         )}
                         {e.status === "published" && !hasTickets(e.eventId) && (
                           <button onClick={() => setConfirmIssue(e.eventId)} className="text-xs font-medium px-2.5 py-1 rounded-lg transition-colors"
                             style={{ background: A.statusOkBg, color: A.statusOk }}>
-                            <Ticket size={12} className="inline mr-1" />Марки
+                            <Ticket size={12} className="inline mr-1" />Выпустить марки / TicketID
                           </button>
                         )}
                       </td>
@@ -143,6 +143,7 @@ export default function AdminEvents({ state, onUpdate }: Props) {
               ))}
               {(() => {
                 const compliance = getComplianceByEvent(drawer.eventId);
+                const salesChannels = getEventSalesChannels(state, drawer).map((code) => getSalesChannelLabel(state, code));
                 return (
                   <>
                     <div>
@@ -152,6 +153,10 @@ export default function AdminEvents({ state, onUpdate }: Props) {
                     <div>
                       <div style={{ color: A.textMuted }} className="text-xs font-medium mb-1">Дата удостоверения</div>
                       <div style={{ color: A.textPrimary }} className="text-sm font-mono">{compliance?.certificateDate || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: A.textMuted }} className="text-xs font-medium mb-1">Каналы продаж</div>
+                      <div style={{ color: A.textPrimary }} className="text-sm">{salesChannels.join(", ")}</div>
                     </div>
                   </>
                 );

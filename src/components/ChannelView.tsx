@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { AppState } from "@/lib/store";
-import { sellTicketsByReseller } from "@/lib/store";
+import { getEventSalesChannels, getSalesChannelLabel, isSalesChannelAllowedForEvent, sellTicketsByReseller } from "@/lib/store";
 import PartnerModuleDrawer, { ModuleDrawerContent } from "@/components/channel/PartnerModuleDrawer";
 
 interface Props {
@@ -172,9 +172,15 @@ export default function ChannelView({ state, onUpdate }: Props) {
     [state.tickets],
   );
 
-  const events = useMemo(() => {
+  const channelAvailableEvents = useMemo(() => {
     return state.events
       .filter((e) => e.status === "published" && issuedEventIds.has(e.eventId))
+      .filter((e) => selectedReseller ? isSalesChannelAllowedForEvent(state, e, selectedReseller.code) : false)
+      .sort((a, b) => a.dateTime.localeCompare(b.dateTime));
+  }, [issuedEventIds, selectedReseller, state]);
+
+  const events = useMemo(() => {
+    return channelAvailableEvents
       .filter((e) => (statusFilter === "all" ? true : e.status === statusFilter))
       .filter((e) => (dateFilter ? e.dateTime.startsWith(dateFilter) : true))
       .filter((e) => {
@@ -188,14 +194,13 @@ export default function ChannelView({ state, onUpdate }: Props) {
         return [e.eventId, e.title, e.venue, organizerMap.get(e.organizerId) || ""].some((value) => value.toLowerCase().includes(q));
       })
       .sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [dateFilter, issuedEventIds, organizerFilter, organizerMap, search, state.events, statusFilter]);
+  }, [channelAvailableEvents, dateFilter, organizerFilter, organizerMap, search, statusFilter]);
 
   const sandboxEvents = useMemo(() => {
-    return state.events
-      .filter((event) => event.status === "published")
+    return channelAvailableEvents
       .filter((event) => state.tickets.some((ticket) => ticket.eventId === event.eventId && ticket.status === "issued"))
       .sort((a, b) => a.dateTime.localeCompare(b.dateTime));
-  }, [state.events, state.tickets]);
+  }, [channelAvailableEvents, state.tickets]);
 
   const organizerOptions = useMemo(() => {
     const set = new Set<string>();
@@ -204,12 +209,12 @@ export default function ChannelView({ state, onUpdate }: Props) {
   }, [events, organizerMap]);
 
   const selectedEvent = useMemo(
-    () => state.events.find((e) => e.eventId === selectedEventId) || null,
-    [selectedEventId, state.events],
+    () => events.find((e) => e.eventId === selectedEventId) || null,
+    [events, selectedEventId],
   );
   const sandboxEvent = useMemo(
-    () => state.events.find((event) => event.eventId === sandboxEventId) || null,
-    [sandboxEventId, state.events],
+    () => sandboxEvents.find((event) => event.eventId === sandboxEventId) || null,
+    [sandboxEventId, sandboxEvents],
   );
   const tierRemaining = (eventId: string, tierName: string) =>
     state.tickets.filter((ticket) => ticket.eventId === eventId && ticket.tier === tierName && ticket.status === "issued").length;
@@ -246,7 +251,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
 
   const today = new Date().toISOString().slice(0, 10);
   const todayOps = channelOps.filter((op) => op.ts.startsWith(today));
-  const activeEvents = state.events.filter((e) => e.status === "published" && issuedEventIds.has(e.eventId));
+  const activeEvents = channelAvailableEvents;
   const ticketsAvailable = activeEvents.reduce((acc, event) => acc + event.remaining, 0);
   const failedRequests = todayOps.filter((op) => op.result === "error").length;
   const webhookDeliveries = todayOps.length;
@@ -332,8 +337,17 @@ export default function ChannelView({ state, onUpdate }: Props) {
       toast.error("Реселлер отключён в Центре Управления. Demo-продажа недоступна.");
       return;
     }
+    if (!selectedReseller.apiConnected || selectedReseller.contractStatus !== "Active") {
+      toast.error("API или договор реселлера не активны.");
+      return;
+    }
     if (!sandboxEventId || !sandboxTier) {
       toast.error("Выберите мероприятие и тариф");
+      return;
+    }
+    const event = state.events.find((item) => item.eventId === sandboxEventId);
+    if (!event || !isSalesChannelAllowedForEvent(state, event, selectedReseller.code)) {
+      toast.error("Реселлер не выбран в каналах продаж этого мероприятия.");
       return;
     }
     const available = tierRemaining(sandboxEventId, sandboxTier);
@@ -450,6 +464,9 @@ export default function ChannelView({ state, onUpdate }: Props) {
           {selectedEvent && (
             <div className="mt-3 rounded-lg border border-cyan-300/20 bg-cyan-500/5 p-3 text-xs text-slate-200">
               Выбрано событие: <span className="font-semibold">{selectedEvent.title}</span> · EventID: {selectedEvent.eventId}
+              <div className="mt-1 text-slate-400">
+                Каналы продаж: {getEventSalesChannels(state, selectedEvent).map((code) => getSalesChannelLabel(state, code)).join(", ")}
+              </div>
               <div className="mt-2 space-y-1">
                 {selectedEvent.tiers.map((tier, index) => (
                   <div key={`${tier.name}-${index}`} className="flex items-center justify-between rounded border border-cyan-200/20 bg-slate-900/55 px-2 py-1">
@@ -511,6 +528,16 @@ export default function ChannelView({ state, onUpdate }: Props) {
                 Реселлер отключён в Центре Управления. Demo-продажа недоступна.
               </div>
             )}
+            {selectedReseller?.status !== "disabled" && selectedReseller && (!selectedReseller.apiConnected || selectedReseller.contractStatus !== "Active") && (
+              <div className="mt-3 rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                API или договор реселлера не активны.
+              </div>
+            )}
+            {selectedReseller && sandboxEvents.length === 0 && selectedReseller.status === "active" && selectedReseller.apiConnected && selectedReseller.contractStatus === "Active" && (
+              <div className="mt-3 rounded-lg border border-cyan-300/25 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
+                Нет опубликованных мероприятий с TicketID, где этот реселлер выбран в каналах продаж.
+              </div>
+            )}
 
             <div className="mt-4 grid gap-3">
               <label className="block">
@@ -565,7 +592,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
               <button
                 type="button"
                 onClick={handleSandboxSale}
-                disabled={!selectedReseller || selectedReseller.status === "disabled" || !sandboxEventId || !sandboxTier}
+                disabled={!selectedReseller || selectedReseller.status === "disabled" || !selectedReseller.apiConnected || selectedReseller.contractStatus !== "Active" || !sandboxEventId || !sandboxTier}
                 className="h-11 rounded-lg bg-cyan-400 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
               >
                 Продать demo-билет через реселлера

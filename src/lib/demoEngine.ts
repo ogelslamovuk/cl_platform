@@ -20,6 +20,7 @@ import {
   refund,
   resetState,
   saveState,
+  sell,
   sellTicketsByReseller,
   verify,
 } from "@/lib/store";
@@ -68,6 +69,7 @@ type DemoAppSeed = {
   time: string;
   poster: string;
   tiers: PriceTier[];
+  salesChannels: string[];
 };
 
 const DEMO_POSTERS = {
@@ -91,6 +93,7 @@ const DEMO_APPS: DemoAppSeed[] = [
     time: "19:00",
     poster: DEMO_POSTERS.concertNeva,
     tiers: [{ name: "Партер", price: 95, quantity: 45 }, { name: "Балкон", price: 70, quantity: 35 }, { name: "Галерея", price: 45, quantity: 20 }],
+    salesChannels: ["OWN", "ByCard", "TicketPro"],
   },
   {
     organizerId: "demo_org_1",
@@ -103,6 +106,7 @@ const DEMO_APPS: DemoAppSeed[] = [
     time: "20:00",
     poster: DEMO_POSTERS.openAirLights,
     tiers: [{ name: "Стандарт", price: 80, quantity: 50 }, { name: "Комфорт", price: 110, quantity: 30 }, { name: "VIP", price: 150, quantity: 20 }],
+    salesChannels: ["OWN", "TicketPro"],
   },
   {
     organizerId: "demo_org_1",
@@ -115,6 +119,7 @@ const DEMO_APPS: DemoAppSeed[] = [
     time: "16:00",
     poster: DEMO_POSTERS.summerFestival,
     tiers: [{ name: "Стандарт", price: 50, quantity: 60 }, { name: "Фан-зона", price: 75, quantity: 25 }, { name: "Премиум", price: 110, quantity: 15 }],
+    salesChannels: ["OWN", "ByCard"],
   },
   {
     organizerId: "demo_org_2",
@@ -127,6 +132,7 @@ const DEMO_APPS: DemoAppSeed[] = [
     time: "18:30",
     poster: DEMO_POSTERS.theatreNight,
     tiers: [{ name: "Партер", price: 65, quantity: 40 }, { name: "Амфитеатр", price: 50, quantity: 35 }, { name: "Балкон", price: 35, quantity: 25 }],
+    salesChannels: ["OWN", "TicketPro"],
   },
   {
     organizerId: "demo_org_2",
@@ -139,6 +145,7 @@ const DEMO_APPS: DemoAppSeed[] = [
     time: "12:00",
     poster: DEMO_POSTERS.familyPlanet,
     tiers: [{ name: "Семейный", price: 40, quantity: 55 }, { name: "Комфорт", price: 60, quantity: 30 }, { name: "Премиум", price: 85, quantity: 15 }],
+    salesChannels: ["OWN", "ByCard", "TicketPro"],
   },
   {
     organizerId: "demo_org_2",
@@ -151,6 +158,7 @@ const DEMO_APPS: DemoAppSeed[] = [
     time: "19:30",
     poster: DEMO_POSTERS.jazzCity,
     tiers: [{ name: "Стандарт", price: 55, quantity: 50 }, { name: "Партер", price: 78, quantity: 35 }, { name: "VIP", price: 120, quantity: 15 }],
+    salesChannels: ["OWN", "TicketPro"],
   },
 ];
 
@@ -205,6 +213,8 @@ function seedDemoCatalog(state: AppState): AppState {
     );
     const approved = approveApplication(state, app.appId);
     if (!approved) continue;
+    const event = state.events.find((item) => item.eventId === approved.eventId);
+    if (event) event.salesChannels = seed.salesChannels;
     publishEvent(state, approved.eventId);
     issueMarks(state, approved.eventId);
   }
@@ -288,6 +298,7 @@ function ensureSeedPublishedEvents(state: AppState): void {
       existingEvent.poster = seed.poster;
       existingEvent.tiers = existingEvent.tiers?.length ? existingEvent.tiers : seed.tiers;
       existingEvent.capacity ||= seed.tiers.reduce((acc, tier) => acc + tier.quantity, 0);
+      existingEvent.salesChannels = seed.salesChannels;
       continue;
     }
     const app = createApplication(
@@ -308,6 +319,8 @@ function ensureSeedPublishedEvents(state: AppState): void {
     );
     const approved = approveApplication(state, app.appId);
     if (!approved) continue;
+    const event = state.events.find((item) => item.eventId === approved.eventId);
+    if (event) event.salesChannels = seed.salesChannels;
     publishEvent(state, approved.eventId);
     issueMarks(state, approved.eventId);
   }
@@ -438,6 +451,7 @@ type DemoComplianceSeed = {
   description: string;
   approvalMode?: EventComplianceData["approvalMode"];
   posterPath: string;
+  salesChannels?: string[];
   hasForeignPerformers?: boolean;
   feeExempt?: boolean;
   feePaid?: boolean;
@@ -452,6 +466,7 @@ function buildComplianceData(seed: DemoComplianceSeed): EventComplianceData {
     shortDescription: seed.description,
     program: "",
     posterPath: seed.posterPath,
+    salesChannels: seed.salesChannels || ["OWN", "ByCard", "TicketPro"],
     dateSlots: [seed.dateTime],
     venueName: seed.venue,
     venueAddress: seed.city,
@@ -502,6 +517,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       limit: 1200,
       description: "Концертная программа с участием белорусских исполнителей.",
       posterPath: DEMO_POSTERS.concertNeva,
+      salesChannels: ["OWN", "ByCard", "TicketPro"],
       feePaid: true,
     },
     {
@@ -522,6 +538,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       limit: 700,
       description: "Семейное культурно-зрелищное шоу для детей и родителей.",
       posterPath: DEMO_POSTERS.familyPlanet,
+      salesChannels: ["OWN", "TicketPro"],
       feePaid: true,
     },
     {
@@ -541,6 +558,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       limit: 320,
       description: "Драматическая постановка с камерной сценографией.",
       posterPath: DEMO_POSTERS.theatreNight,
+      salesChannels: ["OWN"],
     },
     {
       id: "eventApplication004",
@@ -559,6 +577,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       limit: 1800,
       description: "Вечерний open-air с несколькими световыми сценами.",
       posterPath: DEMO_POSTERS.openAirLights,
+      salesChannels: ["OWN", "ByCard"],
     },
     {
       id: "eventApplication005",
@@ -576,6 +595,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       description: "Сценарий notice_only: требуется уведомление уполномоченного органа.",
       approvalMode: "notice_only",
       posterPath: DEMO_POSTERS.jazzCity,
+      salesChannels: ["OWN", "TicketPro"],
       executiveCommitteeNotified: true,
     },
     {
@@ -594,6 +614,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       description: "Сценарий, где удостоверение не требуется.",
       approvalMode: "certificate_not_required",
       posterPath: DEMO_POSTERS.familyPlanet,
+      salesChannels: ["OWN", "ByCard", "TicketPro"],
     },
     {
       id: "eventApplication007",
@@ -610,6 +631,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       limit: 520,
       description: "Заявка с иностранными исполнителями.",
       posterPath: DEMO_POSTERS.concertNeva,
+      salesChannels: ["OWN", "TicketPro"],
       hasForeignPerformers: true,
       feePaid: true,
     },
@@ -628,6 +650,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       limit: 900,
       description: "Сценарий с освобождением от госпошлины.",
       posterPath: DEMO_POSTERS.summerFestival,
+      salesChannels: ["OWN", "ByCard"],
       feeExempt: true,
     },
   ];
@@ -669,6 +692,7 @@ function ensureEventComplianceApplications(state: AppState): void {
     row.data = { ...data, ...row.data, posterPath: row.data.posterPath || data.posterPath };
     row.data.ticketTiers = row.data.ticketTiers?.length ? row.data.ticketTiers : data.ticketTiers;
     row.data.plannedTicketsForSale = row.data.ticketTiers.reduce((acc, tier) => acc + (tier.quantity || 0), 0);
+    row.data.salesChannels = row.data.salesChannels?.length ? row.data.salesChannels : data.salesChannels;
   }
 }
 
@@ -698,6 +722,7 @@ function ensureCertificatesForPublishedEvents(state: AppState): void {
           shortDescription: event.description || "",
           program: "",
           posterPath: event.poster || "",
+          salesChannels: event.salesChannels || ["OWN", "ByCard", "TicketPro"],
           dateSlots: [event.dateTime],
           venueName: event.venue,
           venueAddress: event.city || "",
@@ -735,6 +760,7 @@ function ensureCertificatesForPublishedEvents(state: AppState): void {
     compliance.certificateNumber ||= certificateNumber;
     compliance.certificateDate ||= certificateDate;
     compliance.data.posterPath ||= event.poster || "";
+    compliance.data.salesChannels = event.salesChannels || compliance.data.salesChannels || ["OWN"];
     event.complianceApplicationId ||= compliance.eventComplianceApplicationId;
   }
 }
@@ -749,6 +775,10 @@ function ensureTicketsForPublishedEvents(state: AppState): void {
 
 function countResellerTickets(state: AppState, resellerCode: string): number {
   return state.tickets.filter((ticket) => ticket.soldByChannel === resellerCode && ticket.status !== "issued").length;
+}
+
+function countChannelTickets(state: AppState, channel: string): number {
+  return state.tickets.filter((ticket) => ticket.soldByChannel === channel && ticket.status !== "issued").length;
 }
 
 function findSeedEvent(state: AppState, seedIndex: number) {
@@ -775,6 +805,21 @@ function ensureDemoTicketOperations(state: AppState): void {
         quantity: 1,
         buyerName: target.buyer,
       });
+      if (!outcome.ok) break;
+    }
+  }
+
+  const ownTargets = [
+    { eventIndex: 2, tierIndex: 0, target: 2, buyer: "Покупатель своего канала" },
+    { eventIndex: 4, tierIndex: 1, target: 1, buyer: "Покупатель организатора" },
+  ];
+
+  for (const target of ownTargets) {
+    const event = findSeedEvent(state, target.eventIndex);
+    const tier = event?.tiers[target.tierIndex] || event?.tiers[0];
+    if (!event || !tier) continue;
+    while (countChannelTickets(state, "OWN") < target.target) {
+      const outcome = sell(state, event.eventId, tier.name, "OWN", target.buyer);
       if (!outcome.ok) break;
     }
   }

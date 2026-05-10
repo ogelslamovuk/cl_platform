@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import type { AppState } from "@/lib/store";
-import { calculateComplianceFee, setEventComplianceReview } from "@/lib/store";
+import { calculateComplianceFee, getSalesChannelLabel, setEventComplianceReview } from "@/lib/store";
 import { A } from "./adminStyles";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import { toast } from "sonner";
@@ -60,7 +60,7 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
       toast.error("Недопустимый переход статуса.");
       return;
     }
-    if (decision === "approved") toast.success("Заявка одобрена, удостоверение присвоено автоматически.");
+    if (decision === "approved") toast.success("Заявка одобрена. Мероприятие создано в статусе «Одобрено», публикация и выпуск TicketID выполняются вручную.");
     if (decision === "needs_rework") toast.success("Заявка возвращена на доработку.");
     if (decision === "rejected") toast.success("Заявка отклонена.");
     onUpdate({ ...state });
@@ -104,6 +104,7 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                 ? `${calculateComplianceFee(r.data.projectedCapacity, r.data.plannedTicketsForSale, r.data.ticketTiers)} БВ`
                 : "—";
               const features = getApplicationFeatures(r);
+              const salesChannels = (r.data.salesChannels?.length ? r.data.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code));
               return (
                 <tr key={r.eventComplianceApplicationId} style={{ borderTop: `1px solid ${A.border}` }}>
                   <td className="py-2 px-3 font-mono text-xs">{r.eventComplianceApplicationId}</td>
@@ -155,6 +156,11 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                         </div>
                       ))}
                       <div className="pt-1" style={{ color: A.textSecondary }}>Итого билетов: {totalTickets}</div>
+                    </div>
+                    <div className="relative rounded border p-2 text-xs space-y-1" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textPrimary }}>
+                      <CardHelp text="Каналы, выбранные организатором для распространения билетов." />
+                      <div style={{ color: A.textSecondary }}>Каналы продаж</div>
+                      <div>{salesChannels.join(", ")}</div>
                     </div>
                     <div className="flex gap-2 flex-wrap">
                       <span className="inline-flex items-center gap-1">

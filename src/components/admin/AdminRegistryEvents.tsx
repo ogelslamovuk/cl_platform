@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from "react";
 import type { AppState, EventRecord } from "@/lib/store";
+import { getEventSalesChannels, getSalesChannelLabel, issueMarks, publishEvent } from "@/lib/store";
 import { A, statusChip } from "./adminStyles";
-import { Calendar, Search, X } from "lucide-react";
+import { Calendar, Globe, Search, Ticket, X } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import { toast } from "sonner";
 
 interface Props {
   state: AppState;
@@ -19,9 +21,10 @@ function CardHelp({ text }: { text: string }) {
   );
 }
 
-export default function AdminRegistryEvents({ state }: Props) {
+export default function AdminRegistryEvents({ state, onUpdate }: Props) {
   const [search, setSearch] = useState("");
   const [drawer, setDrawer] = useState<EventRecord | null>(null);
+  const [confirmIssue, setConfirmIssue] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return state.events.filter((event) => {
@@ -55,6 +58,24 @@ export default function AdminRegistryEvents({ state }: Props) {
     const sold = tierTickets.filter((ticket) => ticket.status === "sold" || ticket.status === "redeemed").length;
     const remaining = tierTickets.filter((ticket) => ticket.status === "issued").length;
     return { issued, sold, remaining };
+  };
+  const hasTickets = (eventId: string) => state.tickets.some((ticket) => ticket.eventId === eventId);
+  const handlePublish = (eventId: string) => {
+    const ok = publishEvent(state, eventId);
+    if (!ok) {
+      toast.error("Публикация доступна только для approved события");
+      return;
+    }
+    toast.success(`Мероприятие ${eventId} опубликовано`);
+    onUpdate({ ...state });
+  };
+  const handleIssue = () => {
+    if (!confirmIssue) return;
+    const count = issueMarks(state, confirmIssue);
+    if (count > 0) toast.success(`Выпущено ${count} марок / TicketID`);
+    else toast.error("Марки уже выпущены");
+    setConfirmIssue(null);
+    onUpdate({ ...state });
   };
 
   return (
@@ -98,6 +119,7 @@ export default function AdminRegistryEvents({ state }: Props) {
                     "Статус",
                     "№ удостоверения",
                     "Дата удостоверения",
+                    "Действия",
                   ].map((h) => (
                     <th key={h} className="text-left py-3 px-4 font-medium text-xs" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
                       {h}
@@ -132,6 +154,18 @@ export default function AdminRegistryEvents({ state }: Props) {
                       </td>
                       <td className="py-3 px-4 font-mono text-xs" style={{ color: A.textPrimary }}>{compliance?.certificateNumber || "—"}</td>
                       <td className="py-3 px-4" style={{ color: A.textSecondary }}>{compliance?.certificateDate || "—"}</td>
+                      <td className="py-3 px-4 space-x-2" onClick={(ev) => ev.stopPropagation()}>
+                        {event.status === "approved" && (
+                          <button type="button" onClick={() => handlePublish(event.eventId)} className="rounded-lg px-2.5 py-1 text-xs font-medium" style={{ background: A.statusInfoBg, color: A.statusInfo }}>
+                            <Globe size={12} className="inline mr-1" />Опубликовать мероприятие
+                          </button>
+                        )}
+                        {event.status === "published" && !hasTickets(event.eventId) && (
+                          <button type="button" onClick={() => setConfirmIssue(event.eventId)} className="rounded-lg px-2.5 py-1 text-xs font-medium" style={{ background: A.statusOkBg, color: A.statusOk }}>
+                            <Ticket size={12} className="inline mr-1" />Выпустить марки / TicketID
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -156,6 +190,7 @@ export default function AdminRegistryEvents({ state }: Props) {
             <div className="p-5 space-y-4">
               {(() => {
                 const compliance = complianceByEventId.get(drawer.eventId);
+                const salesChannels = getEventSalesChannels(state, drawer).map((code) => getSalesChannelLabel(state, code));
                 return (
                   <>
                     {([
@@ -168,6 +203,7 @@ export default function AdminRegistryEvents({ state }: Props) {
                       ["Статус", evtStatusLabel[drawer.status] || drawer.status],
                       ["Номер удостоверения", compliance?.certificateNumber || "—"],
                       ["Дата удостоверения", compliance?.certificateDate || "—"],
+                      ["Каналы продаж", salesChannels.join(", ")],
                       ["Заявка на согласование", drawer.complianceApplicationId || compliance?.eventComplianceApplicationId || "—"],
                     ] as [string, string][]).map(([k, v]) => (
                       <div key={k}>
@@ -196,6 +232,31 @@ export default function AdminRegistryEvents({ state }: Props) {
           </div>
         </div>
       )}
+
+      {confirmIssue && (() => {
+        const event = state.events.find((item) => item.eventId === confirmIssue);
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={() => setConfirmIssue(null)}>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <div
+              className="relative w-full max-w-sm rounded-2xl p-6"
+              onClick={(e) => e.stopPropagation()}
+              style={{ background: A.glassGradient + ", " + A.cardBg, border: `1px solid ${A.borderGlass}`, boxShadow: A.cardShadow }}
+            >
+              <h3 style={{ color: A.textPrimary }} className="mb-3 font-semibold">Выпустить марки / TicketID?</h3>
+              <p style={{ color: A.textSecondary }} className="mb-5 text-sm">Будет создано {event?.capacity || 0} TicketID для {confirmIssue}</p>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setConfirmIssue(null)} className="h-9 rounded-xl px-4 text-sm" style={{ border: `1px solid ${A.borderLight}`, color: A.textPrimary }}>
+                  Отмена
+                </button>
+                <button type="button" onClick={handleIssue} className="h-9 rounded-xl px-4 text-sm font-semibold" style={{ background: A.statusOk, color: "#000" }}>
+                  Выпустить
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

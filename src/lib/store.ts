@@ -1,7 +1,7 @@
 // TicketHub MVP State Management — localStorage based
 
 export type Role = "organizer" | "regulator" | "tickethub" | "channel" | "b2c";
-export type Channel = "ByCard" | "TicketPro" | "SellerPOS";
+export type Channel = "OWN" | "ByCard" | "TicketPro" | "SellerPOS";
 export type AppStatus = "draft" | "submitted" | "approved" | "rejected";
 export type ReviewStatus = "draft" | "submitted" | "in_review" | "approved" | "rejected" | "needs_rework";
 export type EventStatus = "approved" | "published";
@@ -10,6 +10,8 @@ export type OpType = "sell" | "refund" | "redeem" | "verify";
 export type OpResult = "ok" | "error";
 export type ResellerStatus = "active" | "disabled";
 export type ResellerContractStatus = "Active" | "Suspended" | "Draft";
+export const OWN_SALES_CHANNEL = "OWN";
+export const OWN_SALES_CHANNEL_LABEL = "Свой канал";
 
 export interface PriceTier {
   name: string;
@@ -51,6 +53,7 @@ export interface EventRecord {
   category: string;
   description: string;
   poster: string;
+  salesChannels: string[];
   status: EventStatus;
   remaining: number;
   createdAt: string;
@@ -76,6 +79,18 @@ export interface Reseller {
   apiConnected: boolean;
   contractStatus: ResellerContractStatus;
   commissionPercent: number;
+  fullName?: string;
+  registrationNumber?: string;
+  legalAddress?: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  contractNumber?: string;
+  contractDate?: string;
+  apiEndpoint?: string;
+  webhookEndpoint?: string;
+  signatureValidation?: boolean;
+  lastSync?: string;
   updatedAt: string;
 }
 
@@ -201,6 +216,7 @@ export interface EventComplianceData {
   shortDescription: string;
   program: string;
   posterPath: string;
+  salesChannels: string[];
   dateSlots: string[];
   venueName: string;
   venueAddress: string;
@@ -289,6 +305,17 @@ const DEFAULT_RESELLERS: Omit<Reseller, "updatedAt">[] = [
     apiConnected: true,
     contractStatus: "Active",
     commissionPercent: 8,
+    fullName: "ООО «ByCard Tickets»",
+    registrationNumber: "193000111",
+    legalAddress: "220030, г. Минск, пр-т Независимости, 18, офис 42",
+    contactPerson: "Анна Романова",
+    email: "partner@bycard.example",
+    phone: "+375 (29) 700-10-10",
+    contractNumber: "TH-BC-2026-01",
+    contractDate: "2026-01-15",
+    apiEndpoint: "https://sandbox.api.bycard.example/v2/tickethub",
+    webhookEndpoint: "https://sandbox.bycard.example/webhooks/tickethub",
+    signatureValidation: true,
   },
   {
     resellerId: "reseller_ticketpro",
@@ -298,6 +325,17 @@ const DEFAULT_RESELLERS: Omit<Reseller, "updatedAt">[] = [
     apiConnected: true,
     contractStatus: "Active",
     commissionPercent: 10,
+    fullName: "ЗАО «TicketPro Беларусь»",
+    registrationNumber: "193000222",
+    legalAddress: "220004, г. Минск, ул. Немига, 5, помещение 12",
+    contactPerson: "Сергей Ковалёв",
+    email: "integration@ticketpro.example",
+    phone: "+375 (33) 700-20-20",
+    contractNumber: "TH-TP-2026-02",
+    contractDate: "2026-02-01",
+    apiEndpoint: "https://sandbox.api.ticketpro.example/v2/tickethub",
+    webhookEndpoint: "https://sandbox.ticketpro.example/webhooks/tickethub",
+    signatureValidation: true,
   },
   {
     resellerId: "reseller_legacy_seller",
@@ -307,6 +345,17 @@ const DEFAULT_RESELLERS: Omit<Reseller, "updatedAt">[] = [
     apiConnected: false,
     contractStatus: "Suspended",
     commissionPercent: 6,
+    fullName: "ООО «Legacy Seller»",
+    registrationNumber: "193000333",
+    legalAddress: "220050, г. Минск, ул. Сторожевая, 9",
+    contactPerson: "Демо-менеджер",
+    email: "legacy@example",
+    phone: "+375 (17) 700-30-30",
+    contractNumber: "TH-LS-2025-11",
+    contractDate: "2025-11-20",
+    apiEndpoint: "https://sandbox.api.legacyseller.example/v2/tickethub",
+    webhookEndpoint: "https://sandbox.legacyseller.example/webhooks/tickethub",
+    signatureValidation: false,
   },
 ];
 
@@ -366,8 +415,67 @@ export function ensureDefaultResellers(state: AppState): void {
     if (typeof existing.apiConnected !== "boolean") existing.apiConnected = seed.apiConnected;
     if (!["Active", "Suspended", "Draft"].includes(existing.contractStatus)) existing.contractStatus = seed.contractStatus;
     if (!Number.isFinite(existing.commissionPercent)) existing.commissionPercent = seed.commissionPercent;
+    existing.fullName ||= seed.fullName;
+    existing.registrationNumber ||= seed.registrationNumber;
+    existing.legalAddress ||= seed.legalAddress;
+    existing.contactPerson ||= seed.contactPerson;
+    existing.email ||= seed.email;
+    existing.phone ||= seed.phone;
+    existing.contractNumber ||= seed.contractNumber;
+    existing.contractDate ||= seed.contractDate;
+    existing.apiEndpoint ||= seed.apiEndpoint;
+    existing.webhookEndpoint ||= seed.webhookEndpoint;
+    if (typeof existing.signatureValidation !== "boolean") existing.signatureValidation = seed.signatureValidation;
     existing.updatedAt ||= now;
   }
+}
+
+export function normalizeSalesChannels(channels: unknown, state?: Pick<AppState, "resellers">): string[] {
+  const knownResellerCodes = new Set((state?.resellers || []).map((reseller) => reseller.code).filter(Boolean));
+  const raw = Array.isArray(channels) ? channels : [];
+  const result: string[] = [OWN_SALES_CHANNEL];
+
+  raw.forEach((value) => {
+    const code = typeof value === "string" ? value.trim() : "";
+    if (!code || code === OWN_SALES_CHANNEL) return;
+    if (state && !knownResellerCodes.has(code)) return;
+    if (!result.includes(code)) result.push(code);
+  });
+
+  return result;
+}
+
+export function buildDefaultSalesChannels(state: Pick<AppState, "resellers">): string[] {
+  return normalizeSalesChannels(
+    [
+      OWN_SALES_CHANNEL,
+      ...(state.resellers || [])
+        .filter((reseller) => reseller.status === "active")
+        .map((reseller) => reseller.code),
+    ],
+    state,
+  );
+}
+
+export function getSalesChannelLabel(state: Pick<AppState, "resellers">, code: string): string {
+  if (code === OWN_SALES_CHANNEL) return OWN_SALES_CHANNEL_LABEL;
+  return state.resellers.find((reseller) => reseller.code === code)?.name || code;
+}
+
+export function getEventSalesChannels(state: Pick<AppState, "resellers">, event: Pick<EventRecord, "salesChannels">): string[] {
+  if (Array.isArray(event.salesChannels) && event.salesChannels.length > 0) {
+    return normalizeSalesChannels(event.salesChannels, state);
+  }
+  return buildDefaultSalesChannels(state);
+}
+
+export function isSalesChannelAllowedForEvent(state: Pick<AppState, "resellers">, event: Pick<EventRecord, "salesChannels">, code: string): boolean {
+  if (!code) return false;
+  if (Array.isArray(event.salesChannels) && event.salesChannels.length > 0) {
+    return normalizeSalesChannels(event.salesChannels, state).includes(code);
+  }
+  if (code === OWN_SALES_CHANNEL) return true;
+  return state.resellers.some((reseller) => reseller.code === code && reseller.status === "active");
 }
 
 function ensureOrganizerDocuments(state: AppState): void {
@@ -422,6 +530,7 @@ function migrateState(parsed: Partial<AppState>): AppState {
       app.tiers = normalizeTierRows(app.tiers, app.capacity);
       app.capacity = sumTierQuantity(app.tiers) || app.capacity || 0;
     }
+    ensureDefaultResellers(state);
     for (const event of state.events) {
       if (!event.organizerId || !knownOrganizerIds.has(event.organizerId)) {
         const fromApp = state.applications.find((a) => a.appId === event.appId)?.organizerId;
@@ -429,17 +538,20 @@ function migrateState(parsed: Partial<AppState>): AppState {
       }
       event.tiers = normalizeTierRows(event.tiers, event.capacity);
       event.capacity = sumTierQuantity(event.tiers) || event.capacity || 0;
+      event.salesChannels = Array.isArray(event.salesChannels) && event.salesChannels.length > 0
+        ? normalizeSalesChannels(event.salesChannels, state)
+        : buildDefaultSalesChannels(state);
     }
     for (const app of state.eventComplianceApplications) {
       const tiers = normalizeComplianceTicketTiers(app.data);
       app.data.ticketTiers = tiers;
       app.data.plannedTicketsForSale = sumTierQuantity(tiers);
       app.data.posterPath ||= "";
+      app.data.salesChannels = normalizeSalesChannels(app.data.salesChannels, state);
     }
     if (state.currentOrganizerId && !knownOrganizerIds.has(state.currentOrganizerId)) {
       state.currentOrganizerId = null;
     }
-    ensureDefaultResellers(state);
     ensureOrganizerDocuments(state);
     state.meta.version = "v4";
     return state;
@@ -603,6 +715,7 @@ export function defaultEventComplianceData(): EventComplianceData {
     shortDescription: "",
     program: "",
     posterPath: "",
+    salesChannels: [OWN_SALES_CHANNEL],
     dateSlots: [""],
     venueName: "",
     venueAddress: "",
@@ -767,6 +880,7 @@ export function createEventComplianceApplication(
     ...data,
     ticketTiers: normalizedTiers,
     plannedTicketsForSale: sumTierQuantity(normalizedTiers),
+    salesChannels: normalizeSalesChannels(data.salesChannels, state),
   };
   const rec: EventComplianceApplicationRecord = {
     eventComplianceApplicationId: quickId("EVAPP"),
@@ -805,6 +919,7 @@ export function updateEventComplianceApplication(
     ...data,
     ticketTiers: normalizedTiers,
     plannedTicketsForSale: sumTierQuantity(normalizedTiers),
+    salesChannels: normalizeSalesChannels(data.salesChannels, state),
   };
   app.data = nextData;
   app.status = submit ? "submitted" : app.status === "needs_rework" ? "needs_rework" : "draft";
@@ -850,6 +965,8 @@ export function setEventComplianceReview(
     const normalizedTiers = normalizeComplianceTicketTiers(app.data);
     const capacity = sumTierQuantity(normalizedTiers);
     const posterPath = app.data.posterPath || existing?.poster || "";
+    const salesChannels = normalizeSalesChannels(app.data.salesChannels, state);
+    app.data.salesChannels = salesChannels;
     const nextEvent: EventRecord = existing || {
       eventId: nextId(state, "evt", "EVT"),
       organizerId: app.organizerId,
@@ -865,7 +982,8 @@ export function setEventComplianceReview(
       category: "",
       description: "",
       poster: posterPath,
-      status: "published",
+      salesChannels,
+      status: "approved",
       remaining: 0,
       createdAt: now,
       updatedAt: now,
@@ -881,16 +999,14 @@ export function setEventComplianceReview(
     nextEvent.category = app.data.eventType || "Иное";
     nextEvent.description = app.data.shortDescription;
     nextEvent.poster = posterPath;
-    nextEvent.status = existing?.status || "published";
+    nextEvent.salesChannels = salesChannels;
+    nextEvent.status = existing?.status || "approved";
     nextEvent.remaining = existing ? state.tickets.filter((ticket) => ticket.eventId === existing.eventId && ticket.status === "issued").length : 0;
     nextEvent.updatedAt = now;
     if (!existing) {
       state.events.push(nextEvent);
     }
     app.linkedEventId = nextEvent.eventId;
-    if (nextEvent.status === "published" && !state.tickets.some((ticket) => ticket.eventId === nextEvent.eventId)) {
-      issueMarks(state, nextEvent.eventId);
-    }
   } else {
     app.certificateNumber = "";
     app.certificateDate = "";
@@ -966,6 +1082,7 @@ export function approveApplication(state: AppState, appId: string): { licenseId:
     category: app.category,
     description: app.description,
     poster: app.poster,
+    salesChannels: buildDefaultSalesChannels(state),
     status: "approved",
     remaining: 0,
     createdAt: new Date().toISOString(),
@@ -1042,6 +1159,78 @@ export function setResellerCommission(state: AppState, resellerId: string, commi
   return true;
 }
 
+export type CreateResellerInput = {
+  name: string;
+  code: string;
+  commissionPercent?: number;
+  apiConnected?: boolean;
+  contractStatus?: ResellerContractStatus;
+  status?: ResellerStatus;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  legalAddress?: string;
+  registrationNumber?: string;
+};
+
+function normalizeResellerCode(code: string): string {
+  return code.trim().replace(/\s+/g, "");
+}
+
+export function createReseller(state: AppState, input: CreateResellerInput): { ok: boolean; reseller?: Reseller; reason?: string } {
+  const name = input.name.trim();
+  const code = normalizeResellerCode(input.code);
+  if (!name) return { ok: false, reason: "Название реселлера обязательно." };
+  if (!code) return { ok: false, reason: "Код канала обязателен." };
+  if (state.resellers.some((reseller) => reseller.code.toLowerCase() === code.toLowerCase())) {
+    return { ok: false, reason: "Код канала должен быть уникальным." };
+  }
+
+  const commission = input.commissionPercent ?? 8;
+  if (!Number.isFinite(commission) || commission < 0 || commission > 100) {
+    return { ok: false, reason: "Комиссия должна быть от 0 до 100%." };
+  }
+
+  const now = nowIso();
+  const reseller: Reseller = {
+    resellerId: quickId("RESELLER"),
+    name,
+    code,
+    status: input.status || "active",
+    apiConnected: input.apiConnected ?? true,
+    contractStatus: input.contractStatus || "Active",
+    commissionPercent: Number(commission.toFixed(2)),
+    fullName: name,
+    registrationNumber: input.registrationNumber?.trim() || "",
+    legalAddress: input.legalAddress?.trim() || "",
+    contactPerson: input.contactPerson?.trim() || "",
+    email: input.email?.trim() || "",
+    phone: input.phone?.trim() || "",
+    contractNumber: `TH-${code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8)}-${new Date().getFullYear()}`,
+    contractDate: now.slice(0, 10),
+    apiEndpoint: `https://sandbox.api.${code.toLowerCase()}.example/v2/tickethub`,
+    webhookEndpoint: `https://sandbox.${code.toLowerCase()}.example/webhooks/tickethub`,
+    signatureValidation: input.apiConnected ?? true,
+    lastSync: now,
+    updatedAt: now,
+  };
+  state.resellers.push(reseller);
+  saveState(state);
+  return { ok: true, reseller };
+}
+
+export function updateReseller(state: AppState, resellerId: string, patch: Partial<Omit<Reseller, "resellerId">>): boolean {
+  const reseller = state.resellers.find((item) => item.resellerId === resellerId);
+  if (!reseller) return false;
+  if (patch.code && state.resellers.some((item) => item.resellerId !== resellerId && item.code.toLowerCase() === patch.code.toLowerCase())) return false;
+  Object.assign(reseller, patch, { updatedAt: nowIso() });
+  if (Number.isFinite(reseller.commissionPercent)) {
+    reseller.commissionPercent = Math.max(0, Math.min(100, Number(reseller.commissionPercent.toFixed(2))));
+  }
+  saveState(state);
+  return true;
+}
+
 export interface OpOutcome {
   ok: boolean;
   reason?: string;
@@ -1064,6 +1253,16 @@ export function sellTicketsByReseller(
   if (!reseller || reseller.status === "disabled") {
     return { ok: false, reason: "Реселлер отключён в Центре Управления. Demo-продажа недоступна.", ticketIds: [] };
   }
+  if (!reseller.apiConnected || reseller.contractStatus !== "Active") {
+    return { ok: false, reason: "API или договор реселлера не активны.", ticketIds: [] };
+  }
+  const event = state.events.find((item) => item.eventId === data.eventId);
+  if (!event || event.status !== "published") {
+    return { ok: false, reason: "Мероприятие не опубликовано или недоступно.", ticketIds: [] };
+  }
+  if (!isSalesChannelAllowedForEvent(state, event, reseller.code)) {
+    return { ok: false, reason: "Реселлер не выбран в каналах продаж этого мероприятия.", ticketIds: [] };
+  }
   const safeQuantity = Math.max(1, Math.floor(data.quantity || 1));
   const tickets = state.tickets.filter(
     (ticket) => ticket.eventId === data.eventId && ticket.tier === data.tierName && ticket.status === "issued"
@@ -1085,7 +1284,6 @@ export function sellTicketsByReseller(
   });
   reseller.updatedAt = now;
   recalcRemaining(state, data.eventId);
-  const event = state.events.find((item) => item.eventId === data.eventId);
   if (event) event.updatedAt = now;
   saveState(state);
   return { ok: true, ticketIds: soldTicketIds };
@@ -1329,7 +1527,7 @@ export function getMySales(state: AppState): OrganizerSaleRecord[] {
         quantity: 1,
         unitPrice: tierPrice,
         amount: tierPrice,
-        channel: ticket.soldByChannel,
+        channel: getSalesChannelLabel(state, ticket.soldByChannel),
         status,
         priceCategory: ticket.tier,
       };
