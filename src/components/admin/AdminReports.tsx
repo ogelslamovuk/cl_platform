@@ -1,10 +1,12 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import type { AppState, EventRecord, OpRecord, Ticket } from "@/lib/store";
 import { A } from "./adminStyles";
 import {
   Activity,
   AlertTriangle,
+  ArrowLeft,
   BarChart3,
+  ChevronRight,
   CircleDollarSign,
   Landmark,
   Percent,
@@ -65,6 +67,17 @@ type FinancialSummary = {
   revenue: number;
   problemOps: number;
   topEvent: EventReportRow | null;
+};
+
+type ReportKey = "events" | "organizers" | "channels" | "finance";
+
+type ReportChoice = {
+  key: ReportKey;
+  heading: string;
+  description: string;
+  metric: string;
+  icon: React.ElementType;
+  accent: string;
 };
 
 const channelLabels: Record<string, string> = {
@@ -442,7 +455,108 @@ function SummaryCard({
   );
 }
 
+function TopEventSpotlight({ topEvent }: { topEvent: EventReportRow | null }) {
+  return (
+    <div
+      className="relative min-h-[156px] p-5"
+      style={{ background: A.glassGradient + ", " + A.cardBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.cardShadow }}
+    >
+      <CardHelp text="Мероприятие с максимальным количеством реализованных билетов." />
+      <div className="mb-5 flex h-10 w-10 items-center justify-center" style={{ background: A.cyan + "18", borderRadius: 12 }}>
+        <Trophy size={18} style={{ color: A.cyan }} />
+      </div>
+      <div className="pr-8">
+        <div className="text-2xl font-bold leading-tight" style={{ color: A.textPrimary }}>
+          {topEvent ? topEvent.title : "Данных по продажам пока нет"}
+        </div>
+        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm" style={{ color: A.textSecondary }}>
+          <span>Топ-мероприятие по продажам</span>
+          {topEvent ? (
+            <>
+              <span>Продано: {formatNumber(topEvent.sold)}</span>
+              <span>Выручка: {formatMoney(topEvent.revenue)}</span>
+              <span>Реализация: {formatPercent(topEvent.realization)}</span>
+            </>
+          ) : (
+            <span>После первых продаж здесь появится главный ориентир по спросу.</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportNavButton({ item, onSelect }: { item: ReportChoice; onSelect: (key: ReportKey) => void }) {
+  const Icon = item.icon;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(item.key)}
+      className="group flex min-h-[136px] w-full items-start gap-4 p-5 text-left transition-all duration-200 hover:-translate-y-0.5"
+      style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.glassShadow, color: A.textPrimary }}
+      onMouseEnter={(e) => (e.currentTarget.style.borderColor = `${item.accent}55`)}
+      onMouseLeave={(e) => (e.currentTarget.style.borderColor = A.border)}
+    >
+      <div style={{ background: item.accent + "18", borderRadius: 12 }} className="flex h-11 w-11 shrink-0 items-center justify-center">
+        <Icon size={20} style={{ color: item.accent }} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <div className="text-sm font-semibold" style={{ color: A.textPrimary }}>
+            {item.heading}
+          </div>
+          <ChevronRight size={18} style={{ color: item.accent }} className="mt-0.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
+        </div>
+        <p className="mt-2 text-xs leading-relaxed" style={{ color: A.textSecondary }}>
+          {item.description}
+        </p>
+        <div className="mt-4 text-xs font-semibold" style={{ color: item.accent }}>
+          {item.metric}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function ReportDetailHeader({ report, onBack }: { report: ReportChoice; onBack: () => void }) {
+  const Icon = report.icon;
+
+  return (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex items-start gap-3">
+        <div style={{ background: report.accent + "18", borderRadius: 12 }} className="flex h-11 w-11 shrink-0 items-center justify-center">
+          <Icon size={20} style={{ color: report.accent }} />
+        </div>
+        <div>
+          <div className="text-xs" style={{ color: A.textMuted }}>
+            Отчёты
+          </div>
+          <h2 className="mt-1 text-xl font-bold leading-tight" style={{ color: A.textPrimary }}>
+            {report.heading}
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed" style={{ color: A.textSecondary }}>
+            {report.description}
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors"
+        style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}
+        onMouseEnter={(e) => (e.currentTarget.style.borderColor = `${report.accent}55`)}
+        onMouseLeave={(e) => (e.currentTarget.style.borderColor = A.border)}
+      >
+        <ArrowLeft size={16} />
+        Все отчёты
+      </button>
+    </div>
+  );
+}
+
 export default function AdminReports({ state }: Props) {
+  const [selectedReport, setSelectedReport] = useState<ReportKey | null>(null);
   const eventRows = useMemo(() => buildEventRows(state), [state]);
   const organizerRows = useMemo(() => buildOrganizerRows(state, eventRows), [state, eventRows]);
   const channelRows = useMemo(() => buildChannelRows(state), [state]);
@@ -513,10 +627,45 @@ export default function AdminReports({ state }: Props) {
       accent: A.statusError,
     },
   ];
+  const reportChoices: ReportChoice[] = [
+    {
+      key: "events",
+      heading: "Продажи по мероприятиям",
+      description: "Вместимость, выпуск, продажи, возвраты, погашения и расчётная выручка по каждому мероприятию.",
+      metric: `${formatNumber(eventRows.length)} мероприятий`,
+      icon: BarChart3,
+      accent: A.cyan,
+    },
+    {
+      key: "organizers",
+      heading: "Эффективность организаторов",
+      description: "Сравнение организаторов по количеству мероприятий, продажам, выручке и средней реализации.",
+      metric: `${formatNumber(organizerRows.length)} организаторов`,
+      icon: Users,
+      accent: A.blue,
+    },
+    {
+      key: "channels",
+      heading: "Каналы продаж",
+      description: "Продажи, сумма, возвраты, погашения, ошибки операций и доля каждого канала.",
+      metric: `${formatNumber(channelRows.length)} каналов`,
+      icon: Activity,
+      accent: A.gold,
+    },
+    {
+      key: "finance",
+      heading: "Финансово-операционная сводка",
+      description: "Единый срез по выпуску, реализации, остаткам, выручке, проблемным операциям и лидеру продаж.",
+      metric: formatMoney(summary.revenue),
+      icon: Landmark,
+      accent: A.violet,
+    },
+  ];
+  const selectedReportMeta = reportChoices.find((item) => item.key === selectedReport) || reportChoices[0];
 
   return (
     <div className="space-y-5">
-      {!hasAnalyticsData && (
+      {!selectedReport && !hasAnalyticsData && (
         <div
           className="relative p-5"
           style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.glassShadow }}
@@ -533,7 +682,23 @@ export default function AdminReports({ state }: Props) {
         </div>
       )}
 
-      <ReportSection
+      {!selectedReport && (
+        <>
+          <TopEventSpotlight topEvent={summary.topEvent} />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {reportChoices.map((item) => (
+              <ReportNavButton key={item.key} item={item} onSelect={setSelectedReport} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {selectedReport && (
+        <ReportDetailHeader report={selectedReportMeta} onBack={() => setSelectedReport(null)} />
+      )}
+
+      {selectedReport === "events" && (
+        <ReportSection
         heading="Продажи по мероприятиям"
         description="Сводит вместимость, выпуск, продажи, возвраты, погашения и расчётную выручку по каждому мероприятию."
         icon={BarChart3}
@@ -581,8 +746,10 @@ export default function AdminReports({ state }: Props) {
           </div>
         )}
       </ReportSection>
+      )}
 
-      <ReportSection
+      {selectedReport === "organizers" && (
+        <ReportSection
         heading="Эффективность организаторов"
         description="Показывает, как организаторы конвертируют выпущенные билеты в продажи и выручку."
         icon={Users}
@@ -628,8 +795,10 @@ export default function AdminReports({ state }: Props) {
           </div>
         )}
       </ReportSection>
+      )}
 
-      <ReportSection
+      {selectedReport === "channels" && (
+        <ReportSection
         heading="Каналы продаж"
         description="Агрегирует продажи, возвраты, погашения и ошибки по каналам операций."
         icon={Activity}
@@ -672,8 +841,10 @@ export default function AdminReports({ state }: Props) {
           </div>
         )}
       </ReportSection>
+      )}
 
-      <ReportSection
+      {selectedReport === "finance" && (
+        <ReportSection
         heading="Финансово-операционная сводка"
         description="Ключевые показатели по всему Центру Управления: выпуск, реализация, возвраты, остаток, выручка и проблемные операции."
         icon={Landmark}
@@ -707,6 +878,7 @@ export default function AdminReports({ state }: Props) {
           </div>
         </div>
       </ReportSection>
+      )}
     </div>
   );
 }
