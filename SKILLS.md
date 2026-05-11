@@ -439,3 +439,29 @@ Commit не делать.
 
 Codex не должен «понять задачу».
 Codex должен выполнить точные замены и пройти self-check.
+
+---
+
+## 17. Особое правило для cl_platform: основная страница проекта
+
+Основная страница проекта cl_platform:
+
+```text
+https://ogelslamovuk.github.io/cl_platform/#/main
+```
+
+`/platform` больше не считать актуальной основной страницей проекта.
+
+В ТЗ, проверках, live URLs и финальных отчётах для cl_platform использовать `/#/main` как основной entrypoint.
+
+Запрещено по умолчанию указывать `/#/platform` как главную страницу, project overview, основную демо-страницу или обязательный live URL.
+
+`/#/platform` можно упоминать только если пользователь явно просит проверить или исправить именно legacy route `/platform`.
+
+Для стандартной live-проверки cl_platform использовать:
+- `https://ogelslamovuk.github.io/cl_platform/#/main`
+- `https://ogelslamovuk.github.io/cl_platform/#/demo`
+- `https://ogelslamovuk.github.io/cl_platform/#/organizer`
+- `https://ogelslamovuk.github.io/cl_platform/#/organizer/compliance`
+- `https://ogelslamovuk.github.io/cl_platform/#/admin`
+- `https://ogelslamovuk.github.io/cl_platform/#/channel`
