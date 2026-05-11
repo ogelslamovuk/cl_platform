@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import type { AppState, EventRecord } from "@/lib/store";
 import { createDemoPurchaseTicket } from "@/lib/store";
 import { toast } from "sonner";
-import { Search, MapPin, Tag, Ticket, X, ChevronRight, Sparkles, TrendingUp, Star, Clock, User, Calendar, CheckCircle2 } from "lucide-react";
+import { Search, MapPin, Tag, Ticket, X, ChevronRight, Sparkles, TrendingUp, Star, User, Calendar, CheckCircle2 } from "lucide-react";
 
 interface Props {
   state: AppState;
@@ -218,32 +218,20 @@ export default function B2CView({ state, onUpdate }: Props) {
       >
         <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
           <img src={resolvePublicAsset(event.poster)} alt={event.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" />
-          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/70 to-transparent" />
-          <div className="absolute left-3 top-3 rounded-lg bg-white/95 px-2.5 py-1 text-xs font-semibold shadow-sm" style={{ color: D.text }}>
-            <Calendar size={12} className="mr-1 inline -mt-0.5" />
-            {formatDateShort(event.dateTime) || dt.date}
-          </div>
-          <div
-            className="absolute right-3 top-3 rounded-lg border bg-white/95 px-2.5 py-1 text-xs font-medium shadow-sm"
-            style={{ borderColor: D.borderSoft, color: D.textSoft }}
-          >
-            {event.category}
-          </div>
-          {isSoldOut && (
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-950/55">
-              <span className="rounded-full px-3 py-1.5 text-sm font-semibold" style={{ background: D.dangerSoft, color: D.danger }}>
-                Распродано
-              </span>
-            </div>
-          )}
         </div>
 
         <div className="flex flex-1 flex-col p-4 sm:p-5">
-          <div className="mb-3 flex items-center gap-2 text-xs font-medium" style={{ color: D.textMuted }}>
-            <Clock size={14} />
-            <span>{dt.time}</span>
-            <span className="h-1 w-1 rounded-full bg-slate-300" />
-            <span>{event.city}</span>
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium" style={{ color: D.textMuted }}>
+              <span>{formatDateShort(event.dateTime) || dt.date}</span>
+              <span aria-hidden="true">·</span>
+              <span>{dt.time}</span>
+              <span aria-hidden="true">·</span>
+              <span>{event.city}</span>
+            </div>
+            <span className="w-fit shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold" style={{ borderColor: D.borderSoft, background: D.accentSoft, color: D.accentText }}>
+              {event.category}
+            </span>
           </div>
 
           <h3 className="text-lg font-semibold leading-snug line-clamp-2" style={{ color: D.text }}>
