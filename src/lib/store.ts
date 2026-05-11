@@ -1,7 +1,7 @@
 // TicketHub MVP State Management — localStorage based
 
 export type Role = "organizer" | "regulator" | "tickethub" | "channel" | "b2c";
-export type Channel = "OWN" | "ByCard" | "TicketPro" | "SellerPOS";
+export type Channel = "OWN" | "ByCard" | "TicketPro" | "KvitkiBY" | "SellerPOS";
 export type AppStatus = "draft" | "submitted" | "approved" | "rejected";
 export type ReviewStatus = "draft" | "submitted" | "in_review" | "approved" | "rejected" | "needs_rework";
 export type EventStatus = "approved" | "published";
@@ -316,6 +316,7 @@ const DEFAULT_RESELLERS: Omit<Reseller, "updatedAt">[] = [
     apiEndpoint: "https://sandbox.api.bycard.example/v2/tickethub",
     webhookEndpoint: "https://sandbox.bycard.example/webhooks/tickethub",
     signatureValidation: true,
+    lastSync: "2026-05-10T09:20:00",
   },
   {
     resellerId: "reseller_ticketpro",
@@ -336,6 +337,28 @@ const DEFAULT_RESELLERS: Omit<Reseller, "updatedAt">[] = [
     apiEndpoint: "https://sandbox.api.ticketpro.example/v2/tickethub",
     webhookEndpoint: "https://sandbox.ticketpro.example/webhooks/tickethub",
     signatureValidation: true,
+    lastSync: "2026-05-10T09:25:00",
+  },
+  {
+    resellerId: "reseller_kvitki_by",
+    name: "Kvitki.by",
+    code: "KvitkiBY",
+    status: "active",
+    apiConnected: true,
+    contractStatus: "Active",
+    commissionPercent: 8,
+    fullName: "ООО «Квитки Бай»",
+    registrationNumber: "193000444",
+    legalAddress: "220030, г. Минск, ул. Кирова, 8, офис 12",
+    contactPerson: "Елена Соколова",
+    email: "integration@kvitki.example",
+    phone: "+375 (29) 700-40-40",
+    contractNumber: "TH-KV-2026-03",
+    contractDate: "2026-03-01",
+    apiEndpoint: "https://sandbox.api.kvitki.example/v2/tickethub",
+    webhookEndpoint: "https://sandbox.kvitki.example/webhooks/tickethub",
+    signatureValidation: true,
+    lastSync: "2026-05-10T09:30:00",
   },
   {
     resellerId: "reseller_legacy_seller",
@@ -356,6 +379,7 @@ const DEFAULT_RESELLERS: Omit<Reseller, "updatedAt">[] = [
     apiEndpoint: "https://sandbox.api.legacyseller.example/v2/tickethub",
     webhookEndpoint: "https://sandbox.legacyseller.example/webhooks/tickethub",
     signatureValidation: false,
+    lastSync: "2026-05-01T08:00:00",
   },
 ];
 
@@ -426,6 +450,7 @@ export function ensureDefaultResellers(state: AppState): void {
     existing.apiEndpoint ||= seed.apiEndpoint;
     existing.webhookEndpoint ||= seed.webhookEndpoint;
     if (typeof existing.signatureValidation !== "boolean") existing.signatureValidation = seed.signatureValidation;
+    existing.lastSync ||= seed.lastSync || existing.updatedAt || now;
     existing.updatedAt ||= now;
   }
 }

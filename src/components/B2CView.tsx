@@ -9,8 +9,8 @@ interface Props {
   onUpdate: (s: AppState) => void;
 }
 
-const CITY_WHITELIST = ["Минск", "Брест", "Витебск", "Гомель", "Гродно", "Могилёв"] as const;
-const CATEGORY_WHITELIST = ["Концерты", "Театр", "Шоу", "Детям", "Фестивали"] as const;
+const CITY_WHITELIST = ["Минск", "Брест", "Витебск", "Гомель", "Гродно", "Могилёв", "Слуцк", "Несвиж"] as const;
+const CATEGORY_WHITELIST = ["Концерты", "Театр", "Шоу", "Детям", "Фестивали", "Выставки", "Конкурсы"] as const;
 const POSTER_PLACEHOLDER = "/placeholder.svg";
 
 type DemoEvent = EventRecord & { city: string; category: string; description: string; poster: string };

@@ -19,12 +19,18 @@ import {
 } from "@/lib/organizerSelectors";
 
 const DEMO_POSTERS = [
-  { path: "/demo/posters/concert-neva.svg", title: "Концерт «Огни Невы»" },
-  { path: "/demo/posters/theatre-night.svg", title: "Театральная ночь" },
-  { path: "/demo/posters/family-planet.svg", title: "Семейная планета" },
-  { path: "/demo/posters/summer-festival.svg", title: "Летний фестиваль" },
-  { path: "/demo/posters/jazz-city.svg", title: "Город и джаз" },
-  { path: "/demo/posters/open-air-lights.svg", title: "Open-air lights" },
+  { path: "/demo/posters/vasilkovy-kraj.svg", title: "Фестиваль «Васільковы край»" },
+  { path: "/demo/posters/rodnaya-zyamlya.svg", title: "Концерт «Песня роднай зямлі»" },
+  { path: "/demo/posters/scena-belarusi.svg", title: "Театральный форум «Сцэна Беларусі»" },
+  { path: "/demo/posters/kazki-palessya.svg", title: "Детская программа «Казкі Палесся»" },
+  { path: "/demo/posters/belarus-u-sertsy.svg", title: "Концерт мастеров искусств «Беларусь у сэрцы»" },
+  { path: "/demo/posters/slutskie-poyasa.svg", title: "Фестиваль ремёсел «Слуцкие пояса»" },
+  { path: "/demo/posters/zvony-nesvizha.svg", title: "Музыкальный вечер «Звоны Нясвіжа»" },
+  { path: "/demo/posters/kola-tradycyj.svg", title: "Хореографическая программа «Кола традыцый»" },
+  { path: "/demo/posters/spadchyna-suchasnast.svg", title: "Выставочная программа «Спадчына і сучаснасць»" },
+  { path: "/demo/posters/kupalski-vianok.svg", title: "Областной праздник «Купальскі вянок»" },
+  { path: "/demo/posters/novyya-imiony.svg", title: "Конкурс молодых исполнителей «Новыя імёны»" },
+  { path: "/demo/posters/siabroustva-kultur.svg", title: "Международная программа «Сяброўства культур»" },
 ];
 
 const COMPLIANCE_FEE_TOOLTIP = "Размер госпошлины рассчитывается по проектной вместимости площадки или количеству заявленных билетов: 1–150 — 3 БВ, 151–300 — 10 БВ, 301–500 — 30 БВ, 501–1000 — 50 БВ, 1001–1500 — 80 БВ, 1501–2000 — 100 БВ, 2001–3000 — 150 БВ, свыше 3000 — 200 БВ. Для отдельных категорий может применяться освобождение от пошлины.";

@@ -5,6 +5,7 @@ import type {
   OrganizerAccount,
   OrganizerApplicationData,
   OrganizerApplicationRecord,
+  MockAttachment,
   PriceTier,
 } from "@/lib/store";
 import {
@@ -13,7 +14,6 @@ import {
   createDemoPurchaseTicket,
   ensureDefaultResellers,
   loadState,
-  defaultState,
   issueMarks,
   publishEvent,
   redeem,
@@ -22,38 +22,67 @@ import {
   saveState,
   sell,
   sellTicketsByReseller,
-  verify,
 } from "@/lib/store";
 
 const DEMO_ORGANIZERS: OrganizerAccount[] = [
   {
-    organizerId: "demo_org_1",
-    login: "organizer.a",
+    organizerId: "demo_org_minskconcert",
+    login: "organizer.minskconcert",
     password: "demo123",
-    name: "ООО «Северный Свет Ивент»",
-    fullName: "Общество с ограниченной ответственностью «Северный Свет Ивент»",
-    unp: "190001111",
+    name: "ГУ «Минскконцерт»",
+    fullName: "Государственное учреждение «Минскконцерт»",
+    unp: "100600111",
     registryStatus: "зарегистрирован в реестре",
     registryRegisteredAt: "2025-02-12",
-    director: "Иванов Илья Петрович",
-    email: "northlight@demo.by",
-    phone: "+375 (29) 100-10-10",
+    director: "Савицкий Андрей Викторович",
+    email: "minskconcert@demo.example",
+    phone: "+375 (17) 300-10-10",
     accountStatus: "активен",
     feesStatus: "оплачены",
   },
   {
-    organizerId: "demo_org_2",
-    login: "organizer.b",
+    organizerId: "demo_org_philharmonic",
+    login: "organizer.philharmonic",
     password: "demo123",
-    name: "ЧУП «Городская Афиша»",
-    fullName: "Частное унитарное предприятие «Городская Афиша»",
-    unp: "190002222",
+    name: "ГУ «Белорусская государственная филармония»",
+    fullName: "Государственное учреждение «Белорусская государственная ордена Трудового Красного Знамени филармония»",
+    unp: "100600222",
     registryStatus: "зарегистрирован в реестре",
     registryRegisteredAt: "2025-03-20",
-    director: "Петрова Марина Сергеевна",
-    email: "cityafisha@demo.by",
-    phone: "+375 (33) 200-20-20",
+    director: "Ковалёва Марина Сергеевна",
+    email: "philharmonic@culture-demo.example",
+    phone: "+375 (17) 300-20-20",
     accountStatus: "активен",
+    feesStatus: "оплачены",
+  },
+  {
+    organizerId: "demo_org_cultural_initiative",
+    login: "organizer.culture",
+    password: "demo123",
+    name: "ООО «Культурная инициатива Беларуси»",
+    fullName: "Общество с ограниченной ответственностью «Культурная инициатива Беларуси»",
+    unp: "193700333",
+    registryStatus: "зарегистрирован в реестре",
+    registryRegisteredAt: "2025-09-05",
+    director: "Лисовская Наталья Павловна",
+    email: "office@culture-initiative.example",
+    phone: "+375 (29) 300-30-30",
+    accountStatus: "активен",
+    feesStatus: "оплачены",
+  },
+  {
+    organizerId: "demo_org_fest_scene",
+    login: "organizer.festscene",
+    password: "demo123",
+    name: "ЧУП «Праздничная сцена»",
+    fullName: "Частное унитарное предприятие «Праздничная сцена»",
+    unp: "193700444",
+    registryStatus: "ожидает включения",
+    registryRegisteredAt: null,
+    director: "Руденко Олег Николаевич",
+    email: "registry@fest-scene.example",
+    phone: "+375 (33) 300-40-40",
+    accountStatus: "pending",
     feesStatus: "оплачены",
   },
 ];
@@ -73,94 +102,237 @@ type DemoAppSeed = {
 };
 
 const DEMO_POSTERS = {
-  concertNeva: "/demo/posters/concert-neva.svg",
-  theatreNight: "/demo/posters/theatre-night.svg",
-  familyPlanet: "/demo/posters/family-planet.svg",
-  summerFestival: "/demo/posters/summer-festival.svg",
-  jazzCity: "/demo/posters/jazz-city.svg",
-  openAirLights: "/demo/posters/open-air-lights.svg",
+  vasilkovyKraj: "/demo/posters/vasilkovy-kraj.svg",
+  rodnayaZyamlya: "/demo/posters/rodnaya-zyamlya.svg",
+  scenaBelarusi: "/demo/posters/scena-belarusi.svg",
+  kazkiPalessya: "/demo/posters/kazki-palessya.svg",
+  belarusUSertsy: "/demo/posters/belarus-u-sertsy.svg",
+  slutskiePoyasa: "/demo/posters/slutskie-poyasa.svg",
+  zvonyNesvizha: "/demo/posters/zvony-nesvizha.svg",
+  kolaTradycyj: "/demo/posters/kola-tradycyj.svg",
+  spadchynaSuchasnast: "/demo/posters/spadchyna-suchasnast.svg",
+  kupalskiVianok: "/demo/posters/kupalski-vianok.svg",
+  novyyaImiony: "/demo/posters/novyya-imiony.svg",
+  siabroustvaKultur: "/demo/posters/siabroustva-kultur.svg",
 } as const;
+
+const ALL_ACTIVE_RESELLER_CHANNELS = ["OWN", "ByCard", "TicketPro", "KvitkiBY"];
 
 const DEMO_APPS: DemoAppSeed[] = [
   {
-    organizerId: "demo_org_1",
-    title: "Концерт «Огни Невы»",
-    venue: "Космос Арена",
+    organizerId: "demo_org_minskconcert",
+    title: "Фестиваль «Васільковы край»",
+    venue: "Верхний город",
+    city: "Минск",
+    category: "Фестивали",
+    description: "Городской фестиваль народного творчества с ремесленными рядами, музыкальными площадками и семейной программой.",
+    daysOffset: 7,
+    time: "18:00",
+    poster: DEMO_POSTERS.vasilkovyKraj,
+    tiers: [{ name: "Вход по приглашению", price: 0, quantity: 200 }, { name: "Основная зона", price: 35, quantity: 2100 }, { name: "Партнёрская трибуна", price: 55, quantity: 900 }],
+    salesChannels: ALL_ACTIVE_RESELLER_CHANNELS,
+  },
+  {
+    organizerId: "demo_org_philharmonic",
+    title: "Концерт «Песня роднай зямлі»",
+    venue: "Белорусская государственная филармония",
     city: "Минск",
     category: "Концерты",
-    description: "Большой вечер симфо-попа с живым оркестром и визуальным шоу.",
-    daysOffset: 7,
+    description: "Торжественная программа белорусской академической и народной музыки с участием солистов и хора.",
+    daysOffset: 10,
     time: "19:00",
-    poster: DEMO_POSTERS.concertNeva,
-    tiers: [{ name: "Партер", price: 95, quantity: 45 }, { name: "Балкон", price: 70, quantity: 35 }, { name: "Галерея", price: 45, quantity: 20 }],
+    poster: DEMO_POSTERS.rodnayaZyamlya,
+    tiers: [{ name: "Партер", price: 75, quantity: 620 }, { name: "Балкон", price: 55, quantity: 430 }, { name: "Ложа", price: 95, quantity: 200 }],
     salesChannels: ["OWN", "ByCard", "TicketPro"],
   },
   {
-    organizerId: "demo_org_1",
-    title: "Шоу «Эхо города»",
-    venue: "Космос Арена",
-    city: "Минск",
-    category: "Шоу",
-    description: "Иммерсивное мультимедийное представление о ритме большого города.",
-    daysOffset: 14,
-    time: "20:00",
-    poster: DEMO_POSTERS.openAirLights,
-    tiers: [{ name: "Стандарт", price: 80, quantity: 50 }, { name: "Комфорт", price: 110, quantity: 30 }, { name: "VIP", price: 150, quantity: 20 }],
-    salesChannels: ["OWN", "TicketPro"],
+    organizerId: "demo_org_cultural_initiative",
+    title: "Театральный форум «Сцэна Беларусі»",
+    venue: "Национальный академический драматический театр имени Якуба Коласа",
+    city: "Витебск",
+    category: "Театр",
+    description: "Форум региональных театральных постановок и творческих встреч с профессиональными коллективами.",
+    daysOffset: 12,
+    time: "18:30",
+    poster: DEMO_POSTERS.scenaBelarusi,
+    tiers: [{ name: "Партер", price: 48, quantity: 320 }, { name: "Амфитеатр", price: 38, quantity: 220 }, { name: "Балкон", price: 28, quantity: 110 }],
+    salesChannels: ["OWN", "TicketPro", "KvitkiBY"],
   },
   {
-    organizerId: "demo_org_1",
-    title: "Фестиваль «Летний импульс»",
-    venue: "Парк Победы",
+    organizerId: "demo_org_fest_scene",
+    title: "Детская программа «Казкі Палесся»",
+    venue: "Гомельский городской центр культуры",
+    city: "Гомель",
+    category: "Детям",
+    description: "Познавательная детская программа по мотивам белорусских сказок, музыки и народных игр.",
+    daysOffset: 14,
+    time: "12:00",
+    poster: DEMO_POSTERS.kazkiPalessya,
+    tiers: [{ name: "Детский билет", price: 18, quantity: 160 }, { name: "Семейный сектор", price: 30, quantity: 120 }],
+    salesChannels: ["OWN"],
+  },
+  {
+    organizerId: "demo_org_minskconcert",
+    title: "Концерт мастеров искусств «Беларусь у сэрцы»",
+    venue: "Дворец Республики",
     city: "Минск",
+    category: "Концерты",
+    description: "Большой концерт мастеров искусств с симфоническим оркестром, хором и сценической программой.",
+    daysOffset: 17,
+    time: "19:30",
+    poster: DEMO_POSTERS.belarusUSertsy,
+    tiers: [{ name: "Партер", price: 95, quantity: 1400 }, { name: "Балкон", price: 70, quantity: 1300 }, { name: "Галерея", price: 45, quantity: 800 }],
+    salesChannels: ALL_ACTIVE_RESELLER_CHANNELS,
+  },
+  {
+    organizerId: "demo_org_cultural_initiative",
+    title: "Фестиваль ремёсел «Слуцкие пояса»",
+    venue: "Дом культуры",
+    city: "Слуцк",
     category: "Фестивали",
-    description: "Дневной open-air фестиваль с несколькими сценами и маркетом.",
-    daysOffset: 21,
-    time: "16:00",
-    poster: DEMO_POSTERS.summerFestival,
-    tiers: [{ name: "Стандарт", price: 50, quantity: 60 }, { name: "Фан-зона", price: 75, quantity: 25 }, { name: "Премиум", price: 110, quantity: 15 }],
+    description: "Фестиваль традиционных ремёсел с мастер-классами, демонстрацией тканых мотивов и выставкой работ.",
+    daysOffset: 19,
+    time: "15:00",
+    poster: DEMO_POSTERS.slutskiePoyasa,
+    tiers: [{ name: "Входной билет", price: 22, quantity: 360 }, { name: "Мастер-класс", price: 36, quantity: 120 }],
     salesChannels: ["OWN", "ByCard"],
   },
   {
-    organizerId: "demo_org_2",
-    title: "Спектакль «Ночной проспект»",
-    venue: "Театр драмы",
+    organizerId: "demo_org_philharmonic",
+    title: "Музыкальный вечер «Звоны Нясвіжа»",
+    venue: "Замковый комплекс «Несвиж»",
+    city: "Несвиж",
+    category: "Концерты",
+    description: "Камерный музыкальный вечер в историко-культурном пространстве Несвижского замка.",
+    daysOffset: 21,
+    time: "20:00",
+    poster: DEMO_POSTERS.zvonyNesvizha,
+    tiers: [{ name: "Камерный зал", price: 68, quantity: 90 }, { name: "Гостевой сектор", price: 84, quantity: 50 }],
+    salesChannels: ["OWN", "KvitkiBY"],
+  },
+  {
+    organizerId: "demo_org_fest_scene",
+    title: "Хореографическая программа «Кола традыцый»",
+    venue: "Гродненский областной драматический театр",
     city: "Гродно",
-    category: "Театр",
-    description: "Современная городская драма в двух актах.",
-    daysOffset: 10,
-    time: "18:30",
-    poster: DEMO_POSTERS.theatreNight,
-    tiers: [{ name: "Партер", price: 65, quantity: 40 }, { name: "Амфитеатр", price: 50, quantity: 35 }, { name: "Балкон", price: 35, quantity: 25 }],
+    category: "Шоу",
+    description: "Сценическая хореографическая программа с народными танцами, современным светом и живой музыкой.",
+    daysOffset: 24,
+    time: "18:00",
+    poster: DEMO_POSTERS.kolaTradycyj,
+    tiers: [{ name: "Партер", price: 52, quantity: 420 }, { name: "Амфитеатр", price: 42, quantity: 300 }, { name: "Балкон", price: 30, quantity: 180 }],
     salesChannels: ["OWN", "TicketPro"],
   },
   {
-    organizerId: "demo_org_2",
-    title: "Семейное шоу «Планета игр»",
-    venue: "Парк Победы",
+    organizerId: "demo_org_cultural_initiative",
+    title: "Выставочная программа «Спадчына і сучаснасць»",
+    venue: "Брестский областной краеведческий музей",
+    city: "Брест",
+    category: "Выставки",
+    description: "Музейная программа о преемственности культурного наследия, архивных материалах и современном искусстве.",
+    daysOffset: 26,
+    time: "11:00",
+    poster: DEMO_POSTERS.spadchynaSuchasnast,
+    tiers: [{ name: "Взрослый", price: 16, quantity: 180 }, { name: "Льготный", price: 8, quantity: 120 }],
+    salesChannels: ["OWN", "ByCard", "KvitkiBY"],
+  },
+  {
+    organizerId: "demo_org_fest_scene",
+    title: "Областной праздник «Купальскі вянок»",
+    venue: "Парк Подниколье",
+    city: "Могилёв",
+    category: "Фестивали",
+    description: "Областной праздник с фольклорной сценой, ремесленными подворьями и вечерней купальской программой.",
+    daysOffset: 30,
+    time: "17:00",
+    poster: DEMO_POSTERS.kupalskiVianok,
+    tiers: [{ name: "Основной вход", price: 28, quantity: 1000 }, { name: "Семейная зона", price: 40, quantity: 500 }],
+    salesChannels: ALL_ACTIVE_RESELLER_CHANNELS,
+  },
+  {
+    organizerId: "demo_org_philharmonic",
+    title: "Конкурс молодых исполнителей «Новыя імёны»",
+    venue: "Концертный зал «Витебск»",
     city: "Витебск",
-    category: "Детям",
-    description: "Интерактивное семейное шоу с аниматорами и музыкальными паузами.",
-    daysOffset: 17,
-    time: "12:00",
-    poster: DEMO_POSTERS.familyPlanet,
-    tiers: [{ name: "Семейный", price: 40, quantity: 55 }, { name: "Комфорт", price: 60, quantity: 30 }, { name: "Премиум", price: 85, quantity: 15 }],
+    category: "Конкурсы",
+    description: "Конкурсная программа молодых исполнителей с открытыми прослушиваниями и гала-концертом лауреатов.",
+    daysOffset: 33,
+    time: "16:30",
+    poster: DEMO_POSTERS.novyyaImiony,
+    tiers: [{ name: "Основной зал", price: 26, quantity: 300 }, { name: "Балкон", price: 18, quantity: 120 }],
+    salesChannels: ["OWN", "TicketPro", "KvitkiBY"],
+  },
+  {
+    organizerId: "demo_org_minskconcert",
+    title: "Международная программа «Сяброўства культур»",
+    venue: "Национальный центр современных искусств",
+    city: "Минск",
+    category: "Концерты",
+    description: "Международная культурная программа с белорусскими коллективами и приглашённым demo-ансамблем.",
+    daysOffset: 36,
+    time: "19:00",
+    poster: DEMO_POSTERS.siabroustvaKultur,
+    tiers: [{ name: "Партер", price: 64, quantity: 900 }, { name: "Балкон", price: 48, quantity: 600 }, { name: "Галерея", price: 32, quantity: 300 }],
     salesChannels: ["OWN", "ByCard", "TicketPro"],
   },
-  {
-    organizerId: "demo_org_2",
-    title: "Концерт «Город и джаз»",
-    venue: "Театр драмы",
-    city: "Гродно",
-    category: "Концерты",
-    description: "Камерный джазовый вечер с авторскими аранжировками.",
-    daysOffset: 28,
-    time: "19:30",
-    poster: DEMO_POSTERS.jazzCity,
-    tiers: [{ name: "Стандарт", price: 55, quantity: 50 }, { name: "Партер", price: 78, quantity: 35 }, { name: "VIP", price: 120, quantity: 15 }],
-    salesChannels: ["OWN", "TicketPro"],
-  },
 ];
+
+const DEMO_ORGANIZER_IDS = new Set(DEMO_ORGANIZERS.map((organizer) => organizer.organizerId));
+const REGISTERED_DEMO_ORGANIZERS = DEMO_ORGANIZERS.filter((organizer) => organizer.registryStatus === "зарегистрирован в реестре" && organizer.registryRegisteredAt);
+const OLD_DEMO_ORGANIZER_IDS = new Set(["demo_org_1", "demo_org_2"]);
+const OLD_DEMO_PHRASES = [
+  "\u041e\u0433\u043d\u0438 \u041d\u0435\u0432\u044b",
+  "\u042d\u0445\u043e \u0433\u043e\u0440\u043e\u0434\u0430",
+  "\u041b\u0435\u0442\u043d\u0438\u0439 \u0438\u043c\u043f\u0443\u043b\u044c\u0441",
+  "\u041d\u043e\u0447\u043d\u043e\u0439 \u043f\u0440\u043e\u0441\u043f\u0435\u043a\u0442",
+  "\u041f\u043b\u0430\u043d\u0435\u0442\u0430 \u0438\u0433\u0440",
+  "\u0413\u043e\u0440\u043e\u0434 \u0438 \u0434\u0436\u0430\u0437",
+  ["City", "Lights"].join(" "),
+  ["Aurum", "Quartet"].join(" "),
+  "\u0421\u0435\u0432\u0435\u0440\u043d\u044b\u0439 \u0421\u0432\u0435\u0442 \u0418\u0432\u0435\u043d\u0442",
+  "\u0413\u043e\u0440\u043e\u0434\u0441\u043a\u0430\u044f \u0410\u0444\u0438\u0448\u0430",
+];
+
+const DEMO_ORGANIZER_DOCUMENT_TEMPLATES: Array<Omit<AppState["organizerDocuments"][number], "organizerId" | "updatedAt">> = [
+  { documentId: "DOC-REGISTRY", title: "Выписка из реестра организаторов мероприятий", type: "реестр", status: "доступен" },
+  { documentId: "DOC-CHARTER", title: "Устав организации или положение учреждения", type: "устав", status: "доступен" },
+  { documentId: "DOC-PLATFORM", title: "Договор с платформой Центр Управления", type: "договор", status: "доступен" },
+  { documentId: "DOC-DETAILS", title: "Регистрационные данные и реквизиты", type: "регистрация", status: "доступен" },
+  { documentId: "DOC-FEES", title: "Подтверждение оплаты государственных пошлин", type: "пошлина", status: "доступен" },
+];
+
+function hasOldDemoPhrase(value: string | null | undefined): boolean {
+  const text = value || "";
+  return OLD_DEMO_PHRASES.some((phrase) => text.includes(phrase));
+}
+
+function cleanupLegacyDemoData(state: AppState): void {
+  const legacyEventIds = new Set(state.events.filter((event) => hasOldDemoPhrase(event.title)).map((event) => event.eventId));
+  const legacyAppIds = new Set(state.applications.filter((app) => hasOldDemoPhrase(app.title)).map((app) => app.appId));
+
+  state.events = state.events.filter((event) => !legacyEventIds.has(event.eventId));
+  state.applications = state.applications.filter((app) => !legacyAppIds.has(app.appId) && !legacyEventIds.has(app.eventId || ""));
+  state.tickets = state.tickets.filter((ticket) => !legacyEventIds.has(ticket.eventId));
+  state.ops = state.ops.filter((op) => !legacyEventIds.has(op.eventId) && op.ticketId !== "DEMO-MISSING-TICKET");
+  state.demoPurchases = state.demoPurchases.filter((purchase) => !legacyEventIds.has(purchase.eventId) && !hasOldDemoPhrase(purchase.eventTitle));
+  state.eventComplianceApplications = state.eventComplianceApplications.filter((app) => !hasOldDemoPhrase(app.data.title));
+  state.organizerRegistry = state.organizerRegistry.filter((row) => !OLD_DEMO_ORGANIZER_IDS.has(row.organizerId));
+  state.organizerDocuments = state.organizerDocuments.filter((doc) => !OLD_DEMO_ORGANIZER_IDS.has(doc.organizerId));
+  state.organizers = state.organizers.filter((organizer) => !OLD_DEMO_ORGANIZER_IDS.has(organizer.organizerId) && !hasOldDemoPhrase(organizer.name) && !hasOldDemoPhrase(organizer.fullName));
+}
+
+function ensureDemoOrganizerDocuments(state: AppState): void {
+  const now = new Date().toISOString();
+  for (const organizer of state.organizers.filter((item) => DEMO_ORGANIZER_IDS.has(item.organizerId))) {
+    for (const template of DEMO_ORGANIZER_DOCUMENT_TEMPLATES) {
+      const documentId = organizer.organizerId + "-" + template.documentId;
+      const existing = state.organizerDocuments.find((doc) => doc.documentId === documentId);
+      const nextDoc = { ...template, documentId, organizerId: organizer.organizerId, updatedAt: now };
+      if (existing) Object.assign(existing, nextDoc);
+      else state.organizerDocuments.push(nextDoc);
+    }
+  }
+}
 
 function toDateTime(daysOffset: number, time: string): string {
   const base = new Date();
@@ -184,14 +356,16 @@ function todayYmd(): string {
 
 function seedDemoCatalog(state: AppState): AppState {
   ensureDefaultResellers(state);
+  cleanupLegacyDemoData(state);
   state.organizers = DEMO_ORGANIZERS.map((organizer) => ({ ...organizer }));
-  state.organizerRegistry = DEMO_ORGANIZERS.map((organizer, index) => ({
-    organizerRegistryId: `DEMO-ORGREG-${index + 1}`,
+  state.organizerRegistry = REGISTERED_DEMO_ORGANIZERS.map((organizer, index) => ({
+    organizerRegistryId: "DEMO-ORGREG-" + String(index + 1).padStart(3, "0"),
     organizerId: organizer.organizerId,
-    internalNumber: index === 0 ? "DEMO-REG-001" : "DEMO-REG-002",
+    internalNumber: "DEMO-REG-" + String(index + 1).padStart(3, "0"),
     includedAt: organizer.registryRegisteredAt || todayYmd(),
   }));
   state.organizerDocuments = [];
+  ensureDemoOrganizerDocuments(state);
   state.currentOrganizerId = null;
 
   for (const seed of DEMO_APPS) {
@@ -214,13 +388,15 @@ function seedDemoCatalog(state: AppState): AppState {
     const approved = approveApplication(state, app.appId);
     if (!approved) continue;
     const event = state.events.find((item) => item.eventId === approved.eventId);
-    if (event) event.salesChannels = seed.salesChannels;
+    if (event) event.salesChannels = [...seed.salesChannels];
     publishEvent(state, approved.eventId);
     issueMarks(state, approved.eventId);
   }
 
-  state.demoPurchases = [];
-  state.ops = [];
+  ensureOrganizerApplications(state);
+  ensureEventComplianceApplications(state);
+  ensureCertificatesForPublishedEvents(state);
+  ensureDemoTicketOperations(state);
   saveState(state);
   return state;
 }
@@ -241,8 +417,10 @@ export function generateDemoData(): AppState {
 
 function enrichDemoData(state: AppState): void {
   ensureDefaultResellers(state);
+  cleanupLegacyDemoData(state);
   ensureDemoOrganizers(state);
   ensureOrganizerRegistry(state);
+  ensureDemoOrganizerDocuments(state);
   ensureSeedPublishedEvents(state);
   ensureOrganizerApplications(state);
   ensureEventComplianceApplications(state);
@@ -258,33 +436,24 @@ function ensureDemoOrganizers(state: AppState): void {
       state.organizers.push({ ...demo });
       continue;
     }
-    existing.name ||= demo.name;
-    existing.fullName ||= demo.fullName;
-    existing.unp ||= demo.unp;
-    existing.registryStatus ||= demo.registryStatus;
-    existing.registryRegisteredAt ||= demo.registryRegisteredAt;
-    existing.director ||= demo.director;
-    existing.email ||= demo.email;
-    existing.phone ||= demo.phone;
-    existing.accountStatus ||= demo.accountStatus;
-    existing.feesStatus ||= demo.feesStatus;
+    Object.assign(existing, demo);
   }
 }
 
 function ensureOrganizerRegistry(state: AppState): void {
-  for (const [index, organizer] of DEMO_ORGANIZERS.entries()) {
+  const registeredIds = new Set(REGISTERED_DEMO_ORGANIZERS.map((organizer) => organizer.organizerId));
+  state.organizerRegistry = state.organizerRegistry.filter((row) => !DEMO_ORGANIZER_IDS.has(row.organizerId) || registeredIds.has(row.organizerId));
+
+  for (const [index, organizer] of REGISTERED_DEMO_ORGANIZERS.entries()) {
     const existing = state.organizerRegistry.find((r) => r.organizerId === organizer.organizerId);
-    if (existing) {
-      existing.internalNumber ||= index === 0 ? "DEMO-REG-001" : "DEMO-REG-002";
-      existing.includedAt ||= organizer.registryRegisteredAt || todayYmd();
-      continue;
-    }
-    state.organizerRegistry.push({
-      organizerRegistryId: `DEMO-ORGREG-${index + 1}`,
+    const nextRecord = {
+      organizerRegistryId: "DEMO-ORGREG-" + String(index + 1).padStart(3, "0"),
       organizerId: organizer.organizerId,
-      internalNumber: index === 0 ? "DEMO-REG-001" : "DEMO-REG-002",
+      internalNumber: "DEMO-REG-" + String(index + 1).padStart(3, "0"),
       includedAt: organizer.registryRegisteredAt || todayYmd(),
-    });
+    };
+    if (existing) Object.assign(existing, nextRecord);
+    else state.organizerRegistry.push(nextRecord);
   }
 }
 
@@ -292,13 +461,17 @@ function ensureSeedPublishedEvents(state: AppState): void {
   for (const seed of DEMO_APPS) {
     const existingEvent = state.events.find((event) => event.organizerId === seed.organizerId && event.title === seed.title);
     if (existingEvent) {
-      existingEvent.city ||= seed.city;
-      existingEvent.category ||= seed.category;
-      existingEvent.description ||= seed.description;
+      existingEvent.venue = seed.venue;
+      existingEvent.city = seed.city;
+      existingEvent.category = seed.category;
+      existingEvent.description = seed.description;
       existingEvent.poster = seed.poster;
-      existingEvent.tiers = existingEvent.tiers?.length ? existingEvent.tiers : seed.tiers;
-      existingEvent.capacity ||= seed.tiers.reduce((acc, tier) => acc + tier.quantity, 0);
-      existingEvent.salesChannels = seed.salesChannels;
+      existingEvent.dateTime ||= toDateTime(seed.daysOffset, seed.time);
+      existingEvent.tiers = seed.tiers.map((tier) => ({ ...tier }));
+      existingEvent.capacity = seed.tiers.reduce((acc, tier) => acc + tier.quantity, 0);
+      existingEvent.salesChannels = [...seed.salesChannels];
+      existingEvent.status = "published";
+      if (!state.tickets.some((ticket) => ticket.eventId === existingEvent.eventId)) issueMarks(state, existingEvent.eventId);
       continue;
     }
     const app = createApplication(
@@ -320,94 +493,178 @@ function ensureSeedPublishedEvents(state: AppState): void {
     const approved = approveApplication(state, app.appId);
     if (!approved) continue;
     const event = state.events.find((item) => item.eventId === approved.eventId);
-    if (event) event.salesChannels = seed.salesChannels;
+    if (event) event.salesChannels = [...seed.salesChannels];
     publishEvent(state, approved.eventId);
     issueMarks(state, approved.eventId);
   }
 }
 
+type DemoOrganizerApplicationSeed = {
+  id: string;
+  organizerId: string;
+  status: OrganizerApplicationRecord["status"];
+  submittedAt: string;
+  reviewedAt: string | null;
+  adminComment: string;
+  data: OrganizerApplicationData;
+};
+
+function attachment(attachmentId: string, name: string, kind: string, uploadedAt: string, isSample = true): MockAttachment {
+  return { attachmentId, name, kind, uploadedAt, isSample };
+}
+
 function ensureOrganizerApplications(state: AppState): void {
-  const seeds: Array<{ id: string; organizerId: string; submittedAt: string; data: OrganizerApplicationData }> = [
+  const seeds: DemoOrganizerApplicationSeed[] = [
     {
       id: "organizerApplication001",
-      organizerId: "pending_org_application_001",
-      submittedAt: "2026-04-21T09:00:00",
+      organizerId: "demo_org_minskconcert",
+      status: "approved",
+      submittedAt: "2026-04-01T09:00:00",
+      reviewedAt: "2026-04-03T11:30:00",
+      adminComment: "Заявка согласована. Данные учреждения культуры заполнены корректно.",
       data: {
-        legalName: "ООО «Городская сцена»",
-        registrationNumber: "193847261",
+        legalName: "Государственное учреждение «Минскконцерт»",
+        registrationNumber: "100600111",
         postalCode: "220030",
         region: "г. Минск",
         locality: "Минск",
-        street: "ул. Интернациональная",
-        houseNumber: "14",
-        roomTypeAndNumber: "",
-        addressExtra: "",
-        contactPhone: "+375 29 111-22-33",
-        website: "",
-        email: "info@gorod-stage.by",
-        ownershipType: "private",
-        director: { fullName: "Анна Ковальчук", docType: "", docNumber: "", issueDate: "", issueAuthority: "" },
-        workers: [],
+        street: "ул. Раковская",
+        houseNumber: "18",
+        roomTypeAndNumber: "кабинет 12",
+        addressExtra: "административный корпус",
+        contactPhone: "+375 (17) 300-10-10",
+        website: "https://minskconcert.demo.example",
+        email: "minskconcert@demo.example",
+        ownershipType: "state",
+        director: { fullName: "Савицкий Андрей Викторович", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" },
+        workers: [{ fullName: "Горбач Мария Александровна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }, { fullName: "Курило Павел Иванович", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }],
         founders: [],
-        activities: ["Концерты"],
-        activityOther: "",
-        pastEventsDescription: "",
-        pastMaterials: [],
-        documents: [],
+        activities: ["концертная деятельность", "фестивали", "городские культурные программы"],
+        activityOther: "координация городских культурных площадок",
+        pastEventsDescription: "Городские концерты, фестивали народного творчества и программы ко Дню Независимости в demo-периоде.",
+        pastMaterials: [attachment("ORGAPP-001-MAT-1", "Фотоотчёт городского концерта.pdf", "past-materials", "2026-04-01T09:10:00")],
+        documents: [attachment("ORGAPP-001-DOC-1", "Устав учреждения.pdf", "charter", "2026-04-01T09:12:00"), attachment("ORGAPP-001-DOC-2", "Выписка из реестра.pdf", "registry", "2026-04-01T09:13:00")],
         confirmations: { isAccurate: true, adminReviewConsent: true },
-        accountCredentials: { login: "", password: "" },
+        accountCredentials: { login: "organizer.minskconcert", password: "demo123" },
       },
     },
     {
       id: "organizerApplication002",
-      organizerId: "pending_org_application_002",
-      submittedAt: "2026-04-22T09:00:00",
+      organizerId: "demo_org_philharmonic",
+      status: "approved",
+      submittedAt: "2026-04-02T10:00:00",
+      reviewedAt: "2026-04-04T12:00:00",
+      adminComment: "Государственная организация культуры включена в демонстрационный реестр.",
       data: {
-        legalName: "ООО «Северный звук»",
-        registrationNumber: "193847262",
-        postalCode: "210015",
-        region: "г. Витебск",
-        locality: "Витебск",
-        street: "пр-т Фрунзе",
-        houseNumber: "22",
-        roomTypeAndNumber: "",
-        addressExtra: "",
-        contactPhone: "+375 29 444-55-66",
-        website: "",
-        email: "office@nord-sound.by",
-        ownershipType: "private",
-        director: { fullName: "Павел Лисовский", docType: "", docNumber: "", issueDate: "", issueAuthority: "" },
-        workers: [],
+        legalName: "Государственное учреждение «Белорусская государственная ордена Трудового Красного Знамени филармония»",
+        registrationNumber: "100600222",
+        postalCode: "220005",
+        region: "г. Минск",
+        locality: "Минск",
+        street: "пр-т Независимости",
+        houseNumber: "50",
+        roomTypeAndNumber: "приёмная",
+        addressExtra: "концертный корпус",
+        contactPhone: "+375 (17) 300-20-20",
+        website: "https://philharmonic.demo.example",
+        email: "philharmonic@culture-demo.example",
+        ownershipType: "state",
+        director: { fullName: "Ковалёва Марина Сергеевна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" },
+        workers: [{ fullName: "Семенюк Ирина Олеговна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }, { fullName: "Мартынов Денис Викторович", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }],
         founders: [],
-        activities: ["Концерты"],
-        activityOther: "",
-        pastEventsDescription: "",
-        pastMaterials: [],
-        documents: [],
+        activities: ["академическая музыка", "народная музыка", "конкурсы исполнителей"],
+        activityOther: "концертное сопровождение государственных культурных программ",
+        pastEventsDescription: "Абонементные концерты, камерные вечера и конкурсные программы молодых исполнителей.",
+        pastMaterials: [attachment("ORGAPP-002-MAT-1", "Программа концертного сезона.pdf", "past-materials", "2026-04-02T10:10:00")],
+        documents: [attachment("ORGAPP-002-DOC-1", "Положение учреждения.pdf", "charter", "2026-04-02T10:12:00"), attachment("ORGAPP-002-DOC-2", "Регистрационные сведения.pdf", "registry", "2026-04-02T10:13:00")],
         confirmations: { isAccurate: true, adminReviewConsent: true },
-        accountCredentials: { login: "", password: "" },
+        accountCredentials: { login: "organizer.philharmonic", password: "demo123" },
+      },
+    },
+    {
+      id: "organizerApplication003",
+      organizerId: "demo_org_cultural_initiative",
+      status: "approved",
+      submittedAt: "2026-04-05T09:30:00",
+      reviewedAt: "2026-04-08T14:20:00",
+      adminComment: "Документы частной организации проверены, опыт проведения культурных мероприятий подтверждён.",
+      data: {
+        legalName: "Общество с ограниченной ответственностью «Культурная инициатива Беларуси»",
+        registrationNumber: "193700333",
+        postalCode: "220004",
+        region: "г. Минск",
+        locality: "Минск",
+        street: "ул. Немига",
+        houseNumber: "7",
+        roomTypeAndNumber: "офис 31",
+        addressExtra: "деловой центр",
+        contactPhone: "+375 (29) 300-30-30",
+        website: "https://culture-initiative.demo.example",
+        email: "office@culture-initiative.example",
+        ownershipType: "private",
+        director: { fullName: "Лисовская Наталья Павловна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" },
+        workers: [{ fullName: "Бондарь Артём Игоревич", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }, { fullName: "Гринкевич Ольга Юрьевна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }],
+        founders: [{ fullName: "Лисовская Наталья Павловна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }],
+        activities: ["выставочные программы", "театральные фестивали", "ремесленные проекты"],
+        activityOther: "партнёрские проекты с музеями и домами культуры",
+        pastEventsDescription: "Выставочные программы, театральные форумы и фестивали ремёсел в областных центрах.",
+        pastMaterials: [attachment("ORGAPP-003-MAT-1", "Каталог выставочной программы.pdf", "past-materials", "2026-04-05T09:40:00")],
+        documents: [attachment("ORGAPP-003-DOC-1", "Устав общества.pdf", "charter", "2026-04-05T09:42:00"), attachment("ORGAPP-003-DOC-2", "Сведения о государственной регистрации.pdf", "registry", "2026-04-05T09:43:00")],
+        confirmations: { isAccurate: true, adminReviewConsent: true },
+        accountCredentials: { login: "organizer.culture", password: "demo123" },
+      },
+    },
+    {
+      id: "organizerApplication004",
+      organizerId: "demo_org_fest_scene",
+      status: "submitted",
+      submittedAt: "2026-04-10T13:15:00",
+      reviewedAt: null,
+      adminComment: "Заявка ожидает проверки документов и подтверждения опыта проведения областных программ.",
+      data: {
+        legalName: "Частное унитарное предприятие «Праздничная сцена»",
+        registrationNumber: "193700444",
+        postalCode: "246050",
+        region: "Гомельская область",
+        locality: "Гомель",
+        street: "ул. Советская",
+        houseNumber: "44",
+        roomTypeAndNumber: "офис 8",
+        addressExtra: "административное помещение",
+        contactPhone: "+375 (33) 300-40-40",
+        website: "https://fest-scene.demo.example",
+        email: "registry@fest-scene.example",
+        ownershipType: "private",
+        director: { fullName: "Руденко Олег Николаевич", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" },
+        workers: [{ fullName: "Климова Елена Андреевна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }, { fullName: "Сташкевич Роман Петрович", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }],
+        founders: [{ fullName: "Руденко Олег Николаевич", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }],
+        activities: ["детские культурные программы", "областные праздники", "хореографические шоу"],
+        activityOther: "техническое сопровождение сценических программ",
+        pastEventsDescription: "Праздничные программы домов культуры, детские спектакли и хореографические концерты.",
+        pastMaterials: [attachment("ORGAPP-004-MAT-1", "Описание реализованных программ.pdf", "past-materials", "2026-04-10T13:20:00")],
+        documents: [attachment("ORGAPP-004-DOC-1", "Устав предприятия.pdf", "charter", "2026-04-10T13:22:00"), attachment("ORGAPP-004-DOC-2", "Справка о регистрации.pdf", "registry", "2026-04-10T13:23:00")],
+        confirmations: { isAccurate: true, adminReviewConsent: true },
+        accountCredentials: { login: "organizer.festscene", password: "demo123" },
       },
     },
   ];
 
   for (const seed of seeds) {
     const existing = findOrganizerApplication(state, seed.id, seed.data.registrationNumber);
-    if (!existing) {
-      const now = new Date().toISOString();
-      state.organizerApplications.push({
-        organizerApplicationId: seed.id,
-        organizerId: seed.organizerId,
-        status: "submitted",
-        submittedAt: seed.submittedAt,
-        reviewedAt: null,
-        adminComment: "",
-        data: seed.data,
-        createdAt: seed.submittedAt,
-        updatedAt: now,
-      });
-      continue;
-    }
-    mergeOrganizerApplication(existing, seed);
+    const now = new Date().toISOString();
+    const nextRecord: OrganizerApplicationRecord = {
+      organizerApplicationId: seed.id,
+      organizerId: seed.organizerId,
+      status: seed.status,
+      submittedAt: seed.submittedAt,
+      reviewedAt: seed.reviewedAt,
+      adminComment: seed.adminComment,
+      data: seed.data,
+      createdAt: seed.submittedAt,
+      updatedAt: now,
+    };
+    if (!existing) state.organizerApplications.push(nextRecord);
+    else Object.assign(existing, nextRecord);
   }
 }
 
@@ -441,62 +698,89 @@ type DemoComplianceSeed = {
   certificateNumber?: string;
   certificateDate?: string;
   title: string;
-  dateTime: string;
-  venue: string;
-  category: string;
-  city: string;
   age: EventComplianceData["ageCategory"];
-  price: number;
-  limit: number;
-  description: string;
+  program: string;
   approvalMode?: EventComplianceData["approvalMode"];
-  posterPath: string;
-  salesChannels?: string[];
+  approvalBasis?: string;
   hasForeignPerformers?: boolean;
   feeExempt?: boolean;
   feePaid?: boolean;
   executiveCommitteeNotified?: boolean;
 };
 
+function findDemoAppByTitle(title: string): DemoAppSeed | undefined {
+  return DEMO_APPS.find((event) => event.title === title);
+}
+
 function buildComplianceData(seed: DemoComplianceSeed): EventComplianceData {
+  const eventSeed = findDemoAppByTitle(seed.title);
   const hasForeignPerformers = Boolean(seed.hasForeignPerformers);
+  const submittedAt = seed.submittedAt;
+  const tiers = (eventSeed?.tiers || [{ name: "Стандарт", price: 30, quantity: 100 }]).map((tier) => ({ ...tier }));
+  const capacity = tiers.reduce((acc, tier) => acc + tier.quantity, 0);
+  const basePerformers: EventComplianceData["performers"] = [
+    { name: "Ансамбль «Спадчына»", performerType: "group", country: "Беларусь", representative: "Demo Culture Office", comment: "Белорусские исполнители, demo-сценарий" },
+  ];
+  const performers = hasForeignPerformers
+    ? [
+        ...basePerformers,
+        { name: "Ensemble Baltic Folk", performerType: "group" as const, country: "Литва", representative: "Demo Culture Agency", comment: "Иностранные исполнители, demo-сценарий" },
+      ]
+    : basePerformers;
+  const approvalMode = seed.approvalMode || "certificate_required";
+  const approvalBasis = seed.approvalBasis ||
+    (approvalMode === "notice_only"
+      ? "Мероприятие проводится в уведомительном порядке для культурной программы без выдачи удостоверения."
+      : approvalMode === "certificate_not_required"
+        ? "Культурно-просветительская программа относится к сценарию, где удостоверение не требуется."
+        : "Публичное культурно-зрелищное мероприятие с реализацией билетов; требуется удостоверение.");
+
   return {
     title: seed.title,
-    eventType: seed.category,
-    shortDescription: seed.description,
-    program: "",
-    posterPath: seed.posterPath,
-    salesChannels: seed.salesChannels || ["OWN", "ByCard", "TicketPro"],
-    dateSlots: [seed.dateTime],
-    venueName: seed.venue,
-    venueAddress: seed.city,
-    performers: hasForeignPerformers
-      ? [{ name: "Aurum Quartet", performerType: "group", country: "Польша", representative: "Demo Agency", comment: "Иностранные исполнители" }]
-      : [],
+    eventType: eventSeed?.category || "Культурная программа",
+    shortDescription: eventSeed?.description || "Демонстрационная культурная программа.",
+    program: seed.program,
+    posterPath: eventSeed?.poster || DEMO_POSTERS.vasilkovyKraj,
+    salesChannels: eventSeed?.salesChannels ? [...eventSeed.salesChannels] : ["OWN"],
+    dateSlots: eventSeed ? [toDateTime(eventSeed.daysOffset, eventSeed.time)] : ["2026-06-01T19:00"],
+    venueName: eventSeed?.venue || "Demo venue",
+    venueAddress: eventSeed ? eventSeed.city + ", demo-адрес площадки" : "г. Минск, demo-адрес площадки",
+    performers,
     onlyBelarusianPerformers: !hasForeignPerformers,
     hasForeignPerformers,
-    venueType: "зрительный зал",
-    projectedCapacity: seed.limit,
-    plannedTicketsForSale: seed.limit,
-    ticketTiers: [{ name: "Стандарт", price: seed.price, quantity: seed.limit }],
+    venueType: capacity <= 300 ? "камерная площадка" : capacity > 3000 ? "крупная открытая площадка" : "зрительный зал",
+    projectedCapacity: capacity,
+    plannedTicketsForSale: capacity,
+    ticketTiers: tiers,
     ageCategory: seed.age,
-    ageComment: "",
-    approvalMode: seed.approvalMode || "certificate_required",
-    approvalBasis: seed.approvalMode === "notice_only" ? "Сценарий уведомления без выдачи удостоверения." : "",
-    eventDocuments: [],
-    salesStartDate: "2026-05-01",
+    ageComment: "Возрастная категория определена по содержанию demo-программы и информационной продукции.",
+    approvalMode,
+    approvalBasis,
+    eventDocuments: [
+      attachment(seed.id + "-program", "Программа мероприятия.pdf", "event-program", submittedAt),
+      attachment(seed.id + "-venue", "Подтверждение права использования площадки.pdf", "venue-rights", submittedAt),
+      attachment(seed.id + "-poster", "Макет афиши.pdf", "poster-layout", submittedAt),
+    ],
+    salesStartDate: "2026-05-12",
     feeExempt: Boolean(seed.feeExempt),
-    feeExemptReason: seed.feeExempt ? "Демонстрационная категория освобождения от пошлины" : "",
+    feeExemptReason: seed.feeExempt ? "Мероприятие проводится в рамках государственной культурной demo-программы; применено освобождение от пошлины." : "Освобождение от пошлины не применяется.",
     feePaid: Boolean(seed.feePaid),
-    paymentAttachments: [],
-    paymentComment: "",
+    paymentAttachments: seed.feePaid ? [attachment(seed.id + "-payment", "Платёжное поручение demo.pdf", "fee-payment", submittedAt)] : [],
+    paymentComment: seed.feePaid
+      ? "Пошлина оплачена по demo-платёжному поручению."
+      : seed.feeExempt
+        ? "Пошлина не начисляется по заявленному основанию освобождения."
+        : "Оплата будет подтверждена после административной проверки.",
     adRestrictionConfirmed: true,
     cancelled: false,
     changesDeclared: false,
     executiveCommitteeNotified: Boolean(seed.executiveCommitteeNotified),
-    citizensNotified: false,
-    notificationsAttachment: [],
-    cancellationComment: "",
+    citizensNotified: true,
+    notificationsAttachment: [
+      attachment(seed.id + "-notice", "Уведомление местного исполнительного комитета.pdf", "executive-notice", submittedAt),
+      attachment(seed.id + "-citizens", "Информация для граждан.pdf", "citizens-notice", submittedAt),
+    ],
+    cancellationComment: "Отмена не заявлялась; изменения программы отсутствуют.",
   };
 }
 
@@ -504,195 +788,159 @@ function ensureEventComplianceApplications(state: AppState): void {
   const seeds: DemoComplianceSeed[] = [
     {
       id: "eventApplication001",
-      organizerId: "demo_org_1",
-      status: "submitted",
-      submittedAt: "2026-04-24T09:00:00",
-      title: "Весенний концерт City Lights",
-      dateTime: "2026-05-20T19:00",
-      venue: "Prime Hall",
-      category: "Концерты",
-      city: "Минск",
-      age: "12+",
-      price: 65,
-      limit: 1200,
-      description: "Концертная программа с участием белорусских исполнителей.",
-      posterPath: DEMO_POSTERS.concertNeva,
-      salesChannels: ["OWN", "ByCard", "TicketPro"],
-      feePaid: true,
+      organizerId: "demo_org_minskconcert",
+      status: "approved",
+      submittedAt: "2026-04-18T09:00:00",
+      reviewedAt: "2026-04-20T11:30:00",
+      certificateNumber: "CERT-DEMO-BY-001",
+      certificateDate: "2026-04-20",
+      adminComment: "Заявка согласована, документы и уведомления представлены в полном объёме.",
+      title: "Фестиваль «Васільковы край»",
+      age: "0+",
+      program: "Открытие фестиваля, ремесленные подворья, концерты народных коллективов, семейная программа и вечерний заключительный блок.",
+      feeExempt: true,
+      executiveCommitteeNotified: true,
     },
     {
       id: "eventApplication002",
-      organizerId: "demo_org_2",
-      status: "approved",
-      submittedAt: "2026-04-20T10:00:00",
-      reviewedAt: "2026-04-22T11:30:00",
-      certificateNumber: "CERT-DEMO-002",
-      certificateDate: "2026-04-22",
-      title: "Семейное шоу «Планета чудес»",
-      dateTime: "2026-05-24T16:00",
-      venue: "Гомельский городской центр культуры",
-      category: "Шоу",
-      city: "Гомель",
+      organizerId: "demo_org_philharmonic",
+      status: "submitted",
+      submittedAt: "2026-04-19T10:00:00",
+      adminComment: "Заявка принята и ожидает проверки оплаты пошлины.",
+      title: "Концерт «Песня роднай зямлі»",
       age: "6+",
-      price: 40,
-      limit: 700,
-      description: "Семейное культурно-зрелищное шоу для детей и родителей.",
-      posterPath: DEMO_POSTERS.familyPlanet,
-      salesChannels: ["OWN", "TicketPro"],
+      program: "Увертюра, блок белорусской академической музыки, выступление хора, народные песни в оркестровой обработке.",
       feePaid: true,
     },
     {
       id: "eventApplication003",
-      organizerId: "demo_org_1",
-      status: "rejected",
-      submittedAt: "2026-04-18T09:20:00",
-      reviewedAt: "2026-04-19T15:10:00",
-      adminComment: "Не приложена программа мероприятия.",
-      title: "Театральный вечер «Северная сцена»",
-      dateTime: "2026-05-28T18:30",
-      venue: "Камерный театр",
-      category: "Театр",
-      city: "Минск",
-      age: "16+",
-      price: 55,
-      limit: 320,
-      description: "Драматическая постановка с камерной сценографией.",
-      posterPath: DEMO_POSTERS.theatreNight,
-      salesChannels: ["OWN"],
+      organizerId: "demo_org_cultural_initiative",
+      status: "needs_rework",
+      submittedAt: "2026-04-20T09:20:00",
+      reviewedAt: "2026-04-21T15:10:00",
+      adminComment: "Уточните проектную вместимость площадки и схему рассадки.",
+      title: "Театральный форум «Сцэна Беларусі»",
+      age: "12+",
+      program: "Показы спектаклей, творческая встреча с режиссёрами, обсуждение сценографии и итоговая дискуссия.",
+      feePaid: true,
     },
     {
       id: "eventApplication004",
-      organizerId: "demo_org_2",
-      status: "needs_rework",
-      submittedAt: "2026-04-23T13:00:00",
-      reviewedAt: "2026-04-24T09:45:00",
-      adminComment: "Уточните вместимость площадки и схему рассадки.",
-      title: "Open-air «Огни набережной»",
-      dateTime: "2026-06-02T20:30",
-      venue: "Набережная сцена",
-      category: "Фестивали",
-      city: "Гродно",
-      age: "12+",
-      price: 48,
-      limit: 1800,
-      description: "Вечерний open-air с несколькими световыми сценами.",
-      posterPath: DEMO_POSTERS.openAirLights,
-      salesChannels: ["OWN", "ByCard"],
+      organizerId: "demo_org_fest_scene",
+      status: "rejected",
+      submittedAt: "2026-04-21T13:00:00",
+      reviewedAt: "2026-04-22T09:45:00",
+      adminComment: "Не приложена программа мероприятия.",
+      title: "Детская программа «Казкі Палесся»",
+      age: "0+",
+      program: "Интерактивная сказочная программа, музыкальные паузы, игровые станции и финальная встреча с артистами.",
+      approvalMode: "certificate_not_required",
     },
     {
       id: "eventApplication005",
-      organizerId: "demo_org_1",
-      status: "submitted",
-      submittedAt: "2026-04-26T08:30:00",
-      title: "Джазовый вечер «Город и джаз»",
-      dateTime: "2026-06-08T19:30",
-      venue: "Музыкальный двор",
-      category: "Концерты",
-      city: "Гродно",
-      age: "12+",
-      price: 58,
-      limit: 260,
-      description: "Сценарий notice_only: требуется уведомление уполномоченного органа.",
-      approvalMode: "notice_only",
-      posterPath: DEMO_POSTERS.jazzCity,
-      salesChannels: ["OWN", "TicketPro"],
+      organizerId: "demo_org_minskconcert",
+      status: "approved",
+      submittedAt: "2026-04-22T08:30:00",
+      reviewedAt: "2026-04-24T12:00:00",
+      certificateNumber: "CERT-DEMO-BY-005",
+      certificateDate: "2026-04-24",
+      adminComment: "Состав исполнителей и возрастная категория подтверждены.",
+      title: "Концерт мастеров искусств «Беларусь у сэрцы»",
+      age: "6+",
+      program: "Симфонический пролог, выступления мастеров искусств, хоровой блок и торжественный финал.",
+      feePaid: true,
       executiveCommitteeNotified: true,
     },
     {
       id: "eventApplication006",
-      organizerId: "demo_org_2",
+      organizerId: "demo_org_cultural_initiative",
       status: "submitted",
-      submittedAt: "2026-04-26T12:15:00",
-      title: "Детская программа «Планета игр»",
-      dateTime: "2026-06-12T12:00",
-      venue: "Дом культуры",
-      category: "Детям",
-      city: "Витебск",
-      age: "6+",
-      price: 35,
-      limit: 140,
-      description: "Сценарий, где удостоверение не требуется.",
-      approvalMode: "certificate_not_required",
-      posterPath: DEMO_POSTERS.familyPlanet,
-      salesChannels: ["OWN", "ByCard", "TicketPro"],
+      submittedAt: "2026-04-23T12:15:00",
+      adminComment: "Уведомительный сценарий принят к учёту.",
+      title: "Фестиваль ремёсел «Слуцкие пояса»",
+      age: "0+",
+      program: "Выставка тканых изделий, мастер-классы ремесленников, лекция о слуцких поясах и семейный маршрут.",
+      approvalMode: "notice_only",
+      feeExempt: true,
+      executiveCommitteeNotified: true,
     },
     {
       id: "eventApplication007",
-      organizerId: "demo_org_1",
-      status: "submitted",
-      submittedAt: "2026-04-27T09:10:00",
-      title: "Международный квартет Aurum",
-      dateTime: "2026-06-14T19:00",
-      venue: "Филармония",
-      category: "Концерты",
-      city: "Минск",
+      organizerId: "demo_org_philharmonic",
+      status: "approved",
+      submittedAt: "2026-04-24T09:10:00",
+      reviewedAt: "2026-04-25T10:00:00",
+      certificateNumber: "CERT-DEMO-BY-007",
+      certificateDate: "2026-04-25",
+      adminComment: "Камерная программа согласована без дополнительных замечаний.",
+      title: "Музыкальный вечер «Звоны Нясвіжа»",
       age: "12+",
-      price: 90,
-      limit: 520,
-      description: "Заявка с иностранными исполнителями.",
-      posterPath: DEMO_POSTERS.concertNeva,
-      salesChannels: ["OWN", "TicketPro"],
-      hasForeignPerformers: true,
-      feePaid: true,
+      program: "Камерная инструментальная программа, рассказ о музыкальной традиции Несвижа и заключительное выступление ансамбля.",
+      approvalMode: "certificate_not_required",
     },
     {
       id: "eventApplication008",
-      organizerId: "demo_org_2",
+      organizerId: "demo_org_fest_scene",
+      status: "rejected",
+      submittedAt: "2026-04-25T14:20:00",
+      reviewedAt: "2026-04-26T16:00:00",
+      adminComment: "Не подтверждены права на использование сценической площадки.",
+      title: "Хореографическая программа «Кола традыцый»",
+      age: "6+",
+      program: "Народные танцы, современная хореография, сценический блок о календарных традициях и финальный поклон коллективов.",
+      feePaid: true,
+    },
+    {
+      id: "eventApplication009",
+      organizerId: "demo_org_cultural_initiative",
+      status: "needs_rework",
+      submittedAt: "2026-04-26T10:30:00",
+      reviewedAt: "2026-04-27T11:45:00",
+      adminComment: "Требуется уточнить состав исполнителей и возрастную категорию информационной продукции.",
+      title: "Выставочная программа «Спадчына і сучаснасць»",
+      age: "6+",
+      program: "Экскурсионный маршрут, лекция куратора, демонстрация музейных предметов и современная художественная секция.",
+      approvalMode: "notice_only",
+      executiveCommitteeNotified: true,
+    },
+    {
+      id: "eventApplication010",
+      organizerId: "demo_org_minskconcert",
       status: "submitted",
-      submittedAt: "2026-04-27T14:20:00",
-      title: "Благотворительный летний фестиваль",
-      dateTime: "2026-06-20T15:00",
-      venue: "Парк Победы",
-      category: "Фестивали",
-      city: "Минск",
-      age: "0+",
-      price: 25,
-      limit: 900,
-      description: "Сценарий с освобождением от госпошлины.",
-      posterPath: DEMO_POSTERS.summerFestival,
-      salesChannels: ["OWN", "ByCard"],
-      feeExempt: true,
+      submittedAt: "2026-04-27T09:40:00",
+      adminComment: "Заявка с иностранными исполнителями ожидает проверки состава участников.",
+      title: "Международная программа «Сяброўства культур»",
+      age: "12+",
+      program: "Белорусский музыкальный блок, выступление приглашённого demo-ансамбля, совместный финал и встреча культурных координаторов.",
+      hasForeignPerformers: true,
+      feePaid: true,
+      executiveCommitteeNotified: true,
     },
   ];
 
   for (const seed of seeds) {
     let row = state.eventComplianceApplications.find((r) => r.eventComplianceApplicationId === seed.id);
-    if (!row) {
-      row = state.eventComplianceApplications.find((r) => r.organizerId === seed.organizerId && r.data.title === seed.title);
-    }
+    if (!row) row = state.eventComplianceApplications.find((r) => r.organizerId === seed.organizerId && r.data.title === seed.title);
     const data = buildComplianceData(seed);
-    if (!row) {
-      const now = new Date().toISOString();
-      state.eventComplianceApplications.push({
-        eventComplianceApplicationId: seed.id,
-        organizerId: seed.organizerId,
-        status: seed.status,
-        submittedAt: seed.submittedAt,
-        reviewedAt: seed.reviewedAt ?? null,
-        adminComment: seed.adminComment || "",
-        feePaymentConfirmedByAdmin: Boolean(seed.feePaid || seed.status === "approved"),
-        certificateNumber: seed.certificateNumber || "",
-        certificateDate: seed.certificateDate || "",
-        linkedLegacyAppId: null,
-        linkedEventId: null,
-        data,
-        createdAt: seed.submittedAt,
-        updatedAt: now,
-      });
-      continue;
-    }
-    row.organizerId ||= seed.organizerId;
-    row.status = seed.status;
-    row.submittedAt ||= seed.submittedAt;
-    row.reviewedAt = seed.reviewedAt ?? row.reviewedAt;
-    row.adminComment = seed.adminComment || row.adminComment || "";
-    row.feePaymentConfirmedByAdmin = row.feePaymentConfirmedByAdmin || Boolean(seed.feePaid || seed.status === "approved");
-    row.certificateNumber = seed.certificateNumber || row.certificateNumber || "";
-    row.certificateDate = seed.certificateDate || row.certificateDate || "";
-    row.data = { ...data, ...row.data, posterPath: row.data.posterPath || data.posterPath };
-    row.data.ticketTiers = row.data.ticketTiers?.length ? row.data.ticketTiers : data.ticketTiers;
-    row.data.plannedTicketsForSale = row.data.ticketTiers.reduce((acc, tier) => acc + (tier.quantity || 0), 0);
-    row.data.salesChannels = row.data.salesChannels?.length ? row.data.salesChannels : data.salesChannels;
+    const now = new Date().toISOString();
+    const nextRecord: EventComplianceApplicationRecord = {
+      eventComplianceApplicationId: seed.id,
+      organizerId: seed.organizerId,
+      status: seed.status,
+      submittedAt: seed.submittedAt,
+      reviewedAt: seed.reviewedAt ?? null,
+      adminComment: seed.adminComment || "",
+      feePaymentConfirmedByAdmin: Boolean(seed.feePaid || seed.feeExempt || seed.status === "approved"),
+      certificateNumber: seed.certificateNumber || "",
+      certificateDate: seed.certificateDate || "",
+      linkedLegacyAppId: row?.linkedLegacyAppId || null,
+      linkedEventId: row?.linkedEventId || null,
+      data,
+      createdAt: seed.submittedAt,
+      updatedAt: now,
+    };
+    if (!row) state.eventComplianceApplications.push(nextRecord);
+    else Object.assign(row, nextRecord);
   }
 }
 
@@ -700,68 +948,67 @@ function ensureCertificatesForPublishedEvents(state: AppState): void {
   const publishedOrApproved = state.events.filter((event) => event.status === "published" || event.status === "approved");
   for (let i = 0; i < publishedOrApproved.length; i++) {
     const event = publishedOrApproved[i];
-    const certificateNumber = i === 0 ? "certificate001" : i === 1 ? "certificate002" : `certificate${String(i + 1).padStart(3, "0")}`;
-    const certificateDate = i === 0 ? "2026-04-18" : i === 1 ? "2026-04-19" : event.createdAt.slice(0, 10);
+    const certificateNumber = "CERT-DEMO-BY-" + String(i + 1).padStart(3, "0");
+    const certificateDate = event.createdAt.slice(0, 10) || "2026-04-30";
     let compliance = state.eventComplianceApplications.find((app) => app.linkedEventId === event.eventId);
     if (!compliance) {
-      compliance = {
-        eventComplianceApplicationId: `mock-cert-${event.eventId}`,
+      compliance = state.eventComplianceApplications.find((app) => !app.linkedEventId && app.status === "approved" && app.organizerId === event.organizerId && app.data.title === event.title);
+    }
+    if (!compliance) {
+      const seed: DemoComplianceSeed = {
+        id: "mock-cert-" + event.eventId,
         organizerId: event.organizerId,
         status: "approved",
         submittedAt: event.createdAt,
         reviewedAt: event.updatedAt,
-        adminComment: "",
+        adminComment: "Заявка согласована в рамках demo-сценария опубликованного мероприятия.",
+        certificateNumber,
+        certificateDate,
+        title: event.title,
+        age: "6+",
+        program: "Основная культурная программа, регистрация зрителей, сценический блок и заключительная часть.",
+        feePaid: true,
+        executiveCommitteeNotified: true,
+      };
+      compliance = {
+        eventComplianceApplicationId: seed.id,
+        organizerId: event.organizerId,
+        status: "approved",
+        submittedAt: seed.submittedAt,
+        reviewedAt: seed.reviewedAt || event.updatedAt,
+        adminComment: seed.adminComment || "",
         feePaymentConfirmedByAdmin: true,
-        certificateNumber: "",
-        certificateDate: "",
+        certificateNumber: seed.certificateNumber || "",
+        certificateDate: seed.certificateDate || "",
         linkedLegacyAppId: event.appId,
         linkedEventId: event.eventId,
-        data: {
-          title: event.title,
-          eventType: event.category || "Иное",
-          shortDescription: event.description || "",
-          program: "",
-          posterPath: event.poster || "",
-          salesChannels: event.salesChannels || ["OWN", "ByCard", "TicketPro"],
-          dateSlots: [event.dateTime],
-          venueName: event.venue,
-          venueAddress: event.city || "",
-          performers: [],
-          onlyBelarusianPerformers: true,
-          hasForeignPerformers: false,
-          venueType: "",
-          projectedCapacity: event.capacity,
-          plannedTicketsForSale: event.capacity,
-          ticketTiers: event.tiers,
-          ageCategory: "12+",
-          ageComment: "",
-          approvalMode: "certificate_required",
-          approvalBasis: "",
-          eventDocuments: [],
-          salesStartDate: "",
-          feeExempt: false,
-          feeExemptReason: "",
-          feePaid: true,
-          paymentAttachments: [],
-          paymentComment: "",
-          adRestrictionConfirmed: false,
-          cancelled: false,
-          changesDeclared: false,
-          executiveCommitteeNotified: false,
-          citizensNotified: false,
-          notificationsAttachment: [],
-          cancellationComment: "",
-        },
+        data: buildComplianceData(seed),
         createdAt: event.createdAt,
         updatedAt: event.updatedAt,
       };
       state.eventComplianceApplications.push(compliance);
     }
+    compliance.status = compliance.status === "draft" || compliance.status === "submitted" ? "approved" : compliance.status;
     compliance.certificateNumber ||= certificateNumber;
     compliance.certificateDate ||= certificateDate;
-    compliance.data.posterPath ||= event.poster || "";
+    compliance.linkedLegacyAppId ||= event.appId;
+    compliance.linkedEventId = event.eventId;
+    compliance.data.posterPath = event.poster || compliance.data.posterPath;
     compliance.data.salesChannels = event.salesChannels || compliance.data.salesChannels || ["OWN"];
-    event.complianceApplicationId ||= compliance.eventComplianceApplicationId;
+    compliance.data.venueName ||= event.venue;
+    compliance.data.venueAddress ||= event.city + ", demo-адрес площадки";
+    compliance.data.projectedCapacity ||= event.capacity;
+    compliance.data.plannedTicketsForSale ||= event.capacity;
+    compliance.data.ticketTiers = compliance.data.ticketTiers?.length ? compliance.data.ticketTiers : event.tiers;
+    compliance.data.program ||= "Основная культурная программа, сценический блок и заключительная часть.";
+    compliance.data.salesStartDate ||= "2026-05-12";
+    compliance.data.ageComment ||= "Возрастная категория подтверждена для demo-сценария.";
+    compliance.data.approvalBasis ||= "Публичное культурно-зрелищное мероприятие с реализацией билетов.";
+    compliance.data.eventDocuments = compliance.data.eventDocuments?.length ? compliance.data.eventDocuments : [attachment(compliance.eventComplianceApplicationId + "-program", "Программа мероприятия.pdf", "event-program", compliance.submittedAt || event.createdAt)];
+    compliance.data.paymentComment ||= compliance.data.feePaid ? "Пошлина оплачена по demo-платёжному поручению." : "Оплата не требуется или ожидает подтверждения.";
+    compliance.data.notificationsAttachment = compliance.data.notificationsAttachment?.length ? compliance.data.notificationsAttachment : [attachment(compliance.eventComplianceApplicationId + "-notice", "Уведомление исполкома.pdf", "executive-notice", compliance.submittedAt || event.createdAt)];
+    compliance.feePaymentConfirmedByAdmin = compliance.feePaymentConfirmedByAdmin || compliance.data.feePaid || compliance.data.feeExempt;
+    event.complianceApplicationId = compliance.eventComplianceApplicationId;
   }
 }
 
@@ -789,8 +1036,9 @@ function findSeedEvent(state: AppState, seedIndex: number) {
 
 function ensureDemoTicketOperations(state: AppState): void {
   const sellTargets = [
-    { resellerCode: "ByCard", eventIndex: 0, tierIndex: 0, target: 3, buyer: "Demo Buyer ByCard" },
-    { resellerCode: "TicketPro", eventIndex: 3, tierIndex: 1, target: 2, buyer: "Demo Buyer TicketPro" },
+    { resellerCode: "ByCard", eventIndex: 0, tierIndex: 1, target: 4, buyer: "Demo Buyer ByCard" },
+    { resellerCode: "TicketPro", eventIndex: 2, tierIndex: 0, target: 3, buyer: "Demo Buyer TicketPro" },
+    { resellerCode: "KvitkiBY", eventIndex: 4, tierIndex: 1, target: 3, buyer: "Demo Buyer Kvitki.by" },
   ];
 
   for (const target of sellTargets) {
@@ -810,8 +1058,8 @@ function ensureDemoTicketOperations(state: AppState): void {
   }
 
   const ownTargets = [
-    { eventIndex: 2, tierIndex: 0, target: 2, buyer: "Покупатель своего канала" },
-    { eventIndex: 4, tierIndex: 1, target: 1, buyer: "Покупатель организатора" },
+    { eventIndex: 3, tierIndex: 0, target: 2, buyer: "Покупатель собственного канала" },
+    { eventIndex: 8, tierIndex: 0, target: 4, buyer: "Покупатель организатора" },
   ];
 
   for (const target of ownTargets) {
@@ -824,6 +1072,17 @@ function ensureDemoTicketOperations(state: AppState): void {
     }
   }
 
+  const b2cEvent = findSeedEvent(state, 1);
+  const b2cTier = b2cEvent?.tiers[0];
+  if (b2cEvent && b2cTier && !state.demoPurchases.some((purchase) => purchase.eventId === b2cEvent.eventId)) {
+    createDemoPurchaseTicket(state, {
+      eventId: b2cEvent.eventId,
+      selectedPriceCategory: b2cTier.name,
+      quantity: 2,
+      buyerName: "Демо покупатель витрины",
+    });
+  }
+
   if (!state.tickets.some((ticket) => ticket.soldByChannel === "ByCard" && ticket.status === "refunded")) {
     const ticket = state.tickets.find((item) => item.soldByChannel === "ByCard" && item.status === "sold");
     if (ticket) refund(state, ticket.ticketId, "ByCard");
@@ -834,8 +1093,14 @@ function ensureDemoTicketOperations(state: AppState): void {
     if (ticket) redeem(state, ticket.ticketId, "TicketPro");
   }
 
-  if (!state.ops.some((op) => op.channel === "LegacySeller" && op.result === "error")) {
-    verify(state, "DEMO-MISSING-TICKET", "LegacySeller");
+  if (!state.tickets.some((ticket) => ticket.soldByChannel === "KvitkiBY" && ticket.status === "redeemed")) {
+    const ticket = state.tickets.find((item) => item.soldByChannel === "KvitkiBY" && item.status === "sold");
+    if (ticket) redeem(state, ticket.ticketId, "KvitkiBY");
+  }
+
+  const errorEvent = findSeedEvent(state, 0);
+  if (errorEvent && !state.ops.some((op) => op.channel === "LegacySeller" && op.result === "error")) {
+    sell(state, errorEvent.eventId, "Недоступный demo-тариф", "LegacySeller", "Demo Legacy Seller");
   }
 }
 
@@ -845,13 +1110,13 @@ export function runDemoScenario(): AppState {
     .filter((event) => event.status === "published")
     .slice(0, 3);
 
-  const buyers = ["Покупатель А", "Покупатель Б", "Покупатель В"];
+  const buyers = ["Посетитель культуры А", "Посетитель культуры Б", "Посетитель культуры В"];
   published.forEach((event, index) => {
     createDemoPurchaseTicket(state, {
       eventId: event.eventId,
       selectedPriceCategory: event.tiers[0]?.name || "Стандарт",
       quantity: 1,
-      buyerName: buyers[index] || `Покупатель ${index + 1}`,
+      buyerName: buyers[index] || "Посетитель культуры " + String(index + 1),
     });
   });
 

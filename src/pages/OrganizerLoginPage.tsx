@@ -97,7 +97,7 @@ export default function OrganizerLoginPage() {
           </Link>
         </div>
         <div className="mt-5 text-xs" style={{ color: "rgba(245,247,250,0.45)" }}>
-          Демо-доступы: organizer.a / demo123 и organizer.b / demo123
+          Демо-доступы: organizer.minskconcert / demo123, organizer.philharmonic / demo123
         </div>
       </div>
     </div>
