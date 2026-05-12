@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import type { AppState, EventRecord } from "@/lib/store";
-import { createDemoPurchaseTicket } from "@/lib/store";
+import { createDemoPurchaseTicket, getTicketRefundBlockReason, refund } from "@/lib/store";
 import { toast } from "sonner";
 import { Search, MapPin, Tag, Ticket, X, ChevronRight, Sparkles, TrendingUp, Star, User, Calendar, CheckCircle2 } from "lucide-react";
 
@@ -194,6 +194,16 @@ export default function B2CView({ state, onUpdate }: Props) {
     setCheckoutOpen(false);
     setSuccessTicketId(rec.ticketId);
     toast.success(`Покупка подтверждена: ${rec.ticketId}`);
+  };
+
+  const handleRefundTicket = (ticketId: string) => {
+    const outcome = refund(state, ticketId, "B2C");
+    if (!outcome.ok) {
+      toast.error(outcome.reason || "Не удалось вернуть билет");
+      return;
+    }
+    onUpdate({ ...state });
+    toast.success("Билет возвращён");
   };
 
   const EventCard = ({ event }: { event: DemoEvent }) => {
@@ -784,7 +794,11 @@ export default function B2CView({ state, onUpdate }: Props) {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {myTickets.map((ticket) => (
+                  {myTickets.map((ticket) => {
+                    const storedTicket = state.tickets.find((item) => item.ticketId === ticket.ticketId);
+                    const isRefunded = ticket.status === "refunded" || storedTicket?.status === "refunded";
+                    const refundReason = getTicketRefundBlockReason(state, ticket.ticketId);
+                    return (
                     <article key={ticket.ticketId} className="rounded-xl border bg-white p-4" style={{ borderColor: D.borderSoft, boxShadow: D.shadowSmall }}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -795,8 +809,11 @@ export default function B2CView({ state, onUpdate }: Props) {
                             {ticket.date} · {ticket.time}
                           </p>
                         </div>
-                        <span className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: D.successSoft, color: D.success }}>
-                          подтвержден
+                        <span
+                          className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold"
+                          style={{ background: isRefunded ? D.warningSoft : D.successSoft, color: isRefunded ? D.warning : D.success }}
+                        >
+                          {isRefunded ? "возвращён" : "подтвержден"}
                         </span>
                       </div>
 
@@ -824,8 +841,25 @@ export default function B2CView({ state, onUpdate }: Props) {
                           {ticket.purchasedAt.replace("T", " ").slice(0, 16)}
                         </span>
                       </div>
+                      <div className="mt-3">
+                        {!refundReason ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRefundTicket(ticket.ticketId)}
+                            className="h-9 w-full rounded-lg px-3 text-sm font-semibold"
+                            style={{ background: D.danger, color: "#FFFFFF" }}
+                          >
+                            Вернуть билет
+                          </button>
+                        ) : (
+                          <div className="rounded-lg px-3 py-2 text-xs leading-5" style={{ background: D.warningSoft, color: D.warning }}>
+                            {refundReason}
+                          </div>
+                        )}
+                      </div>
                     </article>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

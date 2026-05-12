@@ -362,6 +362,8 @@ function buildChannelRows(state: AppState): ChannelReportRow[] {
     }
 
     if (op.type === "sell") {
+      const ticket = op.ticketId ? ticketById.get(op.ticketId) : undefined;
+      if (ticket && ticket.status === "refunded") return;
       row.sales += 1;
       row.salesAmount += getOpTicketPrice(op, ticketById, eventById);
       if (op.ticketId) sellOpTickets.add(op.ticketId);
@@ -385,7 +387,7 @@ function buildChannelRows(state: AppState): ChannelReportRow[] {
     const row = ensureRow(ticket.soldByChannel);
     const event = eventById.get(ticket.eventId);
 
-    if ((ticket.status === "sold" || ticket.status === "redeemed" || ticket.status === "refunded") && !sellOpTickets.has(ticket.ticketId)) {
+    if ((ticket.status === "sold" || ticket.status === "redeemed") && !sellOpTickets.has(ticket.ticketId)) {
       row.sales += 1;
       row.salesAmount += getTicketPrice(ticket, event);
     }
@@ -401,6 +403,7 @@ function buildChannelRows(state: AppState): ChannelReportRow[] {
 
   state.demoPurchases.forEach((purchase) => {
     const row = ensureRow("B2C");
+    if (purchase.status === "refunded") return;
     if (purchase.ticketId && ticketById.has(purchase.ticketId)) return;
     const event = eventById.get(purchase.eventId);
     const tier = event?.tiers.find((item) => item.name === purchase.selectedPriceCategory);
@@ -423,8 +426,9 @@ function buildResellerRows(state: AppState): ResellerReportRow[] {
 
   return state.resellers
     .map((reseller) => {
-      const tickets = state.tickets.filter((ticket) => ticket.soldByChannel === reseller.code && ticket.status !== "issued");
-      const salesTurnover = tickets.reduce((acc, ticket) => acc + getTicketPrice(ticket, eventById.get(ticket.eventId)), 0);
+      const resellerTickets = state.tickets.filter((ticket) => ticket.soldByChannel === reseller.code && ticket.status !== "issued");
+      const activeTickets = resellerTickets.filter((ticket) => ticket.status === "sold" || ticket.status === "redeemed");
+      const salesTurnover = activeTickets.reduce((acc, ticket) => acc + getTicketPrice(ticket, eventById.get(ticket.eventId)), 0);
       const commissionAmount = salesTurnover * reseller.commissionPercent / 100;
       const ministryShare = commissionAmount * 0.25;
       const platformShare = commissionAmount * 0.125;
@@ -440,9 +444,9 @@ function buildResellerRows(state: AppState): ResellerReportRow[] {
         ministryShare,
         platformShare,
         resellerNetShare,
-        soldTickets: tickets.length,
-        refunds: tickets.filter((ticket) => ticket.status === "refunded").length,
-        redeems: tickets.filter((ticket) => ticket.status === "redeemed").length,
+        soldTickets: activeTickets.length,
+        refunds: resellerTickets.filter((ticket) => ticket.status === "refunded").length,
+        redeems: resellerTickets.filter((ticket) => ticket.status === "redeemed").length,
         errors: state.ops.filter((op) => op.channel === reseller.code && op.result === "error").length,
       };
     })

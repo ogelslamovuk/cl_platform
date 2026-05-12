@@ -122,7 +122,7 @@ export interface DemoPurchaseTicket {
   selectedPriceCategory: string;
   quantity: number;
   purchasedAt: string;
-  status: "confirmed";
+  status: "confirmed" | "refunded";
 }
 
 export interface OrganizerAccount {
@@ -573,6 +573,9 @@ function migrateState(parsed: Partial<AppState>): AppState {
       app.data.plannedTicketsForSale = sumTierQuantity(tiers);
       app.data.posterPath ||= "";
       app.data.salesChannels = normalizeSalesChannels(app.data.salesChannels, state);
+    }
+    for (const purchase of state.demoPurchases) {
+      purchase.status ||= "confirmed";
     }
     if (state.currentOrganizerId && !knownOrganizerIds.has(state.currentOrganizerId)) {
       state.currentOrganizerId = null;
@@ -1270,6 +1273,12 @@ export interface ResellerSellOutcome {
   ticketIds: string[];
 }
 
+export interface ResellerRefundOutcome {
+  ok: boolean;
+  reason?: string;
+  ticketId?: string;
+}
+
 export function sellTicketsByReseller(
   state: AppState,
   data: { resellerCode: string; eventId: string; tierName: string; quantity: number; buyerName: string }
@@ -1340,6 +1349,21 @@ function ticketErrorReason(status: TicketStatus): string {
   }
 }
 
+const REFUND_TOO_LATE_REASON = "Возврат невозможен менее чем за 24 часа до начала мероприятия";
+
+export function getTicketRefundBlockReason(state: AppState, ticketId: string): string | null {
+  const ticket = state.tickets.find((t) => t.ticketId === ticketId);
+  if (!ticket) return "Билет не найден";
+  if (ticket.status !== "sold") return ticketErrorReason(ticket.status);
+  const event = state.events.find((item) => item.eventId === ticket.eventId);
+  if (!event) return "Мероприятие не найдено";
+  const eventStart = new Date(event.dateTime).getTime();
+  if (!Number.isFinite(eventStart)) return "Дата мероприятия не определена";
+  const hoursBeforeStart = (eventStart - Date.now()) / (1000 * 60 * 60);
+  if (hoursBeforeStart <= 24) return REFUND_TOO_LATE_REASON;
+  return null;
+}
+
 export function refund(state: AppState, ticketId: string, channel: string): OpOutcome {
   const ticket = state.tickets.find((t) => t.ticketId === ticketId);
   if (!ticket) {
@@ -1347,18 +1371,48 @@ export function refund(state: AppState, ticketId: string, channel: string): OpOu
     saveState(state);
     return { ok: false, reason: "Билет не найден", op };
   }
-  if (ticket.status !== "sold") {
-    const reason = ticketErrorReason(ticket.status);
+  const blockReason = getTicketRefundBlockReason(state, ticketId);
+  if (blockReason) {
+    const reason = blockReason;
     const op = addOp(state, { type: "refund", ticketId, eventId: ticket.eventId, channel, result: "error", reason });
     saveState(state);
     return { ok: false, reason, status: ticket.status, op };
   }
   ticket.status = "refunded";
   ticket.updatedAt = new Date().toISOString();
+  state.demoPurchases
+    .filter((purchase) => purchase.ticketId === ticketId)
+    .forEach((purchase) => {
+      purchase.status = "refunded";
+    });
   const op = addOp(state, { type: "refund", ticketId, eventId: ticket.eventId, channel, result: "ok" });
   recalcRemaining(state, ticket.eventId);
   saveState(state);
   return { ok: true, ticketId, status: ticket.status, op };
+}
+
+export function refundTicketByReseller(state: AppState, data: { resellerCode: string; ticketId: string }): ResellerRefundOutcome {
+  const reseller = state.resellers.find((item) => item.code === data.resellerCode);
+  if (!reseller || reseller.status === "disabled") {
+    return { ok: false, reason: "Реселлер отключён в Центре Управления. Demo-возврат недоступен." };
+  }
+  if (!reseller.apiConnected || reseller.contractStatus !== "Active") {
+    return { ok: false, reason: "API или договор реселлера не активны." };
+  }
+  const ticket = state.tickets.find((item) => item.ticketId === data.ticketId);
+  if (!ticket) {
+    const op = addOp(state, { type: "refund", eventId: "", channel: reseller.code, result: "error", reason: "Билет не найден", ticketId: data.ticketId });
+    saveState(state);
+    return { ok: false, reason: "Билет не найден" };
+  }
+  if (ticket.soldByChannel !== reseller.code) {
+    const reason = "Нельзя вернуть билет, проданный другим каналом";
+    addOp(state, { type: "refund", ticketId: ticket.ticketId, eventId: ticket.eventId, channel: reseller.code, result: "error", reason });
+    saveState(state);
+    return { ok: false, reason };
+  }
+  const outcome = refund(state, data.ticketId, reseller.code);
+  return outcome.ok ? { ok: true, ticketId: outcome.ticketId } : { ok: false, reason: outcome.reason };
 }
 
 export function redeem(state: AppState, ticketId: string, channel: string): OpOutcome {
@@ -1415,23 +1469,24 @@ export function createDemoPurchaseTicket(
   const [date = "", timeRaw = ""] = event.dateTime.split("T");
   const time = timeRaw ? timeRaw.slice(0, 5) : "";
   const now = new Date().toISOString();
-  const rec: DemoPurchaseTicket = {
-    ticketId: soldTicketIds[0],
+  const buyerName = data.buyerName.trim();
+  const records = soldTicketIds.map((ticketId): DemoPurchaseTicket => ({
+    ticketId,
     eventId: event.eventId,
     eventTitle: event.title,
     date,
     time,
     city: event.city || "",
     venue: event.venue,
-    buyerName: data.buyerName.trim(),
+    buyerName,
     selectedPriceCategory: data.selectedPriceCategory,
-    quantity: safeQty,
+    quantity: 1,
     purchasedAt: now,
     status: "confirmed",
-  };
-  state.demoPurchases.push(rec);
+  }));
+  state.demoPurchases.push(...records);
   saveState(state);
-  return rec;
+  return records[0] || null;
 }
 
 // ===== Organizer auth + selectors =====
@@ -1515,7 +1570,9 @@ export function getMySales(state: AppState): OrganizerSaleRecord[] {
     .map((purchase) => {
       const event = state.events.find((e) => e.eventId === purchase.eventId);
       if (!event || event.organizerId !== organizer.organizerId) return null;
+      const ticket = state.tickets.find((item) => item.ticketId === purchase.ticketId);
       const tierPrice = event.tiers.find((tier) => tier.name === purchase.selectedPriceCategory)?.price ?? 0;
+      const status = ticket?.status === "refunded" || purchase.status === "refunded" ? "возврат" : "подтверждена";
       return {
         saleId: purchase.ticketId,
         eventId: event.eventId,
@@ -1526,7 +1583,7 @@ export function getMySales(state: AppState): OrganizerSaleRecord[] {
         unitPrice: tierPrice,
         amount: tierPrice * purchase.quantity,
         channel: "B2C",
-        status: "подтверждена" as const,
+        status,
         priceCategory: purchase.selectedPriceCategory,
       };
     })

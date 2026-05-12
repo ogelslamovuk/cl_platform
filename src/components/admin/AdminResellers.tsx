@@ -90,8 +90,10 @@ function buildMetrics(state: AppState): Map<string, ResellerMetrics> {
   state.tickets.forEach((ticket) => {
     if (!ticket.soldByChannel || ticket.status === "issued") return;
     const row = ensure(ticket.soldByChannel);
-    row.soldTickets += 1;
-    row.salesTurnover += getTicketPrice(ticket, eventById.get(ticket.eventId));
+    if (ticket.status === "sold" || ticket.status === "redeemed") {
+      row.soldTickets += 1;
+      row.salesTurnover += getTicketPrice(ticket, eventById.get(ticket.eventId));
+    }
     if (ticket.status === "refunded") row.refunds += 1;
     if (ticket.status === "redeemed") row.redeems += 1;
   });
