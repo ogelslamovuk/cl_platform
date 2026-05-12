@@ -280,6 +280,11 @@ const DEMO_APPS: DemoAppSeed[] = [
 const DEMO_ORGANIZER_IDS = new Set(DEMO_ORGANIZERS.map((organizer) => organizer.organizerId));
 const REGISTERED_DEMO_ORGANIZERS = DEMO_ORGANIZERS.filter((organizer) => organizer.registryStatus === "зарегистрирован в реестре" && organizer.registryRegisteredAt);
 const OLD_DEMO_ORGANIZER_IDS = new Set(["demo_org_1", "demo_org_2"]);
+const TODAY_DEMO_EVENT_ID = "demo_event_today";
+const TODAY_DEMO_APP_ID = "demo_app_today";
+const TODAY_DEMO_CAPACITY = 50;
+const TODAY_DEMO_SOLD = 47;
+const TODAY_DEMO_TIER = { name: "Камерный зал", price: 45, quantity: TODAY_DEMO_CAPACITY };
 const OLD_DEMO_PHRASES = [
   "\u041e\u0433\u043d\u0438 \u041d\u0435\u0432\u044b",
   "\u042d\u0445\u043e \u0433\u043e\u0440\u043e\u0434\u0430",
@@ -351,7 +356,116 @@ function buildBaselineState(): AppState {
 }
 
 function todayYmd(): string {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function todayDateTime(time = "20:00"): string {
+  return `${todayYmd()}T${time}`;
+}
+
+function ensureTodayNearSoldOutEvent(state: AppState): void {
+  const now = new Date().toISOString();
+  const organizerId = "demo_org_philharmonic";
+  const eventTitle = "Камерный концерт «Песня роднай зямлі»";
+  const tiers = [{ ...TODAY_DEMO_TIER }];
+
+  let app = state.applications.find((item) => item.appId === TODAY_DEMO_APP_ID);
+  if (!app) {
+    app = {
+      appId: TODAY_DEMO_APP_ID,
+      organizerId,
+      title: eventTitle,
+      venue: "Белорусская государственная филармония",
+      dateTime: todayDateTime(),
+      capacity: TODAY_DEMO_CAPACITY,
+      tiers,
+      city: "Минск",
+      category: "Концерты",
+      description: "Камерная программа белорусской академической и народной музыки.",
+      poster: DEMO_POSTERS.rodnayaZyamlya,
+      status: "approved",
+      licenseId: "LIC-DEMO-TODAY",
+      eventId: TODAY_DEMO_EVENT_ID,
+      createdAt: now,
+      updatedAt: now,
+    };
+    state.applications.push(app);
+  } else {
+    Object.assign(app, {
+      organizerId,
+      title: eventTitle,
+      venue: "Белорусская государственная филармония",
+      dateTime: todayDateTime(),
+      capacity: TODAY_DEMO_CAPACITY,
+      tiers,
+      city: "Минск",
+      category: "Концерты",
+      description: "Камерная программа белорусской академической и народной музыки.",
+      poster: DEMO_POSTERS.rodnayaZyamlya,
+      status: "approved",
+      licenseId: app.licenseId || "LIC-DEMO-TODAY",
+      eventId: TODAY_DEMO_EVENT_ID,
+      updatedAt: now,
+    });
+  }
+
+  const nextEvent = {
+    eventId: TODAY_DEMO_EVENT_ID,
+    organizerId,
+    licenseId: "LIC-DEMO-TODAY",
+    appId: TODAY_DEMO_APP_ID,
+    title: eventTitle,
+    venue: "Белорусская государственная филармония",
+    dateTime: todayDateTime(),
+    capacity: TODAY_DEMO_CAPACITY,
+    tiers,
+    city: "Минск",
+    category: "Концерты",
+    description: "Камерная программа белорусской академической и народной музыки.",
+    poster: DEMO_POSTERS.rodnayaZyamlya,
+    salesChannels: ["OWN", "ByCard", "TicketPro"],
+    status: "published" as const,
+    remaining: TODAY_DEMO_CAPACITY - TODAY_DEMO_SOLD,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const existingEvent = state.events.find((event) => event.eventId === TODAY_DEMO_EVENT_ID);
+  if (existingEvent) Object.assign(existingEvent, nextEvent, { createdAt: existingEvent.createdAt || now });
+  else state.events.push(nextEvent);
+
+  state.tickets = state.tickets.filter((ticket) => ticket.eventId !== TODAY_DEMO_EVENT_ID);
+  state.ops = state.ops.filter((op) => op.eventId !== TODAY_DEMO_EVENT_ID);
+
+  for (let index = 1; index <= TODAY_DEMO_CAPACITY; index++) {
+    const sold = index <= TODAY_DEMO_SOLD;
+    const ticketId = `${TODAY_DEMO_EVENT_ID}_ticket_${String(index).padStart(3, "0")}`;
+    state.tickets.push({
+      ticketId,
+      eventId: TODAY_DEMO_EVENT_ID,
+      tier: TODAY_DEMO_TIER.name,
+      status: sold ? "sold" : "issued",
+      soldByChannel: sold ? "B2C" : undefined,
+      soldToUserId: sold ? "demo_user_1" : undefined,
+      createdAt: now,
+      updatedAt: now,
+    });
+    if (sold) {
+      state.ops.push({
+        opId: `demo_today_sell_${String(index).padStart(3, "0")}`,
+        type: "sell",
+        ticketId,
+        eventId: TODAY_DEMO_EVENT_ID,
+        channel: "B2C",
+        result: "ok",
+        ts: now,
+      });
+    }
+  }
 }
 
 function seedDemoCatalog(state: AppState): AppState {
@@ -395,6 +509,7 @@ function seedDemoCatalog(state: AppState): AppState {
 
   ensureOrganizerApplications(state);
   ensureEventComplianceApplications(state);
+  ensureTodayNearSoldOutEvent(state);
   ensureCertificatesForPublishedEvents(state);
   ensureDemoTicketOperations(state);
   saveState(state);
@@ -424,6 +539,7 @@ function enrichDemoData(state: AppState): void {
   ensureSeedPublishedEvents(state);
   ensureOrganizerApplications(state);
   ensureEventComplianceApplications(state);
+  ensureTodayNearSoldOutEvent(state);
   ensureCertificatesForPublishedEvents(state);
   ensureTicketsForPublishedEvents(state);
   ensureDemoTicketOperations(state);

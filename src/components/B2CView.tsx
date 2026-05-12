@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import type { AppState, EventRecord } from "@/lib/store";
-import { createDemoPurchaseTicket } from "@/lib/store";
+import { createDemoPurchaseTicket, getTicketRefundBlockReason, refund } from "@/lib/store";
 import { toast } from "sonner";
 import { Search, MapPin, Tag, Ticket, X, ChevronRight, Sparkles, TrendingUp, Star, User, Calendar, CheckCircle2 } from "lucide-react";
 
@@ -196,6 +196,16 @@ export default function B2CView({ state, onUpdate }: Props) {
     toast.success(`Покупка подтверждена: ${rec.ticketId}`);
   };
 
+  const handleRefundTicket = (ticketId: string) => {
+    const outcome = refund(state, ticketId, "B2C");
+    if (!outcome.ok) {
+      toast.error(outcome.reason || "Не удалось вернуть билет");
+      return;
+    }
+    onUpdate({ ...state });
+    toast.success("Билет возвращён");
+  };
+
   const EventCard = ({ event }: { event: DemoEvent }) => {
     const dt = formatDateTime(event.dateTime);
     const priceFrom = getPriceFrom(event);
@@ -304,10 +314,10 @@ export default function B2CView({ state, onUpdate }: Props) {
             </div>
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold" style={{ color: D.text }}>
-                CL Platform
+                CinemaLab
               </div>
               <div className="truncate text-xs" style={{ color: D.textMuted }}>
-                B2C demo
+                прототип билетной платформы
               </div>
             </div>
           </div>
@@ -336,13 +346,13 @@ export default function B2CView({ state, onUpdate }: Props) {
         <div>
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-xs font-semibold" style={{ borderColor: D.borderSoft, color: D.accentText }}>
             <Sparkles size={14} />
-            Демо-модуль публичной продажи билетов
+            Витрина розничной продажи билетов
           </div>
           <h1 className="max-w-3xl text-[2rem] font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl" style={{ color: D.text }}>
-            B2C-афиша и покупка <span className="block sm:inline">demo-билета</span>
+            Афиша мероприятий
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 sm:text-lg" style={{ color: D.textSoft }}>
-            На этой странице показан покупательский экран платформы: поиск события, фильтрация афиши, выбор ценовой категории и оформление demo-билета без изменения реальных данных.
+            На этой странице показан покупательский экран платформы: поиск события, фильтрация афиши, выбор ценовой категории и оформление билета в прототипе без изменения реальных данных.
           </p>
         </div>
 
@@ -350,7 +360,7 @@ export default function B2CView({ state, onUpdate }: Props) {
           {[
             { label: "Опубликовано", value: String(publishedEvents.length), note: "событий в афише", icon: Calendar },
             { label: "Доступно", value: String(availableTicketCount), note: formatTicketWord(availableTicketCount), icon: TrendingUp },
-            { label: "Покупки", value: String(myTickets.length), note: "demo-билетов", icon: CheckCircle2 },
+            { label: "Покупки", value: String(myTickets.length), note: "билетов", icon: CheckCircle2 },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-3 rounded-lg px-2 py-1.5">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: D.accentSoft, color: D.accent }}>
@@ -465,7 +475,7 @@ export default function B2CView({ state, onUpdate }: Props) {
           </div>
           <div className="inline-flex w-fit items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-sm" style={{ borderColor: D.borderSoft, color: D.textSoft }}>
             <Star size={14} style={{ color: D.warning }} />
-            Demo purchase flow
+            Розничная витрина
           </div>
         </div>
 
@@ -505,7 +515,7 @@ export default function B2CView({ state, onUpdate }: Props) {
       <section className="mt-10 grid gap-4 border-t pt-6 md:grid-cols-3" style={{ borderColor: D.borderSoft }}>
         {[
           { icon: CheckCircle2, title: "Сценарий без лишнего шума", text: "Покупатель видит только афишу, выбор билета и результат покупки." },
-          { icon: Ticket, title: "Demo-билет в один поток", text: "После оформления билет появляется в панели «Мои билеты» без перехода на другие страницы." },
+          { icon: Ticket, title: "Билет в один поток", text: "После оформления билет появляется в панели «Мои билеты» без перехода на другие страницы." },
           { icon: Star, title: "Готово для презентации", text: "Интерфейс выдержан в спокойной B2C-стилистике для деловой демонстрации." },
         ].map((item) => (
           <div key={item.title} className="flex gap-3 rounded-xl border bg-white p-4" style={{ borderColor: D.borderSoft }}>
@@ -592,10 +602,10 @@ export default function B2CView({ state, onUpdate }: Props) {
                       <div className="mb-4 flex items-center justify-between gap-3">
                         <div>
                           <h4 className="text-sm font-semibold" style={{ color: D.text }}>
-                            Выбор билета
+                            Покупка билета
                           </h4>
                           <p className="mt-1 text-xs" style={{ color: D.textMuted }}>
-                            Категория и количество для demo-покупки.
+                            Категория и количество для покупки.
                           </p>
                         </div>
                         <div className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: D.accentSoft, color: D.accentText }}>
@@ -779,12 +789,16 @@ export default function B2CView({ state, onUpdate }: Props) {
                     Билетов пока нет
                   </h4>
                   <p className="mt-2 max-w-xs text-sm leading-6" style={{ color: D.textMuted }}>
-                    Выберите событие в афише и оформите demo-покупку, чтобы билет появился здесь.
+                    Выберите событие в афише и оформите покупку, чтобы билет появился здесь.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {myTickets.map((ticket) => (
+                  {myTickets.map((ticket) => {
+                    const storedTicket = state.tickets.find((item) => item.ticketId === ticket.ticketId);
+                    const isRefunded = ticket.status === "refunded" || storedTicket?.status === "refunded";
+                    const refundReason = getTicketRefundBlockReason(state, ticket.ticketId);
+                    return (
                     <article key={ticket.ticketId} className="rounded-xl border bg-white p-4" style={{ borderColor: D.borderSoft, boxShadow: D.shadowSmall }}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -795,8 +809,11 @@ export default function B2CView({ state, onUpdate }: Props) {
                             {ticket.date} · {ticket.time}
                           </p>
                         </div>
-                        <span className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: D.successSoft, color: D.success }}>
-                          подтвержден
+                        <span
+                          className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold"
+                          style={{ background: isRefunded ? D.warningSoft : D.successSoft, color: isRefunded ? D.warning : D.success }}
+                        >
+                          {isRefunded ? "возвращён" : "подтвержден"}
                         </span>
                       </div>
 
@@ -824,8 +841,25 @@ export default function B2CView({ state, onUpdate }: Props) {
                           {ticket.purchasedAt.replace("T", " ").slice(0, 16)}
                         </span>
                       </div>
+                      <div className="mt-3">
+                        {!refundReason ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRefundTicket(ticket.ticketId)}
+                            className="h-9 w-full rounded-lg px-3 text-sm font-semibold"
+                            style={{ background: D.danger, color: "#FFFFFF" }}
+                          >
+                            Вернуть билет
+                          </button>
+                        ) : (
+                          <div className="rounded-lg px-3 py-2 text-xs leading-5" style={{ background: D.warningSoft, color: D.warning }}>
+                            {refundReason}
+                          </div>
+                        )}
+                      </div>
                     </article>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

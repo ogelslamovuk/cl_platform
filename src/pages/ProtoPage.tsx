@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import { generateDemoData, resetDemoData, runDemoScenario } from "@/lib/demoEngine";
+import { getPlatformCommissionPercent } from "@/lib/finance";
+import { setPlatformCommissionPercent } from "@/lib/store";
 import platformLogo from "../../logo.jpg";
 
 type Accent = { border: string; glow: string; iconBg: string; iconColor: string; shadow: string };
@@ -76,7 +78,13 @@ function ToolCard({ tool }: { tool: Tool }) {
 }
 
 export default function ProtoPage() {
-  const { setState } = useStorageSync();
+  const { state, update, setState } = useStorageSync();
+  const commissionPercent = getPlatformCommissionPercent(state);
+
+  const handleCommissionChange = (value: string) => {
+    setPlatformCommissionPercent(state, Number(value));
+    update({ ...state });
+  };
 
   const quickCards: Card[] = [
     { title: "Кабинет организатора", description: "Управление мероприятиями, билетами и продажами", route: "/organizer", icon: Building2, accent: accents.violet },
@@ -136,6 +144,25 @@ export default function ProtoPage() {
             {tools.map((tool) => (
               <ToolCard key={tool.title} tool={tool} />
             ))}
+          </div>
+          <div className="mt-5 rounded-[22px] border p-5" style={{ background: "linear-gradient(180deg, rgba(9,17,31,0.96) 0%, rgba(6,12,25,0.94) 100%)", borderColor: "rgba(255,255,255,0.08)" }}>
+            <h3 className="text-[22px] font-semibold leading-7">Настройки финансовой модели</h3>
+            <label className="mt-4 block max-w-sm">
+              <span className="mb-2 block text-[14px] font-semibold text-[rgba(233,238,255,0.92)]">Процент платформы / Минкульта</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={0.1}
+                value={commissionPercent}
+                onChange={(event) => handleCommissionChange(event.target.value)}
+                className="h-11 w-full rounded-[12px] border bg-[#020611] px-3 text-[15px] text-white outline-none focus:ring-2 focus:ring-blue-400/40"
+                style={{ borderColor: "rgba(255,255,255,0.12)" }}
+              />
+            </label>
+            <p className="mt-3 text-[14px] leading-6 text-[rgba(203,213,225,0.78)]">
+              Используется для расчёта начислений организатора по проданным билетам.
+            </p>
           </div>
         </section>
       </div>

@@ -10,7 +10,6 @@ import NotFound from "./pages/NotFound";
 import OrganizerLoginPage from "./pages/OrganizerLoginPage";
 import OrganizerRegistrationStubPage from "./pages/OrganizerRegistrationStubPage";
 import OrganizerEventCompliancePage from "./pages/OrganizerEventCompliancePage";
-import PlatformLandingPage from "./pages/PlatformLandingPage";
 import MainPage from "./pages/MainPage";
 import ProtoPage from "./pages/ProtoPage";
 import DemoToolsPanel from "./components/demo/DemoToolsPanel";
@@ -56,7 +55,6 @@ const App = () => (
           <Route path="/organizer/compliance" element={<OrganizerEventCompliancePage />} />
           <Route path="/channel" element={<ChannelPage />} />
           <Route path="/demo" element={<DemoPage />} />
-          <Route path="/platform" element={<PlatformLandingPage />} />
           <Route path="/main" element={<MainRoute />} />
           <Route path="/proto" element={<ProtoPage />} />
           <Route path="/admin" element={<AdminPage />} />

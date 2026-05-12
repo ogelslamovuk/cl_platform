@@ -7,20 +7,22 @@ import { useStorageSync } from "@/hooks/useStorageSync";
 import type { EventComplianceApplicationRecord, EventRecord, OrganizerDocument, OrganizerSaleRecord } from "@/lib/store";
 import { calculateComplianceFee, getSalesChannelLabel, logoutOrganizer } from "@/lib/store";
 import {
-  DEMO_VAT_RATE,
+  calculateOrganizerFinance,
+  calculateOrganizerSettlementReport,
+  type OrganizerSettlementEventRow,
+  type OrganizerSettlementReport,
+} from "@/lib/finance";
+import {
   selectCurrentOrganizer,
   selectMyEventComplianceApplications,
   selectMyDocuments,
   selectMyEvents,
-  selectMyReportingRows,
   selectMySales,
 } from "@/lib/organizerSelectors";
 import {
   BarChart3,
   Calendar,
-  CheckCircle,
   ChevronDown,
-  Clock,
   FileText,
   FolderOpen,
   HelpCircle,
@@ -32,7 +34,6 @@ import {
   TrendingUp,
   User,
   X,
-  XCircle,
 } from "lucide-react";
 
 type Section = "dashboard" | "applications" | "events" | "sales" | "reports" | "marketing" | "documents" | "support";
@@ -98,6 +99,10 @@ function fmtDateTime(v: string): string {
   return v?.replace("T", " ").slice(0, 16) || "—";
 }
 
+function formatMoney(value: number): string {
+  return `${value.toFixed(2)} BYN`;
+}
+
 function sortDir(next: boolean): SortDirection {
   return next ? "asc" : "desc";
 }
@@ -128,8 +133,28 @@ export default function OrganizerPage() {
   const myComplianceApplications = useMemo(() => selectMyEventComplianceApplications(state), [state]);
   const myEvents = useMemo(() => selectMyEvents(state), [state]);
   const mySales = useMemo(() => selectMySales(state), [state]);
-  const reportingRows = useMemo(() => selectMyReportingRows(state), [state]);
   const myDocuments = useMemo(() => selectMyDocuments(state), [state]);
+  const organizerFinance = useMemo(() => (
+    organizer
+      ? calculateOrganizerFinance(state, organizer.organizerId)
+      : { currentRevenue: 0, soldTickets: 0, amountDue: 0, openEvents: 0, commissionPercent: 5 }
+  ), [organizer, state]);
+  const organizerSettlementReport = useMemo(() => (
+    organizer
+      ? calculateOrganizerSettlementReport(state, organizer.organizerId)
+      : {
+          openEvents: [],
+          closedEvents: [],
+          openSummary: { revenue: 0, soldTickets: 0, amountDue: 0 },
+          closedSummary: { revenue: 0, soldTickets: 0, amountDue: 0 },
+          totalRevenue: 0,
+          totalSoldTickets: 0,
+          totalAmountDue: 0,
+          paidAmount: 0,
+          remainingDue: 0,
+          commissionPercent: 5,
+        }
+  ), [organizer, state]);
   const isOrganizerApproved = useMemo(() => {
     if (!organizer) return false;
     if (organizer.accountStatus === "активен") return true;
@@ -138,14 +163,6 @@ export default function OrganizerPage() {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     return latestOrganizerApplication?.status === "approved";
   }, [organizer, state.organizerApplications]);
-
-  const kpi = {
-    draft: myComplianceApplications.filter((a) => a.status === "draft").length,
-    submitted: myComplianceApplications.filter((a) => a.status === "submitted").length,
-    approved: myComplianceApplications.filter((a) => a.status === "approved").length,
-    rejected: myComplianceApplications.filter((a) => a.status === "rejected").length,
-    needsRework: myComplianceApplications.filter((a) => a.status === "needs_rework").length,
-  };
 
   const recentOps = useMemo(() => {
     const allowedEventIds = new Set(myEvents.map((e) => e.eventId));
@@ -191,15 +208,6 @@ export default function OrganizerPage() {
     });
   }, [myEvents, eventSort]);
 
-  const totals = useMemo(() => {
-    const salesCount = reportingRows.length;
-    const totalTickets = reportingRows.reduce((sum, r) => sum + r.quantity, 0);
-    const revenue = reportingRows.reduce((sum, r) => sum + r.saleAmount, 0);
-    const vat = reportingRows.reduce((sum, r) => sum + r.vatAmount, 0);
-    const net = reportingRows.reduce((sum, r) => sum + r.netRevenue, 0);
-    return { salesCount, totalTickets, revenue, vat, net };
-  }, [reportingRows]);
-
   if (!organizer) {
     return <Navigate to="/organizer/login" replace />;
   }
@@ -209,11 +217,6 @@ export default function OrganizerPage() {
     update({ ...state });
     return <Navigate to="/organizer/login" replace />;
   }
-
-  const openFilteredApplications = (filter: AppFilter) => {
-    setAppFilter(filter);
-    setActiveSection("applications");
-  };
 
   const handleLogout = () => {
     logoutOrganizer(state);
@@ -228,7 +231,7 @@ export default function OrganizerPage() {
   const sectionTiles: { id: Section; label: string; desc: string; icon: React.ElementType }[] = [
     { id: "applications", label: "Новая заявка", desc: "Создать заявку на мероприятие", icon: Plus },
     { id: "applications", label: "Мои заявки", desc: "Управление статусами заявок", icon: FileText },
-    { id: "reports", label: "Отчетность", desc: "Финансовые показатели и НДС", icon: BarChart3 },
+    { id: "reports", label: "Отчетность", desc: "Финансовые показатели и расчеты с платформой", icon: BarChart3 },
     { id: "marketing", label: "Маркетинг", desc: "Раздел будет расширен позже", icon: Megaphone },
     { id: "documents", label: "Документы", desc: "Реестр, договоры, реквизиты", icon: FolderOpen },
     { id: "support", label: "Поддержка", desc: "Каналы связи и AI-помощник", icon: HelpCircle },
@@ -350,15 +353,13 @@ export default function OrganizerPage() {
               <>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                      { label: "Черновики", value: kpi.draft, icon: Clock, filter: "draft" as const },
-                      { label: "На рассмотрении", value: kpi.submitted, icon: FileText, filter: "submitted" as const },
-                      { label: "На доработке", value: kpi.needsRework, icon: X, filter: "needs_rework" as const },
-                      { label: "Одобрено", value: kpi.approved, icon: CheckCircle, filter: "approved" as const },
-                      { label: "Отклонено", value: kpi.rejected, icon: XCircle, filter: "rejected" as const },
+                      { label: "Текущая выручка", value: formatMoney(organizerFinance.currentRevenue), icon: TrendingUp, tooltip: "Выручка по открытым мероприятиям: учитываются только проданные и не возвращённые билеты." },
+                      { label: "Продано билетов", value: String(organizerFinance.soldTickets), icon: BarChart3, tooltip: "Количество проданных билетов по открытым мероприятиям без возвращённых билетов." },
+                      { label: "К уплате платформе", value: formatMoney(organizerFinance.amountDue), icon: ShieldCheck, tooltip: `Начисление по ставке ${organizerFinance.commissionPercent}% от текущей выручки.` },
+                      { label: "Открытые мероприятия", value: String(organizerFinance.openEvents), icon: Calendar, tooltip: "Опубликованные мероприятия, дата и время которых ещё не прошли." },
                     ].map((k) => (
                     <div key={k.label} className="relative">
-                    <button
-                      onClick={() => openFilteredApplications(k.filter)}
+                    <div
                       className="rounded-[18px] border p-5 text-left transition-all duration-200 hover:-translate-y-0.5 w-full"
                       style={{ background: T.cardBg, backgroundImage: T.cardGradient, borderColor: T.border, boxShadow: T.cardShadow }}
                     >
@@ -369,8 +370,8 @@ export default function OrganizerPage() {
                       </div>
                       <div className="text-[28px] font-bold" style={{ color: T.textPrimary }}>{k.value}</div>
                       <div className="text-[13px] mt-1" style={{ color: T.textSecondary }}>{k.label}</div>
-                    </button>
-                    <CardHelp text={k.label === "Черновики" ? "Количество черновиков заявок. Нажмите, чтобы отфильтровать заявки по статусу «Черновик»." : k.label === "На рассмотрении" ? "Заявки, ожидающие рассмотрения. Нажмите, чтобы отфильтровать заявки со статусом «На рассмотрении»." : k.label === "На доработке" ? "Заявки с замечаниями администратора. Нажмите, чтобы открыть заявки, требующие доработки." : k.label === "Одобрено" ? "Количество заявок, одобренных регулятором. Нажмите, чтобы посмотреть одобренные заявки." : "Заявки, отклонённые регулятором. Нажмите, чтобы увидеть отклонённые заявки."} />
+                    </div>
+                    <CardHelp text={k.tooltip} />
                     </div>
                   ))}
                 </div>
@@ -464,7 +465,7 @@ export default function OrganizerPage() {
             )}
 
             {activeSection === "reports" && (
-              <ReportsSection rows={reportingRows} totals={totals} />
+              <ReportsSection report={organizerSettlementReport} />
             )}
 
             {activeSection === "documents" && (
@@ -793,64 +794,106 @@ function SalesSection({ rows }: { rows: OrganizerSaleRecord[] }) {
   );
 }
 
-function ReportsSection({ rows, totals }: {
-  rows: ReturnType<typeof selectMyReportingRows>;
-  totals: { salesCount: number; totalTickets: number; revenue: number; vat: number; net: number };
-}) {
+function ReportsSection({ report }: { report: OrganizerSettlementReport }) {
   return (
     <div className="space-y-4">
       <div className="rounded-[18px] border p-4 relative" style={{ background: T.cardBg, borderColor: T.border }}>
-        <CardHelp text="В демонстрационном режиме расчёт НДС и стоимости упрощён и приведён для примера." />
+        <CardHelp text="Расчёт использует процент платформы из демо-настроек и учитывает только активные проданные билеты без возвратов." />
         <div className="text-sm" style={{ color: T.textSecondary }}>
-          Демонстрационное правило расчёта: цена билета берётся из тарифа мероприятия, сумма продажи = цена × количество,
-          НДС = {Math.round(DEMO_VAT_RATE * 100)}% от суммы продажи.
+          Процент платформы / Минкульта: <span className="font-semibold" style={{ color: T.textPrimary }}>{report.commissionPercent}%</span>.
+          Суммы к уплате рассчитываются по открытым и закрытым мероприятиям. Оплаты в прототипе пока не моделируются.
         </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <KpiCard title="Всего продаж" value={String(totals.salesCount)} cardTitle="Общее количество транзакций продажи билетов." />
-        <KpiCard title="Всего билетов" value={String(totals.totalTickets)} cardTitle="Общее количество билетов, проданных по всем продажам." />
-        <KpiCard title="Выручка" value={`${totals.revenue.toFixed(2)} BYN`} cardTitle="Общая сумма выручки с НДС." />
-        <KpiCard title="НДС" value={`${totals.vat.toFixed(2)} BYN`} cardTitle="Сумма налога на добавленную стоимость по всем продажам." />
-        <KpiCard title="Чистая выручка" value={`${totals.net.toFixed(2)} BYN`} cardTitle="Сумма выручки за вычетом НДС." />
+        <KpiCard title="Выручка" value={formatMoney(report.totalRevenue)} cardTitle="Сумма активных продаж по открытым и закрытым мероприятиям." />
+        <KpiCard title="Продано билетов" value={String(report.totalSoldTickets)} cardTitle="Количество проданных и погашенных билетов без возвращённых билетов." />
+        <KpiCard title="К уплате платформе" value={formatMoney(report.totalAmountDue)} cardTitle="Начисление по настроенному проценту платформы / Минкульта." />
+        <KpiCard title="Оплачено" value={formatMoney(report.paidAmount)} cardTitle="Платежный контур в этом прототипе не моделируется." />
+        <KpiCard title="Остаток к оплате" value={formatMoney(report.remainingDue)} cardTitle="Сумма к уплате за вычетом уже отражённых оплат." />
       </div>
 
-      <div className="rounded-[18px] border p-6 relative" style={{ background: T.cardBg, borderColor: T.border, boxShadow: T.cardShadow }}>
-        <CardHelp text="Таблица отчётности по продажам, билетам, НДС и чистой выручке." />
-        <h2 className="text-lg font-semibold mb-4" style={{ color: T.textPrimary }}>Таблица отчетности</h2>
-        {rows.length === 0 ? (
-          <SimpleEmpty title="Нет данных для отчета" desc="Когда на розничной витрине появятся продажи, они автоматически попадут в отчетность." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr style={{ background: T.tableHeaderBg }}>
-                  <th className="py-2.5 px-3 text-left font-semibold">Мероприятие</th>
-                  <th className="py-2.5 px-3 text-left font-semibold">Дата продажи</th>
-                  <th className="py-2.5 px-3 text-left font-semibold">Количество</th>
-                  <th className="py-2.5 px-3 text-left font-semibold">Цена билета</th>
-                  <th className="py-2.5 px-3 text-left font-semibold">Сумма продажи</th>
-                  <th className="py-2.5 px-3 text-left font-semibold">НДС</th>
-                  <th className="py-2.5 px-3 text-left font-semibold">Итоговая выручка</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.saleId} className="border-b" style={{ borderColor: T.border }}>
-                    <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>{r.eventTitle}</td>
-                    <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{fmtDateTime(r.soldAt)}</td>
-                    <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{r.quantity}</td>
-                    <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{r.unitPrice.toFixed(2)} BYN</td>
-                    <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{r.saleAmount.toFixed(2)} BYN</td>
-                    <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{r.vatAmount.toFixed(2)} BYN</td>
-                    <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{r.netRevenue.toFixed(2)} BYN</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <SettlementEventsTable
+        title="Открытые мероприятия"
+        rows={report.openEvents}
+        summary={report.openSummary}
+        commissionPercent={report.commissionPercent}
+        emptyTitle="Нет открытых мероприятий"
+        emptyDesc="Опубликованные мероприятия с будущей датой появятся здесь после открытия продаж."
+      />
+
+      <SettlementEventsTable
+        title="Закрытые мероприятия"
+        rows={report.closedEvents}
+        summary={report.closedSummary}
+        commissionPercent={report.commissionPercent}
+        emptyTitle="Нет закрытых мероприятий"
+        emptyDesc="Мероприятия с прошедшей датой появятся здесь для сверки начислений."
+      />
+    </div>
+  );
+}
+
+function SettlementEventsTable({
+  title,
+  rows,
+  summary,
+  commissionPercent,
+  emptyTitle,
+  emptyDesc,
+}: {
+  title: string;
+  rows: OrganizerSettlementEventRow[];
+  summary: OrganizerSettlementReport["openSummary"];
+  commissionPercent: number;
+  emptyTitle: string;
+  emptyDesc: string;
+}) {
+  return (
+    <div className="rounded-[18px] border p-6 relative" style={{ background: T.cardBg, borderColor: T.border, boxShadow: T.cardShadow }}>
+      <CardHelp text="Возвращённые билеты не входят в выручку и начисления." />
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold" style={{ color: T.textPrimary }}>{title}</h2>
+          <p className="mt-1 text-sm" style={{ color: T.textSecondary }}>
+            Выручка {formatMoney(summary.revenue)} · продано {summary.soldTickets} · к уплате {formatMoney(summary.amountDue)}
+          </p>
+        </div>
+        <div className="rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: T.goldBorder, color: T.gold, background: T.goldBg }}>
+          Комиссия платформы {commissionPercent}%
+        </div>
       </div>
+
+      {rows.length === 0 ? (
+        <SimpleEmpty title={emptyTitle} desc={emptyDesc} />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr style={{ background: T.tableHeaderBg }}>
+                <th className="py-2.5 px-3 text-left font-semibold">Мероприятие</th>
+                <th className="py-2.5 px-3 text-left font-semibold">Дата</th>
+                <th className="py-2.5 px-3 text-left font-semibold">Продано билетов</th>
+                <th className="py-2.5 px-3 text-left font-semibold">Выручка</th>
+                <th className="py-2.5 px-3 text-left font-semibold">Комиссия платформы</th>
+                <th className="py-2.5 px-3 text-left font-semibold">К уплате платформе</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.eventId} className="border-b" style={{ borderColor: T.border }}>
+                  <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>{row.title}</td>
+                  <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{fmtDateTime(row.dateTime)}</td>
+                  <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{row.soldTickets}</td>
+                  <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{formatMoney(row.revenue)}</td>
+                  <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{commissionPercent}%</td>
+                  <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{formatMoney(row.amountDue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { AppState } from "@/lib/store";
-import { getEventSalesChannels, getSalesChannelLabel, isSalesChannelAllowedForEvent, sellTicketsByReseller } from "@/lib/store";
+import { getEventSalesChannels, getSalesChannelLabel, getTicketRefundBlockReason, isSalesChannelAllowedForEvent, refundTicketByReseller, sellTicketsByReseller } from "@/lib/store";
 import PartnerModuleDrawer, { ModuleDrawerContent } from "@/components/channel/PartnerModuleDrawer";
 
 interface Props {
@@ -149,6 +149,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
   const [sandboxEventId, setSandboxEventId] = useState("");
   const [sandboxTier, setSandboxTier] = useState("");
   const [sandboxQuantity, setSandboxQuantity] = useState(1);
+  const [refundTicketId, setRefundTicketId] = useState("");
   const [buyerName, setBuyerName] = useState("Demo Buyer");
   const [selectedResellerCode, setSelectedResellerCode] = useState(defaultResellerCode);
   const [search, setSearch] = useState("");
@@ -216,13 +217,34 @@ export default function ChannelView({ state, onUpdate }: Props) {
     () => sandboxEvents.find((event) => event.eventId === sandboxEventId) || null,
     [sandboxEventId, sandboxEvents],
   );
-  const tierRemaining = (eventId: string, tierName: string) =>
-    state.tickets.filter((ticket) => ticket.eventId === eventId && ticket.tier === tierName && ticket.status === "issued").length;
+  const tierRemaining = useCallback(
+    (eventId: string, tierName: string) =>
+      state.tickets.filter((ticket) => ticket.eventId === eventId && ticket.tier === tierName && ticket.status === "issued").length,
+    [state.tickets],
+  );
 
   const sandboxTiers = useMemo(() => {
     if (!sandboxEvent) return [];
     return sandboxEvent.tiers.filter((tier) => tierRemaining(sandboxEvent.eventId, tier.name) > 0);
-  }, [sandboxEvent, state.tickets]);
+  }, [sandboxEvent, tierRemaining]);
+
+  const refundableTickets = useMemo(() => {
+    const eventById = new Map(state.events.map((event) => [event.eventId, event]));
+    return state.tickets
+      .filter((ticket) => ticket.soldByChannel === activeResellerCode && ticket.status === "sold")
+      .map((ticket) => {
+        const event = eventById.get(ticket.eventId);
+        const reason = getTicketRefundBlockReason(state, ticket.ticketId);
+        return {
+          ticket,
+          event,
+          reason,
+          label: `${ticket.ticketId} · ${event?.title || ticket.eventId} · ${ticket.tier}`,
+        };
+      })
+      .filter((row) => !row.reason)
+      .sort((a, b) => (a.event?.dateTime || "").localeCompare(b.event?.dateTime || ""));
+  }, [activeResellerCode, state]);
 
   useEffect(() => {
     if (selectedReseller || state.resellers.length === 0) return;
@@ -249,6 +271,16 @@ export default function ChannelView({ state, onUpdate }: Props) {
     }
   }, [sandboxTier, sandboxTiers]);
 
+  useEffect(() => {
+    if (refundableTickets.length === 0) {
+      setRefundTicketId("");
+      return;
+    }
+    if (!refundableTickets.some((row) => row.ticket.ticketId === refundTicketId)) {
+      setRefundTicketId(refundableTickets[0].ticket.ticketId);
+    }
+  }, [refundTicketId, refundableTickets]);
+
   const today = new Date().toISOString().slice(0, 10);
   const todayOps = channelOps.filter((op) => op.ts.startsWith(today));
   const activeEvents = channelAvailableEvents;
@@ -257,7 +289,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
   const webhookDeliveries = todayOps.length;
 
   const commissionAccrued = state.tickets
-    .filter((ticket) => ticket.soldByChannel === activeResellerCode && ticket.status !== "issued")
+    .filter((ticket) => ticket.soldByChannel === activeResellerCode && (ticket.status === "sold" || ticket.status === "redeemed"))
     .reduce((acc, ticket) => {
       const event = state.events.find((e) => e.eventId === ticket.eventId);
       const tier = event?.tiers.find((item) => item.name === ticket.tier);
@@ -368,6 +400,27 @@ export default function ChannelView({ state, onUpdate }: Props) {
     }
     onUpdate({ ...state });
     toast.success(`Продано demo-билетов: ${outcome.ticketIds.length}`);
+  };
+
+  const handleSandboxRefund = () => {
+    if (!selectedReseller) {
+      toast.error("Реселлер не найден");
+      return;
+    }
+    if (!refundTicketId) {
+      toast.error("Нет билетов этого реселлера, доступных для возврата");
+      return;
+    }
+    const outcome = refundTicketByReseller(state, {
+      resellerCode: selectedReseller.code,
+      ticketId: refundTicketId,
+    });
+    if (!outcome.ok) {
+      toast.error(outcome.reason || "Demo-возврат не выполнен");
+      return;
+    }
+    onUpdate({ ...state });
+    toast.success("Демо-билет возвращён через реселлера");
   };
 
   const activeModuleContent = activeModule ? buildModuleContent(activeModule, formatDate(state.meta.updatedAt)) : null;
@@ -597,6 +650,33 @@ export default function ChannelView({ state, onUpdate }: Props) {
               >
                 Продать demo-билет через реселлера
               </button>
+
+              <div className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs text-slate-400">Билет для возврата</span>
+                  <select
+                    value={refundTicketId}
+                    onChange={(event) => setRefundTicketId(event.target.value)}
+                    className="h-10 w-full rounded-lg border border-white/15 bg-slate-950 px-3 text-sm text-slate-100 outline-none"
+                  >
+                    {refundableTickets.length === 0 && <option value="">Нет билетов этого реселлера, доступных для возврата</option>}
+                    {refundableTickets.map((row) => (
+                      <option key={row.ticket.ticketId} value={row.ticket.ticketId}>{row.label}</option>
+                    ))}
+                  </select>
+                </label>
+                {refundableTickets.length === 0 && (
+                  <p className="mt-2 text-xs text-amber-200">Нет билетов этого реселлера, доступных для возврата</p>
+                )}
+                <button
+                  type="button"
+                  onClick={handleSandboxRefund}
+                  disabled={!selectedReseller || selectedReseller.status === "disabled" || !selectedReseller.apiConnected || selectedReseller.contractStatus !== "Active" || !refundTicketId}
+                  className="mt-3 h-11 w-full rounded-lg bg-rose-400 font-semibold text-slate-950 transition hover:bg-rose-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+                >
+                  Вернуть демо-билет через реселлера
+                </button>
+              </div>
             </div>
           </article>
 

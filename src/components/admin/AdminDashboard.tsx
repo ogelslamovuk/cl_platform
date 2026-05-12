@@ -6,12 +6,28 @@ import {
 } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
 
-interface Props { state: AppState; onNavigate: (tab: any) => void; }
+interface Props { state: AppState; onNavigate: (tab: AdminDashboardTab) => void; }
 
 const statusLabel: Record<string, string> = {
-  draft: "Черновик", submitted: "Отправлена", approved: "Одобрена", rejected: "Отклонена",
+  draft: "Черновик", submitted: "Отправлена", approved: "Одобрена", rejected: "Отклонена", needs_rework: "На доработке",
 };
 const opTypeLabel: Record<string, string> = { sell: "Продажа", refund: "Возврат", redeem: "Погашение", verify: "Проверка" };
+
+type AdminDashboardTab = "eventComplianceApplications" | "operations";
+type DashboardApplicationRow = {
+  id: string;
+  title: string;
+  status: string;
+  kind: string;
+  sortAt: string;
+};
+
+function localDateKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 function CardHelp({ text }: { text: string }) {
   return (
@@ -24,8 +40,10 @@ function CardHelp({ text }: { text: string }) {
 export default function AdminDashboard({ state, onNavigate }: Props) {
   const kpi = useMemo(() => {
     const apps = state.applications;
-    const newApps = apps.filter(a => a.status === "submitted").length;
-    const reviewing = apps.filter(a => a.status === "submitted").length;
+    const eventApplications = state.eventComplianceApplications;
+    const newApps = apps.filter(a => a.status === "submitted").length
+      + eventApplications.filter((a) => a.status === "submitted").length;
+    const reviewing = eventApplications.filter((a) => a.status === "submitted").length;
     const activeEvents = state.events.filter(e => e.status === "published").length;
     const totalTickets = state.tickets.length;
     const errorOps = state.ops.filter(o => o.result === "error").length;
@@ -33,7 +51,25 @@ export default function AdminDashboard({ state, onNavigate }: Props) {
     return { newApps, reviewing, activeEvents, totalTickets, errorOps, suspiciousOps };
   }, [state]);
 
-  const recentApps = useMemo(() => [...state.applications].reverse().slice(0, 5), [state.applications]);
+  const recentApps = useMemo<DashboardApplicationRow[]>(() => {
+    const legacyRows = state.applications.map((a) => ({
+      id: a.appId,
+      title: a.title,
+      status: a.status,
+      kind: "Заявка",
+      sortAt: a.updatedAt || a.createdAt,
+    }));
+    const eventRows = state.eventComplianceApplications.map((a) => ({
+      id: a.eventComplianceApplicationId,
+      title: a.data.title || "Без названия",
+      status: a.status,
+      kind: "Мероприятие",
+      sortAt: a.submittedAt || a.updatedAt || a.createdAt,
+    }));
+    return [...legacyRows, ...eventRows]
+      .sort((a, b) => b.sortAt.localeCompare(a.sortAt))
+      .slice(0, 5);
+  }, [state.applications, state.eventComplianceApplications]);
   const recentOps = useMemo(() => [...state.ops].reverse().slice(0, 6), [state.ops]);
   const criticalFlags = useMemo(() => {
     const flags: { id: string; text: string; type: 'error' | 'warn' }[] = [];
@@ -49,7 +85,7 @@ export default function AdminDashboard({ state, onNavigate }: Props) {
   }, [state.ops]);
 
   const todayEvents = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateKey();
     return state.events.filter(e => e.dateTime?.startsWith(today));
   }, [state.events]);
 
@@ -95,7 +131,7 @@ export default function AdminDashboard({ state, onNavigate }: Props) {
           <div className="flex items-center justify-between mb-4">
             <h3 style={{ color: A.textPrimary }} className="text-sm font-semibold tracking-tight">Последние заявки</h3>
             <div className="inline-flex items-center gap-1">
-              <button onClick={() => onNavigate("applications")} style={{ color: A.cyan }} className="text-xs hover:underline">Все заявки →</button>
+              <button onClick={() => onNavigate("eventComplianceApplications")} style={{ color: A.cyan }} className="text-xs hover:underline">Все заявки →</button>
               <HelpTooltip text="Перейти к разделу всех заявок." />
             </div>
           </div>
@@ -106,12 +142,13 @@ export default function AdminDashboard({ state, onNavigate }: Props) {
               {recentApps.map(a => {
                 const chip = appStatusChip(a.status);
                 return (
-                  <div key={a.appId} className="flex items-center justify-between py-2 px-3 rounded-lg transition-colors"
+                  <div key={a.id} className="flex items-center justify-between py-2 px-3 rounded-lg transition-colors"
                     style={{ background: 'transparent' }}
                     onMouseEnter={e => (e.currentTarget.style.background = A.rowHover)}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <div>
-                      <span style={{ color: A.textMuted }} className="text-xs font-mono mr-2">{a.appId}</span>
+                      <span style={{ color: A.textMuted }} className="text-xs font-mono mr-2">{a.id}</span>
+                      <span style={{ color: A.textMuted }} className="text-xs mr-2">{a.kind}</span>
                       <span style={{ color: A.textPrimary }} className="text-sm">{a.title}</span>
                     </div>
                     <span style={{ background: chip.bg, color: chip.color, borderRadius: 999 }} className="text-xs px-2.5 py-0.5 font-medium">
