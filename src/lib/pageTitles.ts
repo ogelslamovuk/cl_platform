@@ -9,7 +9,6 @@ export const ROUTE_TITLES: Record<string, string> = {
   "/admin": "Админ-консоль",
   "/demo": "Демо-портал",
   "/channel": "Партнёрский кабинет",
-  "/platform": "Демо-платформа",
   "/main": "Описание проекта",
   "/proto": "Прототип платформы",
 };
