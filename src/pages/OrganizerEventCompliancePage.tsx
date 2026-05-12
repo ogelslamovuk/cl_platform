@@ -18,21 +18,6 @@ import {
   selectMyEventComplianceApplications,
 } from "@/lib/organizerSelectors";
 
-const DEMO_POSTERS = [
-  { path: "/demo/posters/vasilkovy-kraj.svg", title: "Фестиваль «Васільковы край»" },
-  { path: "/demo/posters/rodnaya-zyamlya.svg", title: "Концерт «Песня роднай зямлі»" },
-  { path: "/demo/posters/scena-belarusi.svg", title: "Театральный форум «Сцэна Беларусі»" },
-  { path: "/demo/posters/kazki-palessya.svg", title: "Детская программа «Казкі Палесся»" },
-  { path: "/demo/posters/belarus-u-sertsy.svg", title: "Концерт мастеров искусств «Беларусь у сэрцы»" },
-  { path: "/demo/posters/slutskie-poyasa.svg", title: "Фестиваль ремёсел «Слуцкие пояса»" },
-  { path: "/demo/posters/zvony-nesvizha.svg", title: "Музыкальный вечер «Звоны Нясвіжа»" },
-  { path: "/demo/posters/kola-tradycyj.svg", title: "Хореографическая программа «Кола традыцый»" },
-  { path: "/demo/posters/spadchyna-suchasnast.svg", title: "Выставочная программа «Спадчына і сучаснасць»" },
-  { path: "/demo/posters/kupalski-vianok.svg", title: "Областной праздник «Купальскі вянок»" },
-  { path: "/demo/posters/novyya-imiony.svg", title: "Конкурс молодых исполнителей «Новыя імёны»" },
-  { path: "/demo/posters/siabroustva-kultur.svg", title: "Международная программа «Сяброўства культур»" },
-];
-
 const COMPLIANCE_FEE_TOOLTIP = "Размер госпошлины рассчитывается по проектной вместимости площадки или количеству заявленных билетов: 1–150 — 3 БВ, 151–300 — 10 БВ, 301–500 — 30 БВ, 501–1000 — 50 БВ, 1001–1500 — 80 БВ, 1501–2000 — 100 БВ, 2001–3000 — 150 БВ, свыше 3000 — 200 БВ. Для отдельных категорий может применяться освобождение от пошлины.";
 const POSTER_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
 const POSTER_MAX_SIZE = 5 * 1024 * 1024;
@@ -255,29 +240,8 @@ export default function OrganizerEventCompliancePage() {
 
         <section className="space-y-3">
           <h2 className="font-semibold">Постер мероприятия</h2>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-              {DEMO_POSTERS.map((poster) => {
-                const selected = form.posterPath === poster.path;
-                return (
-                  <button
-                    key={poster.path}
-                    type="button"
-                    onClick={() => setForm((prev) => ({ ...prev, posterPath: poster.path }))}
-                    className="overflow-hidden rounded-xl border p-2 text-left transition"
-                    style={{
-                      borderColor: selected ? "#F2C94C" : "rgba(255,255,255,0.12)",
-                      background: selected ? "rgba(242,201,76,0.12)" : "#0F1620",
-                      boxShadow: selected ? "0 0 0 3px rgba(242,201,76,0.16)" : "none",
-                    }}
-                  >
-                    <img src={resolvePublicAsset(poster.path)} alt={poster.title} className="aspect-[16/10] w-full rounded-lg object-cover" />
-                    <div className="mt-2 text-xs font-medium">{poster.title}</div>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="rounded-xl border p-4" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
               <div className="mb-2 text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>Предпросмотр</div>
               {form.posterPath ? (
                 <img src={resolvePublicAsset(form.posterPath)} alt="Выбранный постер" className="aspect-[16/10] w-full rounded-lg object-cover" />
@@ -286,13 +250,15 @@ export default function OrganizerEventCompliancePage() {
                   Постер не выбран
                 </div>
               )}
-              <div className="mt-3 space-y-2">
+            </div>
+            <div className="rounded-xl border p-4" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
+              <div className="space-y-2">
                 <label className="inline-flex h-9 cursor-pointer items-center rounded-lg px-3 text-sm font-semibold" style={{ background: "#1d2a3b", color: "#F5F7FA" }}>
                   Загрузить свой постер
                   <input type="file" accept={POSTER_ALLOWED_TYPES.join(",")} className="hidden" onChange={handlePosterUpload} />
                 </label>
                 <p className="text-xs leading-relaxed" style={{ color: "rgba(245,247,250,0.65)" }}>
-                  JPG, PNG, WEBP или SVG, до 5 MB. Рекомендуемый размер — 1200×750 px.
+                  JPG, PNG, WEBP или SVG, до 5 МБ. Рекомендуемый размер — 1200×750 px.
                 </p>
               </div>
             </div>
