@@ -6,6 +6,7 @@ import HelpTooltip from "@/components/ui/help-tooltip";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import type { EventComplianceApplicationRecord, EventRecord, OrganizerDocument, OrganizerSaleRecord } from "@/lib/store";
 import { calculateComplianceFee, getSalesChannelLabel, logoutOrganizer } from "@/lib/store";
+import { calculateOrganizerFinance } from "@/lib/finance";
 import {
   DEMO_VAT_RATE,
   selectCurrentOrganizer,
@@ -18,9 +19,7 @@ import {
 import {
   BarChart3,
   Calendar,
-  CheckCircle,
   ChevronDown,
-  Clock,
   FileText,
   FolderOpen,
   HelpCircle,
@@ -32,7 +31,6 @@ import {
   TrendingUp,
   User,
   X,
-  XCircle,
 } from "lucide-react";
 
 type Section = "dashboard" | "applications" | "events" | "sales" | "reports" | "marketing" | "documents" | "support";
@@ -98,6 +96,10 @@ function fmtDateTime(v: string): string {
   return v?.replace("T", " ").slice(0, 16) || "—";
 }
 
+function formatMoney(value: number): string {
+  return `${value.toFixed(2)} BYN`;
+}
+
 function sortDir(next: boolean): SortDirection {
   return next ? "asc" : "desc";
 }
@@ -130,6 +132,11 @@ export default function OrganizerPage() {
   const mySales = useMemo(() => selectMySales(state), [state]);
   const reportingRows = useMemo(() => selectMyReportingRows(state), [state]);
   const myDocuments = useMemo(() => selectMyDocuments(state), [state]);
+  const organizerFinance = useMemo(() => (
+    organizer
+      ? calculateOrganizerFinance(state, organizer.organizerId)
+      : { currentRevenue: 0, soldTickets: 0, amountDue: 0, openEvents: 0, commissionPercent: 5 }
+  ), [organizer, state]);
   const isOrganizerApproved = useMemo(() => {
     if (!organizer) return false;
     if (organizer.accountStatus === "активен") return true;
@@ -138,14 +145,6 @@ export default function OrganizerPage() {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     return latestOrganizerApplication?.status === "approved";
   }, [organizer, state.organizerApplications]);
-
-  const kpi = {
-    draft: myComplianceApplications.filter((a) => a.status === "draft").length,
-    submitted: myComplianceApplications.filter((a) => a.status === "submitted").length,
-    approved: myComplianceApplications.filter((a) => a.status === "approved").length,
-    rejected: myComplianceApplications.filter((a) => a.status === "rejected").length,
-    needsRework: myComplianceApplications.filter((a) => a.status === "needs_rework").length,
-  };
 
   const recentOps = useMemo(() => {
     const allowedEventIds = new Set(myEvents.map((e) => e.eventId));
@@ -209,11 +208,6 @@ export default function OrganizerPage() {
     update({ ...state });
     return <Navigate to="/organizer/login" replace />;
   }
-
-  const openFilteredApplications = (filter: AppFilter) => {
-    setAppFilter(filter);
-    setActiveSection("applications");
-  };
 
   const handleLogout = () => {
     logoutOrganizer(state);
@@ -350,15 +344,13 @@ export default function OrganizerPage() {
               <>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                      { label: "Черновики", value: kpi.draft, icon: Clock, filter: "draft" as const },
-                      { label: "На рассмотрении", value: kpi.submitted, icon: FileText, filter: "submitted" as const },
-                      { label: "На доработке", value: kpi.needsRework, icon: X, filter: "needs_rework" as const },
-                      { label: "Одобрено", value: kpi.approved, icon: CheckCircle, filter: "approved" as const },
-                      { label: "Отклонено", value: kpi.rejected, icon: XCircle, filter: "rejected" as const },
+                      { label: "Текущая выручка", value: formatMoney(organizerFinance.currentRevenue), icon: TrendingUp, tooltip: "Выручка по открытым мероприятиям: учитываются только проданные и не возвращённые билеты." },
+                      { label: "Продано билетов", value: String(organizerFinance.soldTickets), icon: BarChart3, tooltip: "Количество проданных билетов по открытым мероприятиям без возвращённых билетов." },
+                      { label: "К уплате платформе", value: formatMoney(organizerFinance.amountDue), icon: ShieldCheck, tooltip: `Начисление по ставке ${organizerFinance.commissionPercent}% от текущей выручки.` },
+                      { label: "Открытые мероприятия", value: String(organizerFinance.openEvents), icon: Calendar, tooltip: "Опубликованные мероприятия, дата и время которых ещё не прошли." },
                     ].map((k) => (
                     <div key={k.label} className="relative">
-                    <button
-                      onClick={() => openFilteredApplications(k.filter)}
+                    <div
                       className="rounded-[18px] border p-5 text-left transition-all duration-200 hover:-translate-y-0.5 w-full"
                       style={{ background: T.cardBg, backgroundImage: T.cardGradient, borderColor: T.border, boxShadow: T.cardShadow }}
                     >
@@ -369,8 +361,8 @@ export default function OrganizerPage() {
                       </div>
                       <div className="text-[28px] font-bold" style={{ color: T.textPrimary }}>{k.value}</div>
                       <div className="text-[13px] mt-1" style={{ color: T.textSecondary }}>{k.label}</div>
-                    </button>
-                    <CardHelp text={k.label === "Черновики" ? "Количество черновиков заявок. Нажмите, чтобы отфильтровать заявки по статусу «Черновик»." : k.label === "На рассмотрении" ? "Заявки, ожидающие рассмотрения. Нажмите, чтобы отфильтровать заявки со статусом «На рассмотрении»." : k.label === "На доработке" ? "Заявки с замечаниями администратора. Нажмите, чтобы открыть заявки, требующие доработки." : k.label === "Одобрено" ? "Количество заявок, одобренных регулятором. Нажмите, чтобы посмотреть одобренные заявки." : "Заявки, отклонённые регулятором. Нажмите, чтобы увидеть отклонённые заявки."} />
+                    </div>
+                    <CardHelp text={k.tooltip} />
                     </div>
                   ))}
                 </div>

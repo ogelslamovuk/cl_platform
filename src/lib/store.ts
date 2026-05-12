@@ -1,3 +1,5 @@
+import { normalizePlatformCommissionPercent } from "@/lib/finance";
+
 // TicketHub MVP State Management — localStorage based
 
 export type Role = "organizer" | "regulator" | "tickethub" | "channel" | "b2c";
@@ -276,6 +278,7 @@ export interface OrganizerDocument {
 export interface AppState {
   meta: { version: string; updatedAt: string };
   counters: { app: number; lic: number; evt: number; tck: number; op: number };
+  finance: { platformCommissionPercent: number };
   applications: Application[];
   organizerApplications: OrganizerApplicationRecord[];
   eventComplianceApplications: EventComplianceApplicationRecord[];
@@ -405,6 +408,7 @@ export function defaultState(): AppState {
   const state: AppState = {
     meta: { version: "v4", updatedAt: createdAt },
     counters: { app: 1, lic: 1, evt: 1, tck: 1, op: 1 },
+    finance: { platformCommissionPercent: 5 },
     applications: [],
     organizerApplications: [],
     eventComplianceApplications: [],
@@ -527,6 +531,9 @@ function migrateState(parsed: Partial<AppState>): AppState {
     const state: AppState = {
       ...defaultState(),
       ...parsed,
+      finance: {
+        platformCommissionPercent: normalizePlatformCommissionPercent(parsed.finance?.platformCommissionPercent),
+      },
       applications: Array.isArray(parsed.applications) ? parsed.applications : [],
       organizerApplications: Array.isArray(parsed.organizerApplications) ? parsed.organizerApplications : [],
       eventComplianceApplications: Array.isArray(parsed.eventComplianceApplications) ? parsed.eventComplianceApplications : [],
@@ -1183,6 +1190,14 @@ export function setResellerCommission(state: AppState, resellerId: string, commi
   const nextValue = Math.max(0, Math.min(100, Number.isFinite(commissionPercent) ? commissionPercent : 0));
   reseller.commissionPercent = Number(nextValue.toFixed(2));
   reseller.updatedAt = nowIso();
+  saveState(state);
+  return true;
+}
+
+export function setPlatformCommissionPercent(state: AppState, commissionPercent: number): boolean {
+  state.finance = {
+    platformCommissionPercent: normalizePlatformCommissionPercent(commissionPercent),
+  };
   saveState(state);
   return true;
 }
