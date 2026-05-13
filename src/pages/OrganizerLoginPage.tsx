@@ -15,17 +15,8 @@ export default function OrganizerLoginPage() {
 
   if (state.currentOrganizerId) {
     const currentOrganizer = state.organizers.find((organizer) => organizer.organizerId === state.currentOrganizerId);
-    const latestApplication = currentOrganizer
-      ? state.organizerApplications
-          .filter((application) => application.organizerId === currentOrganizer.organizerId)
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
-      : null;
-    const isApproved = Boolean(currentOrganizer && (currentOrganizer.accountStatus === "активен" || latestApplication?.status === "approved"));
-    if (!isApproved) {
-      state.currentOrganizerId = null;
-      update({ ...state });
-    } else {
-    return <Navigate to="/organizer" replace />;
+    if (currentOrganizer) {
+      return <Navigate to="/organizer" replace />;
     }
   }
 
@@ -33,10 +24,6 @@ export default function OrganizerLoginPage() {
     e.preventDefault();
     const result = loginOrganizer(state, login, password);
     if (!result.ok) {
-      if (result.reason === "not_approved") {
-        toast.error("Доступ в кабинет будет открыт после одобрения заявки. Результат будет направлен на указанный email.");
-        return;
-      }
       toast.error("Неверный логин или пароль.");
       return;
     }

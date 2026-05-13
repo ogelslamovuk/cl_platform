@@ -1508,17 +1508,7 @@ export function createDemoPurchaseTicket(
 
 export type OrganizerLoginResult =
   | { ok: true; organizer: OrganizerAccount }
-  | { ok: false; reason: "invalid_credentials" | "not_approved" };
-
-function hasApprovedOrganizerStatus(state: AppState, organizerId: string): boolean {
-  const organizer = state.organizers.find((o) => o.organizerId === organizerId);
-  if (!organizer) return false;
-  if (organizer.accountStatus === "активен") return true;
-  const latestApplication = state.organizerApplications
-    .filter((application) => application.organizerId === organizerId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-  return latestApplication?.status === "approved";
-}
+  | { ok: false; reason: "invalid_credentials" };
 
 export function loginOrganizer(state: AppState, login: string, password: string): OrganizerLoginResult {
   const normalized = login.trim().toLowerCase();
@@ -1526,9 +1516,6 @@ export function loginOrganizer(state: AppState, login: string, password: string)
     (o) => o.login.toLowerCase() === normalized && o.password === password
   );
   if (!organizer) return { ok: false, reason: "invalid_credentials" };
-  if (!hasApprovedOrganizerStatus(state, organizer.organizerId)) {
-    return { ok: false, reason: "not_approved" };
-  }
   state.currentOrganizerId = organizer.organizerId;
   saveState(state);
   return { ok: true, organizer };

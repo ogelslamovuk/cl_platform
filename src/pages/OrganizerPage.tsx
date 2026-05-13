@@ -273,7 +273,6 @@ export default function OrganizerPage() {
   }
 
   const submittedAt = latestOrganizerApplication?.submittedAt || latestOrganizerApplication?.createdAt || "";
-  const isActiveSectionLocked = !isOrganizerApproved && pendingLockedSections.includes(activeSection);
 
   const showPendingSectionToast = () => {
     toast.info("Раздел будет доступен после включения организации в реестр.");
@@ -438,17 +437,7 @@ export default function OrganizerPage() {
 
         <main className="flex-1 p-6 overflow-y-auto">
           <div className="max-w-[1200px] mx-auto space-y-5">
-            {activeSection === "dashboard" && !isOrganizerApproved && (
-              <PendingOrganizerLockedCard
-                organizer={organizer}
-                application={latestOrganizerApplication}
-                submittedAt={submittedAt}
-                onLogout={handleLogout}
-                onRefresh={refreshPendingStatus}
-              />
-            )}
-
-            {isActiveSectionLocked && activeSection !== "dashboard" && (
+            {!isOrganizerApproved && (
               <PendingOrganizerLockedCard
                 organizer={organizer}
                 application={latestOrganizerApplication}
@@ -577,11 +566,11 @@ export default function OrganizerPage() {
               <ReportsSection report={organizerSettlementReport} />
             )}
 
-            {activeSection === "documents" && (
+            {activeSection === "documents" && isOrganizerApproved && (
               <DocumentsSection rows={myDocuments} complianceRows={myComplianceApplications} />
             )}
 
-            {activeSection === "support" && (
+            {activeSection === "support" && isOrganizerApproved && (
               <SupportSection />
             )}
 
