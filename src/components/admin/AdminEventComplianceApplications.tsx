@@ -7,6 +7,8 @@ import { toast } from "sonner";
 
 interface Props { state: AppState; onUpdate: (s: AppState) => void; }
 
+type StatusFilter = "all" | "submitted" | "approved" | "needs_rework" | "rejected";
+
 function CardHelp({ text }: { text: string }) {
   return (
     <div className="absolute right-4 top-4 z-10">
@@ -17,11 +19,19 @@ function CardHelp({ text }: { text: string }) {
 
 const statusLabel: Record<string, string> = {
   draft: "Черновик",
-  submitted: "Отправлена",
+  submitted: "Новые / на рассмотрении",
   approved: "Одобрена",
   rejected: "Отклонена",
-  needs_rework: "На доработке",
+  needs_rework: "Возвращена на доработку",
 };
+
+const statusFilterOptions: { value: StatusFilter; label: string }[] = [
+  { value: "all", label: "Все" },
+  { value: "submitted", label: "Новые / на рассмотрении" },
+  { value: "approved", label: "Одобрена" },
+  { value: "needs_rework", label: "Возвращена на доработку" },
+  { value: "rejected", label: "Отклонена" },
+];
 
 const approvalModeLabel: Record<string, string> = {
   certificate_required: "Требуется удостоверение",
@@ -42,8 +52,13 @@ function getApplicationFeatures(row: AppState["eventComplianceApplications"][num
 export default function AdminEventComplianceApplications({ state, onUpdate }: Props) {
   const [comment, setComment] = useState<Record<string, string>>({});
   const [confirmFee, setConfirmFee] = useState<Record<string, boolean>>({});
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("submitted");
 
-  const rows = useMemo(() => state.eventComplianceApplications.slice().reverse(), [state.eventComplianceApplications]);
+  const allRows = useMemo(() => state.eventComplianceApplications.slice().reverse(), [state.eventComplianceApplications]);
+  const rows = useMemo(
+    () => statusFilter === "all" ? allRows : allRows.filter((row) => row.status === statusFilter),
+    [allRows, statusFilter]
+  );
 
   const applyDecision = (id: string, decision: "approved" | "rejected" | "needs_rework") => {
     const text = (comment[id] || "").trim();
@@ -74,6 +89,22 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
           <p className="mt-1 text-xs" style={{ color: A.textSecondary }}>Согласование, госпошлина и выдача удостоверения.</p>
         </div>
         <HelpTooltip text="Заявки проходят рассмотрение в Центре Управления; после одобрения создаётся мероприятие и присваивается удостоверение, если оно требуется." />
+      </div>
+      <div className="rounded-xl border p-3" style={{ background: A.surfaceBg, borderColor: A.border }}>
+        <label className="block max-w-sm" htmlFor="event-compliance-status-filter">
+          <span className="mb-2 block text-xs font-semibold" style={{ color: A.textSecondary }}>Статус заявки</span>
+          <select
+            id="event-compliance-status-filter"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+            className="h-10 w-full rounded-lg border px-3 text-sm outline-none"
+            style={{ background: A.cardBg, borderColor: A.border, color: A.textPrimary }}
+          >
+            {statusFilterOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
       </div>
       <div className="space-y-3">
         {rows.map((r) => {
@@ -205,7 +236,7 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
         })}
         {rows.length === 0 && (
           <div className="rounded-xl border py-6 px-3 text-center" style={{ background: A.cardBg, borderColor: A.border, color: A.textMuted }}>
-            Пока нет заявок на проведение мероприятий
+            Заявок с выбранным статусом нет.
           </div>
         )}
       </div>

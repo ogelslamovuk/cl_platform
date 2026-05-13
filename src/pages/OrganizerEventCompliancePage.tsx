@@ -178,6 +178,63 @@ export default function OrganizerEventCompliancePage() {
     reader.readAsDataURL(file);
   };
 
+  const fillWithMockData = () => {
+    const eventDate = new Date();
+    eventDate.setDate(eventDate.getDate() + 14);
+    eventDate.setHours(19, 0, 0, 0);
+    const yyyy = eventDate.getFullYear();
+    const mm = String(eventDate.getMonth() + 1).padStart(2, "0");
+    const dd = String(eventDate.getDate()).padStart(2, "0");
+    const salesStart = new Date(eventDate);
+    salesStart.setDate(salesStart.getDate() - 7);
+    const salesYyyy = salesStart.getFullYear();
+    const salesMm = String(salesStart.getMonth() + 1).padStart(2, "0");
+    const salesDd = String(salesStart.getDate()).padStart(2, "0");
+    const uploadedAt = new Date().toISOString();
+
+    setForm((prev) => ({
+      ...prev,
+      title: "Гала-концерт «Беларусь культурная»",
+      eventType: "концерт",
+      shortDescription: "Демонстрационное культурно-зрелищное мероприятие для проверки полного цикла согласования, выпуска билетов и отчётности.",
+      program: "Торжественное открытие, выступление белорусских исполнителей, концертная программа, финальный номер.",
+      posterPath: "/demo/posters/belarus-u-sertsy.svg",
+      salesChannels: Array.from(new Set(["OWN", ...buildDefaultSalesChannels(state)])),
+      dateSlots: [`${yyyy}-${mm}-${dd}T19:00`],
+      venueName: "Дворец культуры ветеранов",
+      venueAddress: "г. Минск, ул. Я. Купалы, 21",
+      onlyBelarusianPerformers: true,
+      hasForeignPerformers: false,
+      venueType: "сценическая площадка",
+      projectedCapacity: 300,
+      plannedTicketsForSale: 220,
+      ticketTiers: [
+        { name: "Стандарт", quantity: 180, price: 25 },
+        { name: "Льготный", quantity: 40, price: 15 },
+      ],
+      ageCategory: "6+",
+      approvalMode: "certificate_required",
+      approvalBasis: "Проведение культурно-зрелищного мероприятия с реализацией входных билетов.",
+      eventDocuments: [
+        { attachmentId: `mock-registry-statement-${Date.now()}`, kind: "registry-statement", name: "Образец: заявление на проведение мероприятия", uploadedAt, isSample: true },
+        { attachmentId: `mock-registry-appendix-${Date.now()}`, kind: "registry-appendix", name: "Образец: приложение к заявлению", uploadedAt, isSample: true },
+      ],
+      salesStartDate: `${salesYyyy}-${salesMm}-${salesDd}`,
+      feeExempt: false,
+      feeExemptReason: "",
+      feePaid: false,
+      paymentAttachments: [],
+      adRestrictionConfirmed: true,
+      changesDeclared: false,
+      executiveCommitteeNotified: false,
+      citizensNotified: false,
+      notificationsAttachment: [],
+      cancellationComment: "",
+    }));
+    setTierErrors([]);
+    toast.success("Форма заполнена mock-данными. Проверьте и отправьте заявку вручную.");
+  };
+
   const save = (submit: boolean) => {
     if (submit && !validateTicketTiers()) {
       toast.error("Заполните тарифы билетов: название, количество и стоимость.");
@@ -215,8 +272,9 @@ export default function OrganizerEventCompliancePage() {
             <h1 className="text-2xl font-bold mb-2">Заявка на проведение мероприятия</h1>
             <p className="text-sm" style={{ color: "rgba(245,247,250,0.72)" }}>Согласование, госпошлина и выдача удостоверения.</p>
           </div>
-          <div className="inline-flex items-center gap-1">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Link to="/organizer" className="px-3 h-9 inline-flex items-center rounded border">Назад в кабинет</Link>
+            <button type="button" className="px-3 h-9 inline-flex items-center rounded border bg-[#1d2a3b]" onClick={fillWithMockData}>Заполнить mock-данными</button>
             <HelpTooltip text="Вернуться в кабинет организатора." />
           </div>
         </div>

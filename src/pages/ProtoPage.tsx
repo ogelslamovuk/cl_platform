@@ -1,5 +1,6 @@
 import { ArrowRight, Building2, ClipboardCheck, Play, RefreshCcw, ShieldCheck, Store, Ticket } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -80,9 +81,14 @@ function ToolCard({ tool }: { tool: Tool }) {
 export default function ProtoPage() {
   const { state, update, setState } = useStorageSync();
   const commissionPercent = getPlatformCommissionPercent(state);
+  const [draftCommissionPercent, setDraftCommissionPercent] = useState(String(commissionPercent));
 
-  const handleCommissionChange = (value: string) => {
-    setPlatformCommissionPercent(state, Number(value));
+  useEffect(() => {
+    setDraftCommissionPercent(String(commissionPercent));
+  }, [commissionPercent]);
+
+  const applyCommissionPercent = () => {
+    setPlatformCommissionPercent(state, Number(draftCommissionPercent));
     update({ ...state });
   };
 
@@ -147,19 +153,29 @@ export default function ProtoPage() {
           </div>
           <div className="mt-5 rounded-[22px] border p-5" style={{ background: "linear-gradient(180deg, rgba(9,17,31,0.96) 0%, rgba(6,12,25,0.94) 100%)", borderColor: "rgba(255,255,255,0.08)" }}>
             <h3 className="text-[22px] font-semibold leading-7">Настройки финансовой модели</h3>
-            <label className="mt-4 block max-w-sm">
-              <span className="mb-2 block text-[14px] font-semibold text-[rgba(233,238,255,0.92)]">Процент платформы / Минкульта</span>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                step={0.1}
-                value={commissionPercent}
-                onChange={(event) => handleCommissionChange(event.target.value)}
-                className="h-11 w-full rounded-[12px] border bg-[#020611] px-3 text-[15px] text-white outline-none focus:ring-2 focus:ring-blue-400/40"
-                style={{ borderColor: "rgba(255,255,255,0.12)" }}
-              />
-            </label>
+            <div className="mt-4 flex max-w-lg flex-col gap-3 sm:flex-row sm:items-end">
+              <label className="block flex-1">
+                <span className="mb-2 block text-[14px] font-semibold text-[rgba(233,238,255,0.92)]">Процент платформы / Минкульта</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  value={draftCommissionPercent}
+                  onChange={(event) => setDraftCommissionPercent(event.target.value)}
+                  className="h-11 w-full rounded-[12px] border bg-[#020611] px-3 text-[15px] text-white outline-none focus:ring-2 focus:ring-blue-400/40"
+                  style={{ borderColor: "rgba(255,255,255,0.12)" }}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={applyCommissionPercent}
+                className="h-11 rounded-[12px] px-4 text-[14px] font-semibold transition hover:brightness-110"
+                style={{ background: "linear-gradient(90deg, #4F7BFF 0%, #B059FF 100%)", color: "#FFFFFF" }}
+              >
+                Применить
+              </button>
+            </div>
             <p className="mt-3 text-[14px] leading-6 text-[rgba(203,213,225,0.78)]">
               Используется для расчёта начислений организатора по проданным билетам.
             </p>
