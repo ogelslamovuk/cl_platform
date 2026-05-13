@@ -3,6 +3,7 @@ import type { AppState, EventRecord } from "@/lib/store";
 import { createDemoPurchaseTicket, getTicketRefundBlockReason, refund } from "@/lib/store";
 import { toast } from "sonner";
 import { Search, MapPin, Tag, Ticket, X, ChevronRight, Sparkles, TrendingUp, Star, User, Calendar, CheckCircle2 } from "lucide-react";
+import platformLogo from "../../logo.jpg";
 
 interface Props {
   state: AppState;
@@ -327,9 +328,7 @@ export default function B2CView({ state, onUpdate }: Props) {
       >
         <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: D.accent, color: "#FFFFFF" }}>
-              <Ticket size={18} />
-            </div>
+            <img src={platformLogo} alt="CinemaLab" className="h-10 w-10 shrink-0 rounded-xl object-cover" />
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold" style={{ color: D.text }}>
                 CinemaLab
