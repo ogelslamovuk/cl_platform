@@ -51,6 +51,8 @@ const sidebarItems: { id: Section; label: string; icon: React.ElementType; demo?
   { id: "support", label: "Поддержка", icon: HelpCircle },
 ];
 
+const pendingLockedSections: Section[] = ["applications", "events", "sales", "reports", "marketing"];
+
 const statusStyle: Record<string, React.CSSProperties> = {
   draft: { background: "rgba(148,163,184,0.18)", color: "#94A3B8" },
   submitted: { background: "rgba(59,130,246,0.18)", color: "#3B82F6" },
@@ -270,55 +272,22 @@ export default function OrganizerPage() {
     );
   }
 
-  if (!isOrganizerApproved) {
-    const submittedAt = latestOrganizerApplication?.submittedAt || latestOrganizerApplication?.createdAt || "";
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: T.pageBg, color: T.textPrimary }}>
-        <Sonner
-          theme="dark"
-          toastOptions={{
-            style: { background: T.cardBg, border: `1px solid ${T.border}`, color: T.textPrimary },
-          }}
-        />
-        <div className="w-full max-w-3xl rounded-[22px] border p-8" style={{ background: T.cardBg, borderColor: T.border, boxShadow: T.cardShadow }}>
-          <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: T.goldBorder, background: T.goldBg, color: T.gold }}>
-            Статус: на рассмотрении
-          </div>
-          <h1 className="mt-5 text-3xl font-bold" style={{ color: T.textPrimary }}>Заявка на включение в реестр подана</h1>
-          <p className="mt-3 text-sm leading-6" style={{ color: T.textSecondary }}>
-            До включения в реестр подача заявок на мероприятия недоступна.
-          </p>
-          <dl className="mt-6 grid gap-3 rounded-xl border p-4 text-sm" style={{ borderColor: T.border, background: T.sidebarBg }}>
-            <Row dt="Организация" dd={organizer.fullName || organizer.name} />
-            <Row dt="ID заявки" dd={latestOrganizerApplication?.organizerApplicationId || "—"} />
-            <Row dt="Подано" dd={submittedAt ? fmtDateTime(submittedAt) : "—"} />
-            <Row dt="УНП" dd={organizer.unp || "—"} />
-          </dl>
-          <p className="mt-5 text-sm leading-6" style={{ color: T.textSecondary }}>
-            Кабинет организатора и подача заявок на мероприятия разблокируются после одобрения заявки оператором Центра Управления.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              onClick={() => navigate("/admin")}
-              className="h-11 rounded-xl px-5 text-sm font-semibold"
-              style={{ background: T.gold, color: "#111" }}
-            >
-              Открыть Центр Управления
-            </button>
-            <button
-              onClick={handleLogout}
-              className="h-11 rounded-xl border px-5 text-sm font-semibold"
-              style={{ borderColor: T.btnSecondaryBorder, color: T.textPrimary, background: "transparent" }}
-            >
-              Выйти
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const submittedAt = latestOrganizerApplication?.submittedAt || latestOrganizerApplication?.createdAt || "";
+  const isActiveSectionLocked = !isOrganizerApproved && pendingLockedSections.includes(activeSection);
+
+  const showPendingSectionToast = () => {
+    toast.info("Раздел будет доступен после включения организации в реестр.");
+  };
+
+  const refreshPendingStatus = () => {
+    toast.info("Статус заявки пока не изменился. Ожидайте решения Центра Управления.");
+  };
 
   const openUnpCheck = () => {
+    if (!isOrganizerApproved) {
+      toast.success(`УНП подтвержден: ${organizer.unp || "—"}. Сведения синхронизированы в demo-режиме.`);
+      return;
+    }
     toast.success(`УНП подтвержден: ${organizer.unp}. Организатор зарегистрирован в реестре. Данные актуальны на 15.04.2026.`);
   };
 
@@ -339,16 +308,18 @@ export default function OrganizerPage() {
           style: { background: T.cardBg, border: `1px solid ${T.border}`, color: T.textPrimary },
         }}
       />
-      <div className="fixed right-5 bottom-5 z-20 inline-flex items-center gap-1">
-        <button
-          onClick={() => navigate("/organizer/compliance")}
-          className="px-4 h-10 rounded-xl text-sm font-semibold shadow-lg"
-          style={{ background: T.gold, color: "#111" }}
-        >
-          Новая заявка
-        </button>
-        <HelpTooltip text="Создать новую заявку на проведение мероприятия." />
-      </div>
+      {isOrganizerApproved && (
+        <div className="fixed right-5 bottom-5 z-20 inline-flex items-center gap-1">
+          <button
+            onClick={() => navigate("/organizer/compliance")}
+            className="px-4 h-10 rounded-xl text-sm font-semibold shadow-lg"
+            style={{ background: T.gold, color: "#111" }}
+          >
+            Новая заявка
+          </button>
+          <HelpTooltip text="Создать новую заявку на проведение мероприятия." />
+        </div>
+      )}
 
       <aside className="w-60 min-h-screen border-r flex-shrink-0 flex flex-col" style={{ background: T.sidebarBg, borderColor: T.border }}>
         <div className="px-5 py-5 border-b" style={{ borderColor: T.border }}>
@@ -359,17 +330,33 @@ export default function OrganizerPage() {
         <nav className="flex-1 py-3 px-2 space-y-0.5">
           {sidebarItems.map((item) => {
             const active = activeSection === item.id;
+            const locked = !isOrganizerApproved && pendingLockedSections.includes(item.id);
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveSection(item.id)}
+                onClick={() => {
+                  if (locked) {
+                    showPendingSectionToast();
+                    return;
+                  }
+                  setActiveSection(item.id);
+                }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors relative"
-                style={{ color: active ? T.textPrimary : T.textSecondary, background: active ? "rgba(242,201,76,0.10)" : "transparent" }}
+                style={{
+                  color: active ? T.textPrimary : T.textSecondary,
+                  background: active ? "rgba(242,201,76,0.10)" : "transparent",
+                  cursor: locked ? "not-allowed" : "pointer",
+                  opacity: locked ? 0.48 : 1,
+                }}
               >
                 {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full" style={{ background: T.gold }} />}
                 <item.icon size={18} strokeWidth={active ? 2 : 1.5} style={{ color: active ? T.textPrimary : T.textSecondary }} />
                 <span>{item.label}</span>
-                {item.demo && (
+                {locked ? (
+                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: "rgba(148,163,184,0.14)", color: T.textMuted }}>
+                    после реестра
+                  </span>
+                ) : item.demo && (
                   <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-semibold" style={{ background: T.goldBg, color: T.gold }}>
                     демо
                   </span>
@@ -409,9 +396,17 @@ export default function OrganizerPage() {
             >
               <ShieldCheck size={14} /> Проверить УНП
             </button>
-            <button onClick={() => navigate("/organizer/compliance")} className="h-9 px-4 rounded-xl text-[13px] font-semibold flex items-center gap-2 org-btn-primary" style={{ background: "#111111", color: "#FFF" }}>
-              <Plus size={14} /> Создать заявку
-            </button>
+            <div className="inline-flex items-center gap-1">
+              <button
+                onClick={() => navigate("/organizer/compliance")}
+                disabled={!isOrganizerApproved}
+                className="h-9 px-4 rounded-xl text-[13px] font-semibold flex items-center gap-2 org-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: "#111111", color: "#FFF" }}
+              >
+                <Plus size={14} /> Создать заявку
+              </button>
+              {!isOrganizerApproved && <HelpTooltip text="Доступно после включения организации в реестр." />}
+            </div>
             <div className="relative">
               <button
                 onClick={() => setProfileOpen((v) => !v)}
@@ -443,7 +438,27 @@ export default function OrganizerPage() {
 
         <main className="flex-1 p-6 overflow-y-auto">
           <div className="max-w-[1200px] mx-auto space-y-5">
-            {activeSection === "dashboard" && (
+            {activeSection === "dashboard" && !isOrganizerApproved && (
+              <PendingOrganizerLockedCard
+                organizer={organizer}
+                application={latestOrganizerApplication}
+                submittedAt={submittedAt}
+                onLogout={handleLogout}
+                onRefresh={refreshPendingStatus}
+              />
+            )}
+
+            {isActiveSectionLocked && activeSection !== "dashboard" && (
+              <PendingOrganizerLockedCard
+                organizer={organizer}
+                application={latestOrganizerApplication}
+                submittedAt={submittedAt}
+                onLogout={handleLogout}
+                onRefresh={refreshPendingStatus}
+              />
+            )}
+
+            {activeSection === "dashboard" && isOrganizerApproved && (
               <>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
@@ -535,7 +550,7 @@ export default function OrganizerPage() {
               </>
             )}
 
-            {activeSection === "applications" && (
+            {activeSection === "applications" && isOrganizerApproved && (
               <ApplicationsTable
                 rows={filteredApplications}
                 search={search}
@@ -550,15 +565,15 @@ export default function OrganizerPage() {
               />
             )}
 
-            {activeSection === "events" && (
+            {activeSection === "events" && isOrganizerApproved && (
               <EventsSection rows={filteredEvents} state={state} sort={eventSort} setSort={setEventSort} />
             )}
 
-            {activeSection === "sales" && (
+            {activeSection === "sales" && isOrganizerApproved && (
               <SalesSection rows={mySales} />
             )}
 
-            {activeSection === "reports" && (
+            {activeSection === "reports" && isOrganizerApproved && (
               <ReportsSection report={organizerSettlementReport} />
             )}
 
@@ -570,7 +585,7 @@ export default function OrganizerPage() {
               <SupportSection />
             )}
 
-            {activeSection === "marketing" && (
+            {activeSection === "marketing" && isOrganizerApproved && (
               <SimpleCard title="Маркетинг" text="Раздел будет расширен в следующих версиях демо-кабинета." tooltipText="Раздел маркетинга в демонстрационном режиме. Будет расширен позже." />
             )}
           </div>
@@ -604,6 +619,58 @@ function Row({ dt, dd }: { dt: string; dd: string }) {
     <div className="flex justify-between">
       <dt style={{ color: T.textSecondary }}>{dt}</dt>
       <dd className="font-medium" style={{ color: T.textPrimary }}>{dd}</dd>
+    </div>
+  );
+}
+
+function PendingOrganizerLockedCard({
+  organizer,
+  application,
+  submittedAt,
+  onLogout,
+  onRefresh,
+}: {
+  organizer: NonNullable<ReturnType<typeof selectCurrentOrganizer>>;
+  application: AppState["organizerApplications"][number] | null;
+  submittedAt: string;
+  onLogout: () => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="rounded-[22px] border p-8 relative" style={{ background: T.cardBg, borderColor: T.border, boxShadow: T.cardShadow }}>
+      <CardHelp text="Статус заявки на включение организации в реестр. Создание мероприятий откроется после одобрения." />
+      <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: T.goldBorder, background: T.goldBg, color: T.gold }}>
+        Статус: на рассмотрении
+      </div>
+      <h2 className="mt-5 text-3xl font-bold" style={{ color: T.textPrimary }}>Заявка на включение в реестр подана</h2>
+      <p className="mt-3 max-w-3xl text-sm leading-6" style={{ color: T.textSecondary }}>
+        До включения в реестр подача заявок на мероприятия недоступна.<br />
+        Кабинет будет разблокирован после одобрения заявки оператором Центра Управления.<br />
+        Результат будет направлен на указанный email.
+      </p>
+      <dl className="mt-6 grid gap-3 rounded-xl border p-4 text-sm md:grid-cols-2" style={{ borderColor: T.border, background: T.sidebarBg }}>
+        <Row dt="Организация" dd={organizer.fullName || organizer.name || "—"} />
+        <Row dt="ID заявки" dd={application?.organizerApplicationId || "—"} />
+        <Row dt="Подано" dd={submittedAt ? fmtDateTime(submittedAt) : "—"} />
+        <Row dt="УНП" dd={organizer.unp || "—"} />
+        <Row dt="Email" dd={organizer.email || "—"} />
+      </dl>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <button
+          onClick={onRefresh}
+          className="h-11 rounded-xl border px-5 text-sm font-semibold"
+          style={{ borderColor: T.btnSecondaryBorder, color: T.textPrimary, background: "transparent" }}
+        >
+          Обновить статус
+        </button>
+        <button
+          onClick={onLogout}
+          className="h-11 rounded-xl border px-5 text-sm font-semibold"
+          style={{ borderColor: "rgba(239,68,68,0.35)", color: "#EF4444", background: "rgba(239,68,68,0.10)" }}
+        >
+          Выйти
+        </button>
+      </div>
     </div>
   );
 }
