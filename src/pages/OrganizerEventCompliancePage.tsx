@@ -63,8 +63,25 @@ export default function OrganizerEventCompliancePage() {
     });
   }, [approved, editId, editingApplication, organizer, state]);
 
-  if (!organizer) return <Navigate to="/organizer/login" replace />;
-  if (!approved) return <Navigate to="/organizer" replace />;
+  if (!organizer) return <Navigate to="/organizer" replace />;
+  if (!approved) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#0B0F14", color: "#F5F7FA" }}>
+        <div className="w-full max-w-2xl rounded-2xl border p-6" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+          <div className="inline-flex rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: "rgba(242,201,76,0.25)", background: "rgba(242,201,76,0.14)", color: "#F2C94C" }}>
+            Реестр организаторов
+          </div>
+          <h1 className="mt-5 text-2xl font-bold">Подача заявки на мероприятие недоступна</h1>
+          <p className="mt-3 text-sm leading-6" style={{ color: "rgba(245,247,250,0.72)" }}>
+            Организатор ещё не включён в реестр. До одобрения заявки Центром Управления создание заявок на мероприятия заблокировано.
+          </p>
+          <Link to="/organizer" className="mt-6 inline-flex h-10 items-center rounded-xl px-4 text-sm font-semibold" style={{ background: "#F2C94C", color: "#111" }}>
+            Вернуться в кабинет организатора
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const totalPlannedTickets = form.ticketTiers.reduce((acc, tier) => acc + (Number.isFinite(tier.quantity) ? Math.max(0, Math.floor(tier.quantity)) : 0), 0);
   const fee = calculateComplianceFee(form.projectedCapacity, totalPlannedTickets, form.ticketTiers);

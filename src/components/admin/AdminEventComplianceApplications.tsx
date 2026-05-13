@@ -115,6 +115,10 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                       <div style={{ color: A.textPrimary }}>{r.data.venueName || "—"}</div>
                     </div>
                     <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
+                      <div className="text-xs" style={{ color: A.textMuted }}>Возрастная категория</div>
+                      <div style={{ color: A.textPrimary }}>{r.data.ageCategory || "—"}</div>
+                    </div>
+                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
                       <div className="text-xs" style={{ color: A.textMuted }}>Режим</div>
                       <div style={{ color: A.textPrimary }}>{approvalModeLabel[r.data.approvalMode] || r.data.approvalMode}</div>
                     </div>

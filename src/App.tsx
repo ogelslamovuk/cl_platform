@@ -13,16 +13,11 @@ import OrganizerEventCompliancePage from "./pages/OrganizerEventCompliancePage";
 import MainPage from "./pages/MainPage";
 import ProtoPage from "./pages/ProtoPage";
 import DemoToolsPanel from "./components/demo/DemoToolsPanel";
-import { useStorageSync } from "./hooks/useStorageSync";
 import RouteTitleManager from "./components/RouteTitleManager";
 
 const queryClient = new QueryClient();
 
 function OrganizerRouteGuard() {
-  const { state } = useStorageSync();
-  if (!state.currentOrganizerId) {
-    return <Navigate to="/organizer/login" replace />;
-  }
   return <OrganizerPage />;
 }
 

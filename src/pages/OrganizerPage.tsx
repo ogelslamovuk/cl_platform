@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import { useStorageSync } from "@/hooks/useStorageSync";
-import type { EventComplianceApplicationRecord, EventRecord, OrganizerDocument, OrganizerSaleRecord } from "@/lib/store";
+import type { AppState, EventComplianceApplicationRecord, EventRecord, OrganizerDocument, OrganizerSaleRecord } from "@/lib/store";
 import { calculateComplianceFee, getSalesChannelLabel, logoutOrganizer } from "@/lib/store";
 import {
   calculateOrganizerFinance,
@@ -97,6 +97,18 @@ function resolvePublicAsset(path: string): string {
 
 function fmtDateTime(v: string): string {
   return v?.replace("T", " ").slice(0, 16) || "—";
+}
+
+function getComplianceByEvent(state: AppState, event: EventRecord): EventComplianceApplicationRecord | null {
+  return state.eventComplianceApplications.find((app) =>
+    app.eventComplianceApplicationId === event.complianceApplicationId ||
+    app.linkedEventId === event.eventId ||
+    (app.organizerId === event.organizerId && app.data.title === event.title)
+  ) || null;
+}
+
+function getEventAgeCategory(state: AppState, event: EventRecord): string {
+  return getComplianceByEvent(state, event)?.data.ageCategory || "—";
 }
 
 function formatMoney(value: number): string {
@@ -207,22 +219,104 @@ export default function OrganizerPage() {
       return eventSort.dir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
     });
   }, [myEvents, eventSort]);
-
-  if (!organizer) {
-    return <Navigate to="/organizer/login" replace />;
-  }
-
-  if (!isOrganizerApproved) {
-    logoutOrganizer(state);
-    update({ ...state });
-    return <Navigate to="/organizer/login" replace />;
-  }
+  const latestOrganizerApplication = useMemo(() => {
+    if (!organizer) return null;
+    return state.organizerApplications
+      .filter((application) => application.organizerId === organizer.organizerId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] || null;
+  }, [organizer, state.organizerApplications]);
 
   const handleLogout = () => {
     logoutOrganizer(state);
     update({ ...state });
     navigate("/organizer/login", { replace: true });
   };
+
+  if (!organizer) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: T.pageBg, color: T.textPrimary }}>
+        <Sonner
+          theme="dark"
+          toastOptions={{
+            style: { background: T.cardBg, border: `1px solid ${T.border}`, color: T.textPrimary },
+          }}
+        />
+        <div className="w-full max-w-3xl rounded-[22px] border p-8" style={{ background: T.cardBg, borderColor: T.border, boxShadow: T.cardShadow }}>
+          <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: T.goldBorder, background: T.goldBg, color: T.gold }}>
+            Реестр организаторов
+          </div>
+          <h1 className="mt-5 text-3xl font-bold" style={{ color: T.textPrimary }}>Кабинет организатора</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6" style={{ color: T.textSecondary }}>
+            Для подачи заявок на мероприятия организация должна быть включена в реестр. Начните с демонстрационной заявки на регистрацию организатора.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={() => navigate("/organizer/register")}
+              className="h-11 rounded-xl px-5 text-sm font-semibold"
+              style={{ background: T.gold, color: "#111" }}
+            >
+              Стать организатором
+            </button>
+            <button
+              onClick={() => navigate("/organizer/login")}
+              className="h-11 rounded-xl border px-5 text-sm font-semibold"
+              style={{ borderColor: T.btnSecondaryBorder, color: T.textPrimary, background: "transparent" }}
+            >
+              Войти в кабинет
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isOrganizerApproved) {
+    const submittedAt = latestOrganizerApplication?.submittedAt || latestOrganizerApplication?.createdAt || "";
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: T.pageBg, color: T.textPrimary }}>
+        <Sonner
+          theme="dark"
+          toastOptions={{
+            style: { background: T.cardBg, border: `1px solid ${T.border}`, color: T.textPrimary },
+          }}
+        />
+        <div className="w-full max-w-3xl rounded-[22px] border p-8" style={{ background: T.cardBg, borderColor: T.border, boxShadow: T.cardShadow }}>
+          <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: T.goldBorder, background: T.goldBg, color: T.gold }}>
+            Статус: на рассмотрении
+          </div>
+          <h1 className="mt-5 text-3xl font-bold" style={{ color: T.textPrimary }}>Заявка на включение в реестр подана</h1>
+          <p className="mt-3 text-sm leading-6" style={{ color: T.textSecondary }}>
+            До включения в реестр подача заявок на мероприятия недоступна.
+          </p>
+          <dl className="mt-6 grid gap-3 rounded-xl border p-4 text-sm" style={{ borderColor: T.border, background: T.sidebarBg }}>
+            <Row dt="Организация" dd={organizer.fullName || organizer.name} />
+            <Row dt="ID заявки" dd={latestOrganizerApplication?.organizerApplicationId || "—"} />
+            <Row dt="Подано" dd={submittedAt ? fmtDateTime(submittedAt) : "—"} />
+            <Row dt="УНП" dd={organizer.unp || "—"} />
+          </dl>
+          <p className="mt-5 text-sm leading-6" style={{ color: T.textSecondary }}>
+            Кабинет организатора и подача заявок на мероприятия разблокируются после одобрения заявки оператором Центра Управления.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={() => navigate("/admin")}
+              className="h-11 rounded-xl px-5 text-sm font-semibold"
+              style={{ background: T.gold, color: "#111" }}
+            >
+              Открыть Центр Управления
+            </button>
+            <button
+              onClick={handleLogout}
+              className="h-11 rounded-xl border px-5 text-sm font-semibold"
+              style={{ borderColor: T.btnSecondaryBorder, color: T.textPrimary, background: "transparent" }}
+            >
+              Выйти
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const openUnpCheck = () => {
     toast.success(`УНП подтвержден: ${organizer.unp}. Организатор зарегистрирован в реестре. Данные актуальны на 15.04.2026.`);
@@ -611,6 +705,7 @@ function ApplicationsTable({
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}><SortableHeader label="Название" active={sort?.key === "title"} direction={sort?.key === "title" ? sort.dir : null} onClick={() => setColumnSort("title")} /></th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>Площадка</th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}><SortableHeader label="Дата и время" active={sort?.key === "dateTime"} direction={sort?.key === "dateTime" ? sort.dir : null} onClick={() => setColumnSort("dateTime")} /></th>
+                <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>Возраст</th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}><SortableHeader label="Статус" active={sort?.key === "status"} direction={sort?.key === "status" ? sort.dir : null} onClick={() => setColumnSort("status")} /></th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>Комментарий администратора</th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>Действия</th>
@@ -623,6 +718,7 @@ function ApplicationsTable({
                   <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>{a.data.title || "—"}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{a.data.venueName || "—"}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{fmtDateTime(a.data.dateSlots[0] || "")}</td>
+                  <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{a.data.ageCategory || "—"}</td>
                   <td className="py-2.5 px-3">
                     <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold" style={statusStyle[a.status]}>{statusLabel[a.status]}</span>
                   </td>
@@ -682,6 +778,7 @@ function EventsSection({ rows, state, sort, setSort }: {
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>Площадка</th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}><SortableHeader label="Город" active={sort?.key === "city"} direction={sort?.key === "city" ? sort.dir : null} onClick={() => setColumnSort("city")} /></th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>Категория</th>
+                <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>Возраст</th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}>Каналы продаж</th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}><SortableHeader label="Дата" active={sort?.key === "dateTime"} direction={sort?.key === "dateTime" ? sort.dir : null} onClick={() => setColumnSort("dateTime")} /></th>
                 <th className="py-2.5 px-3 text-left font-semibold" style={{ color: T.textPrimary }}><SortableHeader label="Вместимость" active={sort?.key === "capacity"} direction={sort?.key === "capacity" ? sort.dir : null} onClick={() => setColumnSort("capacity")} /></th>
@@ -699,6 +796,7 @@ function EventsSection({ rows, state, sort, setSort }: {
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.venue}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.city || "—"}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.category || "—"}</td>
+                  <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{getEventAgeCategory(state, e)}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{(e.salesChannels?.length ? e.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code)).join(", ")}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{fmtDateTime(e.dateTime)}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.capacity}</td>
@@ -726,6 +824,7 @@ function EventsTable({ rows, state, compact = false }: { rows: EventRecord[]; st
             <th className="py-2.5 px-3 text-left font-semibold">ID мероприятия</th>
             <th className="py-2.5 px-3 text-left font-semibold">Название</th>
             <th className="py-2.5 px-3 text-left font-semibold">Дата и время</th>
+            <th className="py-2.5 px-3 text-left font-semibold">Возраст</th>
             {!compact && <th className="py-2.5 px-3 text-left font-semibold">Площадка</th>}
             {!compact && <th className="py-2.5 px-3 text-left font-semibold">Каналы продаж</th>}
             <th className="py-2.5 px-3 text-left font-semibold">Статус</th>
@@ -741,6 +840,7 @@ function EventsTable({ rows, state, compact = false }: { rows: EventRecord[]; st
               <td className="py-2.5 px-3 font-mono text-xs" style={{ color: T.textSecondary }}>{e.eventId}</td>
               <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>{e.title}</td>
               <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{fmtDateTime(e.dateTime)}</td>
+              <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{getEventAgeCategory(state, e)}</td>
               {!compact && <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.venue}</td>}
               {!compact && <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{(e.salesChannels?.length ? e.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code)).join(", ")}</td>}
               <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.status === "published" ? "Опубликовано" : "Одобрено"}</td>
@@ -1102,6 +1202,7 @@ function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianc
             <Item k="Дата подачи" v={fmtDateTime(app.submittedAt || app.createdAt)} />
             <Item k="Площадка" v={app.data.venueName || "—"} />
             <Item k="Дата мероприятия" v={fmtDateTime(app.data.dateSlots[0] || "")} />
+            <Item k="Возрастная категория" v={app.data.ageCategory || "—"} />
             <Item k="Каналы продаж" v={salesChannels.join(", ")} />
             <Item k="Режим согласования" v={approvalModeLabel[app.data.approvalMode] || app.data.approvalMode} />
             <Item k="Госпошлина" v={fee} />

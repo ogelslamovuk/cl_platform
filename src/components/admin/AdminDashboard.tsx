@@ -13,7 +13,7 @@ const statusLabel: Record<string, string> = {
 };
 const opTypeLabel: Record<string, string> = { sell: "Продажа", refund: "Возврат", redeem: "Погашение", verify: "Проверка" };
 
-type AdminDashboardTab = "eventComplianceApplications" | "operations";
+type AdminDashboardTab = "organizerApplications" | "eventComplianceApplications" | "events" | "operations";
 type DashboardApplicationRow = {
   id: string;
   title: string;
@@ -88,6 +88,31 @@ export default function AdminDashboard({ state, onNavigate }: Props) {
     const today = localDateKey();
     return state.events.filter(e => e.dateTime?.startsWith(today));
   }, [state.events]);
+  const attentionItems = useMemo(() => {
+    const organizerPending = state.organizerApplications.filter((app) => app.status === "submitted").length;
+    const eventPending = state.eventComplianceApplications.filter((app) => app.status === "submitted").length;
+    const needsRework =
+      state.organizerApplications.filter((app) => app.status === "needs_rework").length +
+      state.eventComplianceApplications.filter((app) => app.status === "needs_rework").length;
+    const todayCount = todayEvents.length;
+    const almostSoldOut = state.events.filter((event) => {
+      const eventTickets = state.tickets.filter((ticket) => ticket.eventId === event.eventId);
+      if (eventTickets.length === 0) return false;
+      const remaining = eventTickets.filter((ticket) => ticket.status === "issued").length;
+      const soldRatio = (eventTickets.length - remaining) / eventTickets.length;
+      return remaining > 0 && soldRatio >= 0.9 && soldRatio <= 0.98;
+    }).length;
+    const operationsToCheck = state.ops.filter((op) => op.result === "error").length;
+
+    return [
+      { label: "заявки организаторов на рассмотрении", count: organizerPending, tab: "organizerApplications" as const },
+      { label: "заявки мероприятий на рассмотрении", count: eventPending, tab: "eventComplianceApplications" as const },
+      { label: "заявки на доработке", count: needsRework, tab: "eventComplianceApplications" as const },
+      { label: "события сегодня", count: todayCount, tab: "events" as const },
+      { label: "события почти распроданы", count: almostSoldOut, tab: "events" as const },
+      { label: "операции требуют проверки", count: operationsToCheck, tab: "operations" as const },
+    ];
+  }, [state.organizerApplications, state.eventComplianceApplications, state.events, state.tickets, state.ops, todayEvents]);
 
   const kpiCards = [
     { label: "Новые заявки", value: kpi.newApps, icon: FileText, accent: A.cyan, tooltip: "Количество новых заявок, ожидающих первичного рассмотрения." },
@@ -121,6 +146,29 @@ export default function AdminDashboard({ state, onNavigate }: Props) {
             <div style={{ color: A.textSecondary }} className="text-xs mt-1">{k.label}</div>
           </div>
         ))}
+      </div>
+
+      <div style={{ background: A.cardBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.cardShadow }} className="relative p-5">
+        <CardHelp text="Краткая сводка задач, которые требуют решения оператора Центра Управления." />
+        <h3 style={{ color: A.textPrimary }} className="text-sm font-semibold tracking-tight mb-4">Требует внимания</h3>
+        {attentionItems.every((item) => item.count === 0) ? (
+          <p style={{ color: A.textMuted }} className="text-sm">Критических задач нет.</p>
+        ) : (
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {attentionItems.filter((item) => item.count > 0).map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => onNavigate(item.tab)}
+                className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors"
+                style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}
+              >
+                <span className="text-sm">{item.count} {item.label}</span>
+                <span className="text-xs" style={{ color: A.cyan }}>Открыть</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Mid row */}

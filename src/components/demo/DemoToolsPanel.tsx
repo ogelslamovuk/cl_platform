@@ -38,7 +38,7 @@ export default function DemoToolsPanel() {
         onMouseLeave={(e) => (e.currentTarget.style.borderColor = A.borderLight)}
       >
         <Database size={16} style={{ color: A.cyan }} />
-        Сгенерировать демо-данные
+        Загрузить mock-данные
       </button>
 
       <button
@@ -60,7 +60,7 @@ export default function DemoToolsPanel() {
         onMouseLeave={(e) => (e.currentTarget.style.borderColor = A.borderLight)}
       >
         <Trash2 size={16} style={{ color: A.statusError }} />
-        Сбросить всё
+        Очистить mock-данные
       </button>
     </div>
   );

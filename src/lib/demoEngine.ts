@@ -285,6 +285,13 @@ const TODAY_DEMO_APP_ID = "demo_app_today";
 const TODAY_DEMO_CAPACITY = 50;
 const TODAY_DEMO_SOLD = 47;
 const TODAY_DEMO_TIER = { name: "Камерный зал", price: 45, quantity: TODAY_DEMO_CAPACITY };
+const SOLD_OUT_DEMO_EVENT_ID = "demo_event_sold_out";
+const SOLD_OUT_DEMO_APP_ID = "demo_app_sold_out";
+const SOLD_OUT_DEMO_CAPACITY = 36;
+const SOLD_OUT_DEMO_TIER = { name: "Малый зал", price: 32, quantity: SOLD_OUT_DEMO_CAPACITY };
+const APPROVED_UNPUBLISHED_EVENT_ID = "demo_event_approved_unpublished";
+const APPROVED_UNPUBLISHED_APP_ID = "demo_app_approved_unpublished";
+const APPROVED_UNPUBLISHED_TIER = { name: "Основной билет", price: 40, quantity: 120 };
 const OLD_DEMO_PHRASES = [
   "\u041e\u0433\u043d\u0438 \u041d\u0435\u0432\u044b",
   "\u042d\u0445\u043e \u0433\u043e\u0440\u043e\u0434\u0430",
@@ -468,6 +475,143 @@ function ensureTodayNearSoldOutEvent(state: AppState): void {
   }
 }
 
+function ensureSoldOutEvent(state: AppState): void {
+  const now = new Date().toISOString();
+  const organizerId = "demo_org_cultural_initiative";
+  const eventTitle = "Спектакль «Тёплый вечер у ратуши»";
+  const dateTime = toDateTime(9, "19:00");
+  const tiers = [{ ...SOLD_OUT_DEMO_TIER }];
+
+  const nextApp = {
+    appId: SOLD_OUT_DEMO_APP_ID,
+    organizerId,
+    title: eventTitle,
+    venue: "Минский областной театр",
+    dateTime,
+    capacity: SOLD_OUT_DEMO_CAPACITY,
+    tiers,
+    city: "Минск",
+    category: "Театр",
+    description: "Камерный театральный вечер с полностью реализованной квотой билетов.",
+    poster: DEMO_POSTERS.scenaBelarusi,
+    status: "approved" as const,
+    licenseId: "LIC-DEMO-SOLDOUT",
+    eventId: SOLD_OUT_DEMO_EVENT_ID,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const existingApp = state.applications.find((item) => item.appId === SOLD_OUT_DEMO_APP_ID);
+  if (existingApp) Object.assign(existingApp, nextApp, { createdAt: existingApp.createdAt || now });
+  else state.applications.push(nextApp);
+
+  const nextEvent = {
+    eventId: SOLD_OUT_DEMO_EVENT_ID,
+    organizerId,
+    licenseId: "LIC-DEMO-SOLDOUT",
+    appId: SOLD_OUT_DEMO_APP_ID,
+    title: eventTitle,
+    venue: "Минский областной театр",
+    dateTime,
+    capacity: SOLD_OUT_DEMO_CAPACITY,
+    tiers,
+    city: "Минск",
+    category: "Театр",
+    description: "Камерный театральный вечер с полностью реализованной квотой билетов.",
+    poster: DEMO_POSTERS.scenaBelarusi,
+    salesChannels: ["OWN", "ByCard"],
+    status: "published" as const,
+    remaining: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const existingEvent = state.events.find((event) => event.eventId === SOLD_OUT_DEMO_EVENT_ID);
+  if (existingEvent) Object.assign(existingEvent, nextEvent, { createdAt: existingEvent.createdAt || now });
+  else state.events.push(nextEvent);
+
+  state.tickets = state.tickets.filter((ticket) => ticket.eventId !== SOLD_OUT_DEMO_EVENT_ID);
+  state.ops = state.ops.filter((op) => op.eventId !== SOLD_OUT_DEMO_EVENT_ID);
+
+  for (let index = 1; index <= SOLD_OUT_DEMO_CAPACITY; index++) {
+    const ticketId = `${SOLD_OUT_DEMO_EVENT_ID}_ticket_${String(index).padStart(3, "0")}`;
+    state.tickets.push({
+      ticketId,
+      eventId: SOLD_OUT_DEMO_EVENT_ID,
+      tier: SOLD_OUT_DEMO_TIER.name,
+      status: "sold",
+      soldByChannel: index % 2 === 0 ? "ByCard" : "B2C",
+      soldToUserId: "demo_sold_out_buyer",
+      createdAt: now,
+      updatedAt: now,
+    });
+    state.ops.push({
+      opId: `demo_sold_out_sell_${String(index).padStart(3, "0")}`,
+      type: "sell",
+      ticketId,
+      eventId: SOLD_OUT_DEMO_EVENT_ID,
+      channel: index % 2 === 0 ? "ByCard" : "B2C",
+      result: "ok",
+      ts: now,
+    });
+  }
+}
+
+function ensureApprovedUnpublishedEvent(state: AppState): void {
+  const now = new Date().toISOString();
+  const organizerId = "demo_org_minskconcert";
+  const eventTitle = "Вечер симфонической музыки во Дворце Республики";
+  const dateTime = toDateTime(15, "19:30");
+  const tiers = [{ ...APPROVED_UNPUBLISHED_TIER }];
+
+  const nextApp = {
+    appId: APPROVED_UNPUBLISHED_APP_ID,
+    organizerId,
+    title: eventTitle,
+    venue: "Дворец Республики",
+    dateTime,
+    capacity: APPROVED_UNPUBLISHED_TIER.quantity,
+    tiers,
+    city: "Минск",
+    category: "Концерты",
+    description: "Одобренное мероприятие, которое ещё не опубликовано и не выпустило билеты.",
+    poster: DEMO_POSTERS.belarusUSertsy,
+    status: "approved" as const,
+    licenseId: "LIC-DEMO-APPROVED",
+    eventId: APPROVED_UNPUBLISHED_EVENT_ID,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const existingApp = state.applications.find((item) => item.appId === APPROVED_UNPUBLISHED_APP_ID);
+  if (existingApp) Object.assign(existingApp, nextApp, { createdAt: existingApp.createdAt || now });
+  else state.applications.push(nextApp);
+
+  const nextEvent = {
+    eventId: APPROVED_UNPUBLISHED_EVENT_ID,
+    organizerId,
+    licenseId: "LIC-DEMO-APPROVED",
+    appId: APPROVED_UNPUBLISHED_APP_ID,
+    title: eventTitle,
+    venue: "Дворец Республики",
+    dateTime,
+    capacity: APPROVED_UNPUBLISHED_TIER.quantity,
+    tiers,
+    city: "Минск",
+    category: "Концерты",
+    description: "Одобренное мероприятие, которое ещё не опубликовано и не выпустило билеты.",
+    poster: DEMO_POSTERS.belarusUSertsy,
+    salesChannels: ["OWN", "ByCard", "TicketPro"],
+    status: "approved" as const,
+    remaining: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const existingEvent = state.events.find((event) => event.eventId === APPROVED_UNPUBLISHED_EVENT_ID);
+  if (existingEvent) Object.assign(existingEvent, nextEvent, { createdAt: existingEvent.createdAt || now });
+  else state.events.push(nextEvent);
+
+  state.tickets = state.tickets.filter((ticket) => ticket.eventId !== APPROVED_UNPUBLISHED_EVENT_ID);
+  state.ops = state.ops.filter((op) => op.eventId !== APPROVED_UNPUBLISHED_EVENT_ID);
+}
+
 function seedDemoCatalog(state: AppState): AppState {
   ensureDefaultResellers(state);
   cleanupLegacyDemoData(state);
@@ -510,6 +654,8 @@ function seedDemoCatalog(state: AppState): AppState {
   ensureOrganizerApplications(state);
   ensureEventComplianceApplications(state);
   ensureTodayNearSoldOutEvent(state);
+  ensureSoldOutEvent(state);
+  ensureApprovedUnpublishedEvent(state);
   ensureCertificatesForPublishedEvents(state);
   ensureDemoTicketOperations(state);
   saveState(state);
@@ -540,6 +686,8 @@ function enrichDemoData(state: AppState): void {
   ensureOrganizerApplications(state);
   ensureEventComplianceApplications(state);
   ensureTodayNearSoldOutEvent(state);
+  ensureSoldOutEvent(state);
+  ensureApprovedUnpublishedEvent(state);
   ensureCertificatesForPublishedEvents(state);
   ensureTicketsForPublishedEvents(state);
   ensureDemoTicketOperations(state);

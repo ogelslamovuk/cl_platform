@@ -9,6 +9,7 @@ import {
   defaultIdentityRecord,
   defaultOrganizerApplicationData,
   type IdentityRecord,
+  type OrganizerApplicationData,
   upsertOrganizerApplication,
 } from "@/lib/store";
 
@@ -16,11 +17,80 @@ function emptyPerson(): IdentityRecord {
   return defaultIdentityRecord();
 }
 
+function mockAttachment(attachmentId: string, name: string, kind: string): OrganizerApplicationData["documents"][number] {
+  return {
+    attachmentId,
+    name,
+    kind,
+    uploadedAt: new Date().toISOString(),
+    isSample: true,
+  };
+}
+
+function buildMockOrganizerApplicationData(): OrganizerApplicationData {
+  return {
+    ...defaultOrganizerApplicationData(),
+    legalName: "Государственное учреждение культуры «Минский городской центр культурных инициатив»",
+    registrationNumber: "192837465",
+    postalCode: "220030",
+    region: "г. Минск",
+    locality: "Минск",
+    street: "ул. Интернациональная",
+    houseNumber: "25",
+    roomTypeAndNumber: "кабинет 304",
+    addressExtra: "административный корпус, вход со двора",
+    contactPhone: "+375 (17) 327-45-10",
+    website: "https://culture-minsk.demo.example",
+    email: "registry@culture-minsk.demo.example",
+    ownershipType: "state",
+    director: {
+      fullName: "Морозова Елена Викторовна",
+      docType: "паспорт гражданина Республики Беларусь",
+      docNumber: "MP1234567",
+      issueDate: "2021-04-16",
+      issueAuthority: "Центральное РУВД г. Минска",
+    },
+    workers: [
+      {
+        fullName: "Петровский Антон Сергеевич",
+        docType: "паспорт гражданина Республики Беларусь",
+        docNumber: "MP7654321",
+        issueDate: "2022-02-08",
+        issueAuthority: "Фрунзенское РУВД г. Минска",
+      },
+    ],
+    founders: [
+      {
+        fullName: "Минский городской исполнительный комитет",
+        docType: "учредитель государственного учреждения",
+        docNumber: "FOUND-DEMO-001",
+        issueDate: "2020-01-10",
+        issueAuthority: "Единый государственный регистр demo",
+      },
+    ],
+    activities: ["Концерты", "Фестивали", "Выставки"],
+    activityOther: "организация культурно-зрелищных мероприятий городского значения",
+    pastEventsDescription: "Городской фестиваль культуры, концерт ко Дню города и выставочная программа в Верхнем городе.",
+    pastMaterials: [
+      mockAttachment("mock-past-program-001", "Программа городского фестиваля.pdf", "past-program"),
+      mockAttachment("mock-past-photo-001", "Фотоотчёт культурной программы.pdf", "past-material"),
+    ],
+    documents: [
+      mockAttachment("mock-registry-statement-001", "Заявление на включение в реестр.pdf", "registry-statement"),
+      mockAttachment("mock-registry-appendix-001", "Приложение к заявлению.pdf", "registry-appendix"),
+      mockAttachment("mock-charter-001", "Положение государственного учреждения.pdf", "charter"),
+    ],
+    confirmations: { isAccurate: true, adminReviewConsent: true },
+    accountCredentials: { login: "organizer.mok", password: "demo123" },
+  };
+}
+
 export default function OrganizerRegistrationStubPage() {
   const navigate = useNavigate();
   const { state, update } = useStorageSync();
   const [form, setForm] = useState(defaultOrganizerApplicationData());
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [mockSyncAt, setMockSyncAt] = useState<string | null>(null);
 
   const missingRequiredFields = useMemo(() => {
     const missing: string[] = [];
@@ -95,12 +165,22 @@ export default function OrganizerRegistrationStubPage() {
     });
 
     const rec = upsertOrganizerApplication(state, organizer.organizerId, form, submit);
+    if (submit) {
+      state.currentOrganizerId = organizer.organizerId;
+    }
     update({ ...state });
 
     toast.success(submit ? "Заявка отправлена на рассмотрение. Результат будет направлен на указанный email." : "Черновик сохранён");
     if (submit) {
-      navigate("/organizer/login", { replace: true, state: { showSubmittedSuccess: true } });
+      navigate("/organizer", { replace: true });
     }
+  };
+
+  const fillMockOrganizer = () => {
+    setForm(buildMockOrganizerApplicationData());
+    setSubmitAttempted(false);
+    setMockSyncAt(new Date().toISOString());
+    toast.success("Сведения синхронизированы в demo-режиме.");
   };
 
   return (
@@ -111,6 +191,31 @@ export default function OrganizerRegistrationStubPage() {
           <h1 className="text-2xl font-bold mb-2">Заявка на статус организатора</h1>
           <p className="text-sm" style={{ color: "rgba(245,247,250,0.72)" }}>Демонстрационная форма для включения в реестр организаторов.</p>
           <p className="text-xs mt-2" style={{ color: "rgba(245,247,250,0.72)" }}>Поля, отмеченные *, обязательны.</p>
+        </div>
+
+        <div className="sticky top-4 z-20 rounded-2xl border p-4" style={{ borderColor: "rgba(242,201,76,0.32)", background: "rgba(15,22,32,0.96)", boxShadow: "0 16px 42px rgba(0,0,0,0.28)" }}>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="text-sm font-semibold">Demo-синхронизация с публичным реестром</div>
+              {mockSyncAt ? (
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(34,197,94,0.16)", color: "#BBF7D0" }}>УНП найден в публичном реестре</span>
+                  <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(59,130,246,0.16)", color: "#BFDBFE" }}>Сведения синхронизированы в demo-режиме</span>
+                  <span style={{ color: "rgba(245,247,250,0.62)" }}>проверено: {mockSyncAt.replace("T", " ").slice(0, 16)}</span>
+                </div>
+              ) : (
+                <p className="mt-1 text-xs" style={{ color: "rgba(245,247,250,0.65)" }}>Кнопка заполнит форму демонстрационными сведениями организации культуры.</p>
+              )}
+            </div>
+            <button
+              type="button"
+              className="h-11 rounded-xl px-5 text-sm font-semibold"
+              style={{ background: "#F2C94C", color: "#111" }}
+              onClick={fillMockOrganizer}
+            >
+              Заполнить МОК
+            </button>
+          </div>
         </div>
 
         <section className="space-y-3">

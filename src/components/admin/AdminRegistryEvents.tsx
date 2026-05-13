@@ -113,6 +113,7 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
                     "Название",
                     "Организатор",
                     "Дата",
+                    "Возраст",
                     "Площадка",
                     "Вместимость",
                     "Остаток",
@@ -144,6 +145,7 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{event.title}</td>
                       <td className="py-3 px-4" style={{ color: A.textSecondary }}>{organizerNameById.get(event.organizerId) || event.organizerId}</td>
                       <td className="py-3 px-4" style={{ color: A.textSecondary }}>{event.dateTime?.replace("T", " ").slice(0, 16) || "—"}</td>
+                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{compliance?.data.ageCategory || "—"}</td>
                       <td className="py-3 px-4" style={{ color: A.textSecondary }}>{event.venue}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{event.capacity}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{event.remaining}</td>
@@ -198,6 +200,7 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
                       ["Организатор", organizerNameById.get(drawer.organizerId) || drawer.organizerId],
                       ["Площадка", drawer.venue],
                       ["Дата", drawer.dateTime?.replace("T", " ") || "—"],
+                      ["Возрастная категория", compliance?.data.ageCategory || "—"],
                       ["Вместимость", String(drawer.capacity)],
                       ["Остаток", String(drawer.remaining)],
                       ["Статус", evtStatusLabel[drawer.status] || drawer.status],

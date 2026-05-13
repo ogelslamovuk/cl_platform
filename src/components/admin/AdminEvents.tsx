@@ -74,7 +74,7 @@ export default function AdminEvents({ state, onUpdate }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["EventID", "LicenseID", "Название", "Площадка", "Дата", "Вместимость", "Остаток", "Статус", "Действия"].map((h, i) => (
+                  {["EventID", "LicenseID", "Название", "Площадка", "Дата", "Возраст", "Вместимость", "Остаток", "Статус", "Действия"].map((h, i) => (
                     <th key={i} className="text-left py-3 px-4 font-medium text-xs" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>{h}</th>
                   ))}
                 </tr>
@@ -82,6 +82,7 @@ export default function AdminEvents({ state, onUpdate }: Props) {
               <tbody>
                 {filtered.map(e => {
                   const chip = e.status === "published" ? statusChip('ok') : statusChip('info');
+                  const compliance = getComplianceByEvent(e.eventId);
                   return (
                     <tr key={e.eventId} className="transition-colors cursor-pointer"
                       style={{ borderBottom: `1px solid ${A.border}` }}
@@ -93,6 +94,7 @@ export default function AdminEvents({ state, onUpdate }: Props) {
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{e.title}</td>
                       <td className="py-3 px-4" style={{ color: A.textSecondary }}>{e.venue}</td>
                       <td className="py-3 px-4" style={{ color: A.textSecondary }}>{e.dateTime?.replace("T", " ").slice(0, 16)}</td>
+                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{compliance?.data.ageCategory || "—"}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{e.capacity}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{e.remaining}</td>
                       <td className="py-3 px-4">
@@ -135,7 +137,7 @@ export default function AdminEvents({ state, onUpdate }: Props) {
               <button onClick={() => setDrawer(null)} style={{ color: A.textMuted }}><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
-              {([["Название", drawer.title], ["Площадка", drawer.venue], ["Дата", drawer.dateTime?.replace("T", " ")], ["Вместимость", String(drawer.capacity)], ["Остаток", String(drawer.remaining)], ["LicenseID", drawer.licenseId], ["Заявка", drawer.complianceApplicationId || drawer.appId || "—"]] as [string, string][]).map(([k, v]) => (
+              {([["Название", drawer.title], ["Площадка", drawer.venue], ["Дата", drawer.dateTime?.replace("T", " ")], ["Возрастная категория", getComplianceByEvent(drawer.eventId)?.data.ageCategory || "—"], ["Вместимость", String(drawer.capacity)], ["Остаток", String(drawer.remaining)], ["LicenseID", drawer.licenseId], ["Заявка", drawer.complianceApplicationId || drawer.appId || "—"]] as [string, string][]).map(([k, v]) => (
                 <div key={k}>
                   <div style={{ color: A.textMuted }} className="text-xs font-medium mb-1">{k}</div>
                   <div style={{ color: A.textPrimary }} className="text-sm font-mono">{v}</div>

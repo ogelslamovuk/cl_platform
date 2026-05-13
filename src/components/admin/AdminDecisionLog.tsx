@@ -6,10 +6,11 @@ import HelpTooltip from "@/components/ui/help-tooltip";
 
 interface Decision {
   ts: string;
-  object: string;
+  objectType: string;
+  objectId: string;
   decision: string;
-  basis: string;
-  executor: string;
+  actor: string;
+  comment: string;
 }
 
 interface Props { state: AppState; }
@@ -25,25 +26,57 @@ function CardHelp({ text }: { text: string }) {
 export default function AdminDecisionLog({ state }: Props) {
   const decisions = useMemo<Decision[]>(() => {
     const result: Decision[] = [];
-    state.applications.forEach(a => {
-      if (a.status === "approved") {
-        result.push({ ts: a.updatedAt, object: a.appId, decision: "Одобрена", basis: "УНП проверен, пошлина оплачена", executor: "Инспектор" });
-      }
-      if (a.status === "rejected") {
-        result.push({ ts: a.updatedAt, object: a.appId, decision: "Отклонена", basis: "Ручное решение", executor: "Инспектор" });
-      }
+    state.organizerApplications.forEach((application) => {
+      if (!application.reviewedAt || !["approved", "rejected", "needs_rework"].includes(application.status)) return;
+      result.push({
+        ts: application.reviewedAt,
+        objectType: "Организатор",
+        objectId: application.organizerApplicationId,
+        decision: application.status === "approved" ? "Одобрено" : application.status === "rejected" ? "Отклонено" : "На доработке",
+        actor: "Оператор Центра Управления",
+        comment: application.adminComment || "—",
+      });
     });
-    state.events.forEach(e => {
-      if (e.status === "published") {
-        result.push({ ts: e.updatedAt, object: e.eventId, decision: "Опубликовано", basis: "Автоматически", executor: "Система" });
+    state.eventComplianceApplications.forEach((application) => {
+      if (!application.reviewedAt || !["approved", "rejected", "needs_rework"].includes(application.status)) return;
+      result.push({
+        ts: application.reviewedAt,
+        objectType: "Мероприятие",
+        objectId: application.eventComplianceApplicationId,
+        decision: application.status === "approved" ? "Одобрено" : application.status === "rejected" ? "Отклонено" : "На доработке",
+        actor: "Оператор Центра Управления",
+        comment: application.adminComment || "—",
+      });
+    });
+    state.applications.forEach((application) => {
+      if (application.status === "approved") {
+        result.push({
+          ts: application.updatedAt,
+          objectType: "Мероприятие",
+          objectId: application.appId,
+          decision: "Одобрено",
+          actor: "Оператор Центра Управления",
+          comment: "Legacy-заявка: УНП проверен, пошлина оплачена",
+        });
+      }
+      if (application.status === "rejected") {
+        result.push({
+          ts: application.updatedAt,
+          objectType: "Мероприятие",
+          objectId: application.appId,
+          decision: "Отклонено",
+          actor: "Оператор Центра Управления",
+          comment: "Legacy-заявка: ручное решение",
+        });
       }
     });
     return result.sort((a, b) => b.ts.localeCompare(a.ts));
   }, [state]);
 
   const decisionChip = (d: string) => {
-    if (d === "Одобрена" || d === "Опубликовано") return statusChip('ok');
-    if (d === "Отклонена") return statusChip('error');
+    if (d === "Одобрено") return statusChip('ok');
+    if (d === "Отклонено") return statusChip('error');
+    if (d === "На доработке") return statusChip('warn');
     return statusChip('neutral');
   };
 
@@ -61,7 +94,7 @@ export default function AdminDecisionLog({ state }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["Дата/время", "Объект", "Решение", "Основание", "Исполнитель"].map((h, i) => (
+                  {["Дата/время", "Тип", "ID объекта", "Решение", "Оператор", "Комментарий"].map((h, i) => (
                     <th key={i} className="text-left py-3 px-4 font-medium text-xs" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>{h}</th>
                   ))}
                 </tr>
@@ -75,12 +108,13 @@ export default function AdminDecisionLog({ state }: Props) {
                       onMouseEnter={e => (e.currentTarget.style.background = A.rowHover)}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                       <td className="py-3 px-4 text-xs" style={{ color: A.textMuted }}>{d.ts?.replace("T", " ").slice(0, 19)}</td>
-                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.cyan }}>{d.object}</td>
+                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{d.objectType}</td>
+                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.cyan }}>{d.objectId}</td>
                       <td className="py-3 px-4">
                         <span style={{ background: chip.bg, color: chip.color, borderRadius: 999 }} className="text-xs px-2.5 py-0.5 font-medium">{d.decision}</span>
                       </td>
-                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{d.basis}</td>
-                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{d.executor}</td>
+                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{d.actor}</td>
+                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{d.comment}</td>
                     </tr>
                   );
                 })}

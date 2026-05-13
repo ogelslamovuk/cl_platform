@@ -14,6 +14,7 @@ const CATEGORY_WHITELIST = ["Концерты", "Театр", "Шоу", "Дет�
 const POSTER_PLACEHOLDER = "/placeholder.svg";
 
 type DemoEvent = EventRecord & { city: string; category: string; description: string; poster: string };
+type AgeCategory = "0+" | "6+" | "12+" | "16+" | "18+";
 
 function resolvePublicAsset(path: string): string {
   const assetPath = path || POSTER_PLACEHOLDER;
@@ -42,6 +43,15 @@ function getTierIssuedCount(state: AppState, eventId: string, tierName: string):
 
 function getEventIssuedCount(state: AppState, eventId: string): number {
   return state.tickets.filter((ticket) => ticket.eventId === eventId && ticket.status === "issued").length;
+}
+
+function getEventAgeCategory(state: AppState, event: EventRecord): AgeCategory | null {
+  const compliance = state.eventComplianceApplications.find((app) =>
+    app.eventComplianceApplicationId === event.complianceApplicationId ||
+    app.linkedEventId === event.eventId ||
+    (app.organizerId === event.organizerId && app.data.title === event.title)
+  );
+  return compliance?.data.ageCategory || null;
 }
 
 function formatDateTime(dateTime: string): { date: string; time: string } {
@@ -211,6 +221,7 @@ export default function B2CView({ state, onUpdate }: Props) {
     const priceFrom = getPriceFrom(event);
     const isSoldOut = getAvailability(state, event) === "Sold out";
     const remaining = getEventIssuedCount(state, event.eventId);
+    const ageCategory = getEventAgeCategory(state, event);
 
     return (
       <article
@@ -239,9 +250,16 @@ export default function B2CView({ state, onUpdate }: Props) {
               <span aria-hidden="true">·</span>
               <span>{event.city}</span>
             </div>
-            <span className="w-fit shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold" style={{ borderColor: D.borderSoft, background: D.accentSoft, color: D.accentText }}>
-              {event.category}
-            </span>
+            <div className="flex shrink-0 flex-wrap gap-1.5">
+              {ageCategory && (
+                <span className="w-fit rounded-full border px-2.5 py-1 text-xs font-semibold" style={{ borderColor: "rgba(180,83,9,0.18)", background: D.warningSoft, color: D.warning }}>
+                  {ageCategory}
+                </span>
+              )}
+              <span className="w-fit rounded-full border px-2.5 py-1 text-xs font-semibold" style={{ borderColor: D.borderSoft, background: D.accentSoft, color: D.accentText }}>
+                {event.category}
+              </span>
+            </div>
           </div>
 
           <h3 className="text-lg font-semibold leading-snug line-clamp-2" style={{ color: D.text }}>
@@ -555,8 +573,15 @@ export default function B2CView({ state, onUpdate }: Props) {
                 <div className="relative min-h-[260px] bg-slate-100 lg:min-h-full">
                   <img src={resolvePublicAsset(detailsEvent.poster)} alt={detailsEvent.title} className="absolute inset-0 h-full w-full object-cover" />
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/70 to-transparent p-5 text-white">
-                    <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur">
-                      {detailsEvent.category}
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur">
+                        {detailsEvent.category}
+                      </span>
+                      {getEventAgeCategory(state, detailsEvent) && (
+                        <span className="inline-flex rounded-full bg-white/20 px-3 py-1 text-xs font-semibold backdrop-blur">
+                          {getEventAgeCategory(state, detailsEvent)}
+                        </span>
+                      )}
                     </div>
                     <h3 className="mt-3 text-2xl font-semibold leading-tight">{detailsEvent.title}</h3>
                   </div>
@@ -573,7 +598,7 @@ export default function B2CView({ state, onUpdate }: Props) {
                       </h3>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-3">
                       <div className="rounded-xl border p-3" style={{ borderColor: D.borderSoft, background: D.panel }}>
                         <div className="mb-1 flex items-center gap-2 text-xs font-medium" style={{ color: D.textMuted }}>
                           <Calendar size={14} />
@@ -590,6 +615,14 @@ export default function B2CView({ state, onUpdate }: Props) {
                         </div>
                         <div className="text-sm font-semibold" style={{ color: D.text }}>
                           {detailsEvent.city} · {detailsEvent.venue}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border p-3" style={{ borderColor: D.borderSoft, background: D.panel }}>
+                        <div className="mb-1 flex items-center gap-2 text-xs font-medium" style={{ color: D.textMuted }}>
+                          Возрастная категория
+                        </div>
+                        <div className="text-sm font-semibold" style={{ color: D.text }}>
+                          {getEventAgeCategory(state, detailsEvent) || "—"}
                         </div>
                       </div>
                     </div>
