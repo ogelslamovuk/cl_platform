@@ -41,10 +41,27 @@ function toEventSeats(baseSeats: SeatMapSeat[], eventSeats: EventSeat[], tiers: 
 }
 
 function seatColor(seat: EventSeat, selected: boolean): string {
-  if (selected) return "#111827";
-  if (seat.status === "sold") return "#9CA3AF";
-  if (seat.status === "blocked") return "#F97316";
-  return seat.color || "#2563EB";
+  if (selected) return "#16A34A";
+  if (seat.status === "sold") return "#CBD5E1";
+  if (seat.status === "blocked") return "#E2E8F0";
+  return "#2563EB";
+}
+
+function seatTextColor(seat: EventSeat, selected: boolean): string {
+  if (selected || seat.status === "available") return "#FFFFFF";
+  return "#64748B";
+}
+
+function seatBorderColor(seat: EventSeat, selected: boolean): string {
+  if (selected) return "#15803D";
+  if (seat.status === "sold") return "#94A3B8";
+  if (seat.status === "blocked") return "#CBD5E1";
+  return "#1D4ED8";
+}
+
+function seatTooltip(seat: EventSeat): string {
+  const tariff = seat.tariffName ? `${seat.tariffName} · ${seat.price || 0} BYN` : "Тариф не назначен";
+  return `${seat.label} · ряд ${seat.row}, место ${seat.number}\n${tariff}`;
 }
 
 export default function SeatMapModal({
@@ -208,15 +225,16 @@ export default function SeatMapModal({
             <div className="space-y-2 border-t pt-4" style={{ borderColor: "rgba(15,23,42,0.12)" }}>
               <div className="text-sm font-semibold text-slate-900">Легенда</div>
               <div className="grid gap-2 text-sm text-slate-600">
-                <span><i className="mr-2 inline-block h-3 w-3 rounded-sm bg-blue-600" /> Доступно: {counts.available}</span>
-                <span><i className="mr-2 inline-block h-3 w-3 rounded-sm bg-slate-400" /> Продано: {counts.sold}</span>
-                <span><i className="mr-2 inline-block h-3 w-3 rounded-sm bg-orange-500" /> Заблокировано: {counts.blocked}</span>
+                <span><i className="mr-2 inline-block h-3 w-3 rounded-sm bg-blue-600" /> Свободно: {counts.available}</span>
+                <span><i className="mr-2 inline-block h-3 w-3 rounded-sm bg-slate-300 ring-1 ring-slate-400" /> Выкуплено: {counts.sold}</span>
+                <span><i className="mr-2 inline-block h-3 w-3 rounded-sm bg-emerald-600" /> Выбрано</span>
+                {counts.blocked > 0 && <span><i className="mr-2 inline-block h-3 w-3 rounded-sm bg-slate-200 ring-1 ring-slate-300" /> Не в продаже: {counts.blocked}</span>}
               </div>
               {tiers.length > 0 && (
-                <div className="space-y-1 pt-2">
-                  {tiers.map((tier, index) => (
-                    <div key={tier.name} className="flex items-center justify-between gap-2 text-xs text-slate-600">
-                      <span><i className="mr-2 inline-block h-3 w-3 rounded-sm" style={{ background: tier.color || SEAT_TARIFF_COLORS[index % SEAT_TARIFF_COLORS.length] }} />{tier.name}</span>
+                <div className="space-y-1 pt-2 text-xs text-slate-500">
+                  {tiers.map((tier) => (
+                    <div key={tier.name} className="flex items-center justify-between gap-2">
+                      <span><i className="mr-2 inline-block h-3 w-3 rounded-sm border border-slate-300 bg-white" />{tier.name}</span>
                       <span>{tier.price} BYN</span>
                     </div>
                   ))}
@@ -231,24 +249,31 @@ export default function SeatMapModal({
               <span className="w-14 text-center text-sm text-slate-600">{Math.round(zoom * 100)}%</span>
               <button onClick={() => setZoom((value) => Math.min(1.8, value + 0.1))} className="flex h-9 w-9 items-center justify-center rounded-lg border bg-white"><Plus size={16} /></button>
             </div>
-            <div className="min-w-max rounded-xl border bg-white p-6" style={{ transform: `scale(${zoom})`, transformOrigin: "top left", borderColor: "rgba(15,23,42,0.12)" }}>
-              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${maxX}, minmax(42px, 1fr))`, gridTemplateRows: `repeat(${maxY}, 42px)` }}>
+            <div className="min-w-max rounded-xl border bg-white px-6 pb-7 pt-5" style={{ transform: `scale(${zoom})`, transformOrigin: "top left", borderColor: "rgba(15,23,42,0.12)" }}>
+              <div className="mx-auto mb-7 h-8 max-w-[72%] rounded-b-[48px] border border-slate-300 bg-slate-100 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shadow-inner">
+                <span className="relative top-2">Сцена</span>
+              </div>
+              <div className="grid gap-x-2 gap-y-3" style={{ gridTemplateColumns: `repeat(${maxX}, minmax(42px, 1fr))`, gridTemplateRows: `repeat(${maxY}, 42px)` }}>
                 {seats.map((seat) => {
                   const eventSeat = workingSeats.find((item) => item.seatId === seat.seatId) || seat as EventSeat;
                   const selected = selectedIds.includes(seat.seatId);
                   const disabled = mode === "buyer" && eventSeat.status !== "available";
+                  const rowOffset = Math.abs((seat.x + (seat.w || 1) / 2) - maxX / 2) * Math.min(7, 18 / Math.max(maxX, 1));
                   return (
                     <button
                       key={seat.seatId}
                       type="button"
                       disabled={disabled}
                       onClick={() => toggleSeat(seat.seatId)}
-                      className="flex h-10 min-w-10 items-center justify-center rounded-md border text-[11px] font-semibold text-white shadow-sm outline-none ring-offset-2 transition focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-55"
+                      title={seatTooltip(eventSeat)}
+                      className="flex h-9 min-w-10 items-center justify-center rounded-t-xl rounded-b-md border text-[11px] font-semibold shadow-sm outline-none ring-offset-2 transition hover:-translate-y-0.5 hover:border-amber-400 hover:ring-2 hover:ring-amber-200 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
                       style={{
                         gridColumn: `${seat.x + 1} / span ${seat.w || 1}`,
                         gridRow: `${seat.y + 1} / span ${seat.h || 1}`,
                         background: mode === "layout" ? (selected ? "#111827" : "#2563EB") : seatColor(eventSeat, selected),
-                        borderColor: selected ? "#FACC15" : "rgba(15,23,42,0.18)",
+                        borderColor: mode === "layout" ? (selected ? "#FACC15" : "rgba(15,23,42,0.18)") : seatBorderColor(eventSeat, selected),
+                        color: mode === "layout" ? "#FFFFFF" : seatTextColor(eventSeat, selected),
+                        transform: `translateY(${rowOffset}px)`,
                       }}
                     >
                       <span className="sr-only">{eventSeat.label}, {statusLabel[eventSeat.status || "available"]}</span>
