@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import type { AppState } from "@/lib/store";
 import { getEventSalesChannels, getSalesChannelLabel, getTicketRefundBlockReason, isSalesChannelAllowedForEvent, refundTicketByReseller, sellTicketsByReseller } from "@/lib/store";
 import PartnerModuleDrawer, { ModuleDrawerContent } from "@/components/channel/PartnerModuleDrawer";
+import SeatMapModal from "@/components/seatmap/SeatMapModal";
 
 interface Props {
   state: AppState;
@@ -146,6 +147,7 @@ const partnerModules: PartnerModule[] = [
 
 export default function ChannelView({ state, onUpdate }: Props) {
   const [selectedEventId, setSelectedEventId] = useState("");
+  const [schemeOpen, setSchemeOpen] = useState(false);
   const [sandboxEventId, setSandboxEventId] = useState("");
   const [sandboxTier, setSandboxTier] = useState("");
   const [sandboxQuantity, setSandboxQuantity] = useState(1);
@@ -528,6 +530,13 @@ export default function ChannelView({ state, onUpdate }: Props) {
                   </div>
                 ))}
               </div>
+              {selectedEvent.eventSeats?.length ? (
+                <div className="mt-3 rounded-lg border border-cyan-200/20 bg-slate-900/55 p-3">
+                  <div className="font-semibold text-slate-100">Схема мероприятия</div>
+                  <div className="mt-1 text-slate-400">Доступно: {selectedEvent.eventSeats.filter((seat) => seat.status === "available").length} · Продано: {selectedEvent.eventSeats.filter((seat) => seat.status === "sold").length} · Блок: {selectedEvent.eventSeats.filter((seat) => seat.status === "blocked").length}</div>
+                  <button onClick={() => setSchemeOpen(true)} className="mt-2 rounded bg-cyan-400 px-3 py-1.5 text-xs font-semibold text-slate-950">Открыть схему</button>
+                </div>
+              ) : null}
             </div>
           )}
         </article>
@@ -750,6 +759,9 @@ export default function ChannelView({ state, onUpdate }: Props) {
         onClose={() => setActiveModule(null)}
         onAction={(_, actionLabel) => toast.info(`Действие: ${actionLabel}`)}
       />
+      {selectedEvent && (
+        <SeatMapModal open={schemeOpen} title="Схема мероприятия" subtitle={selectedEvent.title} mode="viewer" eventSeats={selectedEvent.eventSeats || []} tiers={selectedEvent.tiers} onClose={() => setSchemeOpen(false)} />
+      )}
     </div>
   );
 }

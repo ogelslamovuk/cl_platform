@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from "react";
-import type { AppState } from "@/lib/store";
+import type { AppState, VenueRegistryRecord } from "@/lib/store";
+import { getSeatMapLayout, saveSeatMapLayout } from "@/lib/store";
 import { A, statusChip } from "./adminStyles";
 import { Building2, MapPin, X } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import SeatMapModal from "@/components/seatmap/SeatMapModal";
 
 function CardHelp({ text }: { text: string }) {
   return (
@@ -136,41 +138,51 @@ export function AdminOrgRegistry({ state }: { state: AppState }) {
           </div>
         </div>
       )}
+      <SeatMapModal
+        open={Boolean(schemeVenue && activeLayout)}
+        title={schemeVenue?.name || "Схема площадки"}
+        subtitle={activeHall?.name}
+        mode="layout"
+        baseSeats={activeLayout?.seats || []}
+        onClose={() => setSchemeVenue(null)}
+        onSaveLayout={(seats) => {
+          if (activeLayout && saveSeatMapLayout(state, activeLayout.layoutId, seats)) {
+            onUpdate({ ...state });
+          }
+          setSchemeVenue(null);
+        }}
+      />
     </div>
   );
 }
 
 // Venue Registry
-export function AdminVenueRegistry({ state }: { state: AppState }) {
-  const [drawer, setDrawer] = useState<any>(null);
+export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpdate: (s: AppState) => void }) {
+  const [drawer, setDrawer] = useState<VenueRegistryRecord | null>(null);
+  const [schemeVenue, setSchemeVenue] = useState<VenueRegistryRecord | null>(null);
+  const [cityFilter, setCityFilter] = useState("");
 
   const venues = useMemo(() => {
-    const map = new Map<string, { venue: string; city: string; type: string; source: string; maxCapacity: number; events: number; violations: number }>();
-    const allVenues = [...new Set([...state.applications.map((a) => a.venue), ...state.events.map((e) => e.venue)])].filter(Boolean);
-    allVenues.forEach((v) => {
-      const apps = state.applications.filter((a) => a.venue === v);
-      const evts = state.events.filter((e) => e.venue === v);
-      const maxCap = Math.max(0, ...apps.map(a => a.capacity), ...evts.map(e => e.capacity));
-      const hasRegistryEvents = evts.some((e) => e.status === "published" || e.status === "approved");
-      const source = hasRegistryEvents ? "Реестровая/постоянная" : "Кейсовая/временная";
-      map.set(v, {
-        venue: v,
-        city: evts[0]?.city || apps[0]?.city || "Минск",
-        type: v.includes("зал") ? "Концертный зал" : v.includes("театр") ? "Театр" : "Площадка",
-        source,
-        maxCapacity: maxCap,
-        events: evts.length,
-        violations: 0,
-      });
-    });
-    return Array.from(map.values());
-  }, [state]);
+    return state.venueRegistry
+      .slice()
+      .sort((a, b) => a.city.localeCompare(b.city) || a.name.localeCompare(b.name))
+      .filter((venue) => !cityFilter || venue.city === cityFilter);
+  }, [cityFilter, state.venueRegistry]);
+  const cityOptions = useMemo(() => Array.from(new Set(state.venueRegistry.map((venue) => venue.city))).sort(), [state.venueRegistry]);
+  const activeHall = schemeVenue?.halls.find((hall) => hall.layoutId) || null;
+  const activeLayout = getSeatMapLayout(state, activeHall?.layoutId);
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-1.5">
         <span className="text-xs" style={{ color: A.textSecondary }}>Реестр площадок</span>
         <HelpTooltip text="Нажмите на строку площадки, чтобы открыть подробные сведения в боковой панели." />
+      </div>
+      <div className="max-w-xs">
+        <select value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} className="h-9 w-full rounded-lg border px-3 text-sm outline-none" style={{ background: A.surfaceBg, borderColor: A.border, color: A.textPrimary }}>
+          <option value="">Все города / регионы</option>
+          {cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}
+        </select>
       </div>
       <div style={{ background: A.cardBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.cardShadow }} className="relative overflow-hidden">
         <CardHelp text="Реестр показывает площадки, связанные с заявками и опубликованными мероприятиями." />
@@ -184,27 +196,33 @@ export function AdminVenueRegistry({ state }: { state: AppState }) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["Площадка", "Источник", "Город", "Тип", "Вместимость", "События", "Нарушения"].map((h, i) => (
+                  {["Площадка", "Город", "Тип", "Вместимость", "Статус", "Схема", "Действия"].map((h, i) => (
                     <th key={i} className="text-left py-3 px-4 font-medium text-xs" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {venues.map(v => (
-                  <tr key={v.venue} className="transition-colors cursor-pointer"
+                {venues.map(v => {
+                  const hallWithScheme = v.halls.find((hall) => hall.hasSeatMap && hall.layoutId);
+                  return (
+                  <tr key={v.venueId} className="transition-colors cursor-pointer"
                     style={{ borderBottom: `1px solid ${A.border}` }}
                     onClick={() => setDrawer(v)}
                     onMouseEnter={e => (e.currentTarget.style.background = A.rowHover)}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    <td className="py-3 px-4" style={{ color: A.textPrimary }}>{v.venue}</td>
-                    <td className="py-3 px-4" style={{ color: A.textSecondary }}>{v.source}</td>
+                    <td className="py-3 px-4" style={{ color: A.textPrimary }}>{v.name}</td>
                     <td className="py-3 px-4" style={{ color: A.textSecondary }}>{v.city}</td>
                     <td className="py-3 px-4" style={{ color: A.textSecondary }}>{v.type}</td>
-                    <td className="py-3 px-4" style={{ color: A.textPrimary }}>{v.maxCapacity}</td>
-                    <td className="py-3 px-4" style={{ color: A.textPrimary }}>{v.events}</td>
-                    <td className="py-3 px-4" style={{ color: A.textPrimary }}>{v.violations}</td>
+                    <td className="py-3 px-4" style={{ color: A.textPrimary }}>{v.capacity}</td>
+                    <td className="py-3 px-4" style={{ color: A.textPrimary }}>{v.status === "approved" ? "утверждена" : "черновик"}</td>
+                    <td className="py-3 px-4" style={{ color: hallWithScheme ? A.statusOk : A.textMuted }}>{hallWithScheme ? "есть схема" : "без схемы"}</td>
+                    <td className="py-3 px-4">
+                      {hallWithScheme && (
+                        <button onClick={(event) => { event.stopPropagation(); setSchemeVenue(v); }} className="rounded px-2 py-1 text-xs font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>Открыть схему</button>
+                      )}
+                    </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
@@ -218,16 +236,19 @@ export function AdminVenueRegistry({ state }: { state: AppState }) {
             style={{ background: A.glassGradient + ', ' + A.sidebarBg, borderLeft: `1px solid ${A.borderGlass}` }}
             onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 z-10 flex items-center justify-between p-5" style={{ background: A.topbarBg, backdropFilter: 'blur(16px)', borderBottom: `1px solid ${A.border}` }}>
-              <h3 style={{ color: A.textPrimary }} className="text-base font-semibold">{drawer.venue}</h3>
+              <h3 style={{ color: A.textPrimary }} className="text-base font-semibold">{drawer.name}</h3>
               <button onClick={() => setDrawer(null)} style={{ color: A.textMuted }}><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
-              {([["Источник", drawer.source], ["Город", drawer.city], ["Тип", drawer.type], ["Вместимость", String(drawer.maxCapacity)], ["События", String(drawer.events)], ["Нарушения", String(drawer.violations)]] as [string, string][]).map(([k, v]) => (
+              {([["Город / регион", `${drawer.city} / ${drawer.region}`], ["Тип", drawer.type], ["Адрес", drawer.address], ["Описание", drawer.description], ["Вместимость", String(drawer.capacity)], ["Залы / пространства", drawer.halls.map((hall) => `${hall.name}: ${hall.capacity}${hall.hasSeatMap ? " · схема" : ""}`).join("; ")]] as [string, string][]).map(([k, v]) => (
                 <div key={k}>
                   <div style={{ color: A.textMuted }} className="text-xs font-medium mb-1">{k}</div>
                   <div style={{ color: A.textPrimary }} className="text-sm">{v}</div>
                 </div>
               ))}
+              {drawer.halls.some((hall) => hall.hasSeatMap) && (
+                <button onClick={() => setSchemeVenue(drawer)} className="w-full rounded-lg px-3 py-2 text-sm font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>Открыть схему</button>
+              )}
             </div>
           </div>
         </div>

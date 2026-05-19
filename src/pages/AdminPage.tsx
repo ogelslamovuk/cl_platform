@@ -185,7 +185,7 @@ export default function AdminPage() {
           {tab === "control" && <AdminControl state={state} />}
           {tab === "decisions" && <AdminDecisionLog state={state} />}
           {tab === "orgRegistry" && <AdminOrgRegistry state={state} />}
-          {tab === "venueRegistry" && <AdminVenueRegistry state={state} />}
+          {tab === "venueRegistry" && <AdminVenueRegistry state={state} onUpdate={update} />}
           {tab === "registryEvents" && <AdminRegistryEvents state={state} onUpdate={update} />}
           {tab === "events" && <AdminEvents state={state} onUpdate={update} />}
           {tab === "tickets" && <AdminTickets state={state} />}

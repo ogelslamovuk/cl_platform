@@ -10,9 +10,12 @@ import type {
 } from "@/lib/store";
 import {
   approveApplication,
+  buildEventSeatsFromLayout,
   createApplication,
   createDemoPurchaseTicket,
+  ensureSeatMapState,
   ensureDefaultResellers,
+  getSeatMapLayout,
   loadState,
   issueMarks,
   publishEvent,
@@ -682,7 +685,9 @@ function enrichDemoData(state: AppState): void {
   ensureDemoOrganizers(state);
   ensureOrganizerRegistry(state);
   ensureDemoOrganizerDocuments(state);
+  ensureSeatMapState(state);
   ensureSeedPublishedEvents(state);
+  ensureSeatMapDemoEvent(state);
   ensureOrganizerApplications(state);
   ensureEventComplianceApplications(state);
   ensureTodayNearSoldOutEvent(state);
@@ -760,6 +765,117 @@ function ensureSeedPublishedEvents(state: AppState): void {
     if (event) event.salesChannels = [...seed.salesChannels];
     publishEvent(state, approved.eventId);
     issueMarks(state, approved.eventId);
+  }
+}
+
+function ensureSeatMapDemoEvent(state: AppState): void {
+  const existing = state.events.find((event) => event.eventId === "EVT-SEAT-MAP-DEMO");
+  const layout = getSeatMapLayout(state, "layout_palace_main");
+  if (!layout) return;
+  const tiers: PriceTier[] = [
+    { name: "Эконом", price: 5, quantity: 0, color: "#2563EB" },
+    { name: "Стандарт", price: 50, quantity: 0, color: "#16A34A" },
+    { name: "VIP", price: 100, quantity: 0, color: "#D97706" },
+  ];
+  const seats = buildEventSeatsFromLayout(layout, tiers).map((seat, index) => ({
+    ...seat,
+    status: index === 2 || index === 13 ? "sold" as const : index === 6 || index === 21 ? "blocked" as const : "available" as const,
+  }));
+  const tierCounts = tiers.map((tier) => ({
+    ...tier,
+    quantity: seats.filter((seat) => seat.status !== "blocked" && seat.tariffName === tier.name).length,
+  }));
+  const now = new Date().toISOString();
+  const next = existing || {
+    eventId: "EVT-SEAT-MAP-DEMO",
+    organizerId: "demo_org_minskconcert",
+    licenseId: "LIC-SEAT-MAP-DEMO",
+    appId: "EVAPP-SEAT-MAP-DEMO",
+    complianceApplicationId: "EVAPP-SEAT-MAP-DEMO",
+    title: "Гала-концерт «Беларусь культурная»",
+    venue: "Дворец Республики",
+    dateTime: toDateTime(16, "19:00"),
+    capacity: 0,
+    tiers: tierCounts,
+    city: "Минск",
+    category: "Концерты",
+    description: "Демо-событие со схемой зала, тарифами, проданными и заблокированными местами.",
+    poster: DEMO_POSTERS.belarusUSertsy,
+    salesChannels: ALL_ACTIVE_RESELLER_CHANNELS,
+    status: "published" as const,
+    remaining: 0,
+    venueId: "venue_palace_republic",
+    hallId: "hall_palace_main",
+    layoutId: "layout_palace_main",
+    eventSeats: seats,
+    createdAt: now,
+    updatedAt: now,
+  };
+  Object.assign(next, {
+    capacity: seats.filter((seat) => seat.status !== "blocked").length,
+    tiers: tierCounts,
+    remaining: seats.filter((seat) => seat.status === "available").length,
+    eventSeats: seats,
+    updatedAt: now,
+  });
+  if (!existing) state.events.push(next);
+  if (!state.tickets.some((ticket) => ticket.eventId === next.eventId)) issueMarks(state, next.eventId);
+  if (!state.eventComplianceApplications.some((app) => app.eventComplianceApplicationId === "EVAPP-SEAT-MAP-DEMO")) {
+    state.eventComplianceApplications.push({
+      eventComplianceApplicationId: "EVAPP-SEAT-MAP-DEMO",
+      organizerId: "demo_org_minskconcert",
+      status: "approved",
+      submittedAt: now,
+      reviewedAt: now,
+      adminComment: "",
+      feePaymentConfirmedByAdmin: true,
+      certificateNumber: "EVAPP-SEAT-MAP-DEMO",
+      certificateDate: now.slice(0, 10),
+      linkedLegacyAppId: null,
+      linkedEventId: next.eventId,
+      data: {
+        title: next.title,
+        eventType: "концерт",
+        shortDescription: next.description,
+        program: "Демо-программа для проверки схемы мест.",
+        posterPath: next.poster,
+        salesChannels: next.salesChannels,
+        dateSlots: [next.dateTime],
+        venueName: next.venue,
+        venueAddress: "Октябрьская площадь, 1",
+        venueId: "venue_palace_republic",
+        hallId: "hall_palace_main",
+        layoutId: "layout_palace_main",
+        eventSeats: seats,
+        performers: [],
+        onlyBelarusianPerformers: true,
+        hasForeignPerformers: false,
+        venueType: "концертный зал",
+        projectedCapacity: next.capacity,
+        plannedTicketsForSale: next.capacity,
+        ticketTiers: tierCounts,
+        ageCategory: "6+",
+        ageComment: "",
+        approvalMode: "certificate_required",
+        approvalBasis: "",
+        eventDocuments: [],
+        salesStartDate: todayYmd(),
+        feeExempt: false,
+        feeExemptReason: "",
+        feePaid: true,
+        paymentAttachments: [],
+        paymentComment: "",
+        adRestrictionConfirmed: true,
+        cancelled: false,
+        changesDeclared: false,
+        executiveCommitteeNotified: false,
+        citizensNotified: false,
+        notificationsAttachment: [],
+        cancellationComment: "",
+      },
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 }
 
