@@ -253,12 +253,16 @@ export default function SeatMapModal({
               <div className="mx-auto mb-7 h-8 max-w-[72%] rounded-b-[48px] border border-slate-300 bg-slate-100 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shadow-inner">
                 <span className="relative top-2">Сцена</span>
               </div>
-              <div className="grid gap-x-2 gap-y-3" style={{ gridTemplateColumns: `repeat(${maxX}, minmax(42px, 1fr))`, gridTemplateRows: `repeat(${maxY}, 42px)` }}>
+              <div
+                className="grid justify-center gap-x-2.5 gap-y-3"
+                style={{ gridTemplateColumns: `repeat(${maxX}, 42px)`, gridTemplateRows: `repeat(${maxY}, 44px)` }}
+              >
                 {seats.map((seat) => {
                   const eventSeat = workingSeats.find((item) => item.seatId === seat.seatId) || seat as EventSeat;
                   const selected = selectedIds.includes(seat.seatId);
                   const disabled = mode === "buyer" && eventSeat.status !== "available";
-                  const rowOffset = Math.abs((seat.x + (seat.w || 1) / 2) - maxX / 2) * Math.min(7, 18 / Math.max(maxX, 1));
+                  const centerOffset = Math.abs((seat.x + (seat.w || 1) / 2) - maxX / 2);
+                  const rowOffset = centerOffset * Math.min(8, 22 / Math.max(maxX, 1)) + seat.y * 1.5;
                   return (
                     <button
                       key={seat.seatId}
@@ -266,7 +270,7 @@ export default function SeatMapModal({
                       disabled={disabled}
                       onClick={() => toggleSeat(seat.seatId)}
                       title={seatTooltip(eventSeat)}
-                      className="flex h-9 min-w-10 items-center justify-center rounded-t-xl rounded-b-md border text-[11px] font-semibold shadow-sm outline-none ring-offset-2 transition hover:-translate-y-0.5 hover:border-amber-400 hover:ring-2 hover:ring-amber-200 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
+                      className="relative flex h-9 w-10 items-center justify-center rounded-t-[18px] rounded-b-lg border text-[10px] font-semibold shadow-sm outline-none ring-offset-2 transition before:absolute before:inset-x-1.5 before:bottom-1 before:h-1 before:rounded-full before:bg-white/30 hover:-translate-y-0.5 hover:border-amber-400 hover:ring-2 hover:ring-amber-200 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
                       style={{
                         gridColumn: `${seat.x + 1} / span ${seat.w || 1}`,
                         gridRow: `${seat.y + 1} / span ${seat.h || 1}`,
