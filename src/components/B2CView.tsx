@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
-import type { AppState, EventRecord } from "@/lib/store";
+import type { AppState, EventRecord, EventSeat } from "@/lib/store";
 import { createDemoPurchaseTicket, getTicketRefundBlockReason, refund } from "@/lib/store";
+import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import { toast } from "sonner";
 import { Search, MapPin, Tag, Ticket, X, ChevronRight, Sparkles, TrendingUp, Star, User, Calendar, CheckCircle2 } from "lucide-react";
 import platformLogo from "../../logo.jpg";
@@ -118,6 +119,8 @@ export default function B2CView({ state, onUpdate }: Props) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [ticketsOpen, setTicketsOpen] = useState(false);
   const [successTicketId, setSuccessTicketId] = useState<string | null>(null);
+  const [seatMapOpen, setSeatMapOpen] = useState(false);
+  const [selectedSeat, setSelectedSeat] = useState<EventSeat | null>(null);
   const [selectedTier, setSelectedTier] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [buyerName, setBuyerName] = useState("");
@@ -170,12 +173,18 @@ export default function B2CView({ state, onUpdate }: Props) {
     setQuantity(1);
     setBuyerName("");
     setCheckoutOpen(false);
+    setSeatMapOpen(false);
+    setSelectedSeat(null);
     setSuccessTicketId(null);
   };
 
   const openCheckout = () => {
     if (!detailsEvent || !selectedTier) {
       toast.error("Выберите ценовую категорию");
+      return;
+    }
+    if (detailsEvent.eventSeats?.length && !selectedSeat) {
+      toast.error("Выберите место на схеме");
       return;
     }
     if (getTierIssuedCount(state, detailsEvent.eventId, selectedTier) < quantity) {
@@ -196,6 +205,7 @@ export default function B2CView({ state, onUpdate }: Props) {
       selectedPriceCategory: selectedTier,
       quantity,
       buyerName,
+      seatId: selectedSeat?.seatId,
     });
     if (!rec) {
       toast.error("Не удалось завершить покупку");
@@ -310,7 +320,7 @@ export default function B2CView({ state, onUpdate }: Props) {
                   if (!isSoldOut) openDetails(event);
                 }}
               >
-                {isSoldOut ? "Нет мест" : "Купить"}
+                {isSoldOut ? "Нет мест" : event.eventSeats?.length ? "Выбрать место" : "Купить"}
                 {!isSoldOut && <ChevronRight size={16} />}
               </button>
             </div>
@@ -640,10 +650,22 @@ export default function B2CView({ state, onUpdate }: Props) {
                             Категория и количество для покупки.
                           </p>
                         </div>
-                        <div className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: D.accentSoft, color: D.accentText }}>
-                          {getEventIssuedCount(state, detailsEvent.eventId)} {formatTicketWord(getEventIssuedCount(state, detailsEvent.eventId))}
+                   <div className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: D.accentSoft, color: D.accentText }}>
+                     {getEventIssuedCount(state, detailsEvent.eventId)} {formatTicketWord(getEventIssuedCount(state, detailsEvent.eventId))}
+                   </div>
+                 </div>
+
+                  {detailsEvent.eventSeats?.length ? (
+                    <div className="mb-4 rounded-xl border p-3" style={{ borderColor: D.borderSoft, background: D.panel }}>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="text-sm font-semibold" style={{ color: D.text }}>Схема зала</div>
+                          <div className="text-xs" style={{ color: D.textMuted }}>{selectedSeat ? `${selectedSeat.label} · ${selectedSeat.tariffName} · ${selectedSeat.price || 0} BYN` : "Выберите доступное место."}</div>
                         </div>
+                        <button type="button" onClick={() => setSeatMapOpen(true)} className="rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: D.accent, color: "#FFFFFF" }}>Выбрать место</button>
                       </div>
+                    </div>
+                  ) : null}
 
                       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_130px]">
                         <label className="block">
@@ -653,6 +675,7 @@ export default function B2CView({ state, onUpdate }: Props) {
                           <select
                             value={selectedTier}
                             onChange={(e) => setSelectedTier(e.target.value)}
+                            disabled={Boolean(detailsEvent.eventSeats?.length)}
                             className="h-11 w-full rounded-lg border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-blue-100"
                             style={{ borderColor: D.border, color: D.text }}
                           >
@@ -675,7 +698,8 @@ export default function B2CView({ state, onUpdate }: Props) {
                             type="number"
                             min={1}
                             max={6}
-                            value={quantity}
+                            disabled={Boolean(detailsEvent.eventSeats?.length)}
+                            value={detailsEvent.eventSeats?.length ? 1 : quantity}
                             onChange={(e) => setQuantity(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
                             className="h-11 w-full rounded-lg border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-blue-100"
                             style={{ borderColor: D.border, color: D.text }}
@@ -897,6 +921,24 @@ export default function B2CView({ state, onUpdate }: Props) {
             </div>
           </aside>
         </div>
+      )}
+      {detailsEvent && (
+        <SeatMapModal
+          open={seatMapOpen}
+          title="Выбор места"
+          subtitle={detailsEvent.title}
+          mode="buyer"
+          eventSeats={detailsEvent.eventSeats || []}
+          tiers={detailsEvent.tiers}
+          onClose={() => setSeatMapOpen(false)}
+          onBuySeat={(seat) => {
+            setSelectedSeat(seat);
+            setSelectedTier(seat.tariffName || detailsEvent.tiers[0]?.name || "");
+            setQuantity(1);
+            setSeatMapOpen(false);
+            setCheckoutOpen(true);
+          }}
+        />
       )}
     </div>
   );

@@ -7,11 +7,17 @@ import { useStorageSync } from "@/hooks/useStorageSync";
 import {
   calculateComplianceFee,
   buildDefaultSalesChannels,
+  buildEventSeatsFromLayout,
   createEventComplianceApplication,
   defaultEventComplianceData,
+  getSeatMapLayout,
+  getVenueRegistryRecord,
   getSalesChannelLabel,
+  SEAT_TARIFF_COLORS,
   updateEventComplianceApplication,
 } from "@/lib/store";
+import type { EventSeat, PriceTier } from "@/lib/store";
+import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import {
   selectCurrentOrganizer,
   selectIsCurrentOrganizerApproved,
@@ -42,7 +48,13 @@ export default function OrganizerEventCompliancePage() {
   const [form, setForm] = useState(makeDefaultForm);
   const [tierErrors, setTierErrors] = useState<number[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [seatMapOpen, setSeatMapOpen] = useState(false);
   const activeResellers = useMemo(() => state.resellers.filter((reseller) => reseller.status === "active"), [state.resellers]);
+  const approvedVenues = useMemo(() => state.venueRegistry.filter((venue) => venue.status === "approved"), [state.venueRegistry]);
+  const selectedVenue = getVenueRegistryRecord(state, form.venueId);
+  const selectedHall = selectedVenue?.halls.find((hall) => hall.hallId === form.hallId) || null;
+  const selectedLayout = getSeatMapLayout(state, form.layoutId);
+  const hasSeatMap = Boolean(selectedLayout && selectedHall?.hasSeatMap);
   const complianceStatusLabel: Record<string, string> = {
     draft: "Черновик",
     submitted: "На рассмотрении",
@@ -85,6 +97,16 @@ export default function OrganizerEventCompliancePage() {
 
   const totalPlannedTickets = form.ticketTiers.reduce((acc, tier) => acc + (Number.isFinite(tier.quantity) ? Math.max(0, Math.floor(tier.quantity)) : 0), 0);
   const fee = calculateComplianceFee(form.projectedCapacity, totalPlannedTickets, form.ticketTiers);
+  const normalizedTiersWithColors = (form.ticketTiers || []).map((tier, index): PriceTier => ({
+    ...tier,
+    color: tier.color || SEAT_TARIFF_COLORS[index % SEAT_TARIFF_COLORS.length],
+  }));
+  const seatCounts = (form.eventSeats || []).reduce((acc, seat) => {
+    if (seat.status === "blocked") acc.blocked += 1;
+    else if (seat.tariffName) acc.assigned += 1;
+    else acc.unassigned += 1;
+    return acc;
+  }, { assigned: 0, blocked: 0, unassigned: 0 });
 
   const normalizeDateTimeLocal = (value: string | null | undefined): string => {
     const raw = (value || "").trim();
@@ -104,17 +126,25 @@ export default function OrganizerEventCompliancePage() {
   const normalizeFormPayload = () => {
     const normalizedTitle = (form.title || "").replace(/\s+/g, " ").trim();
     const firstDateSlot = normalizeDateTimeLocal(form.dateSlots[0]);
-    const normalizedTiers = (form.ticketTiers || []).map((tier) => ({
+    const normalizedTiers = (form.ticketTiers || []).map((tier, index) => ({
       name: (tier.name || "").trim(),
       quantity: Number.isFinite(tier.quantity) ? Math.max(0, Math.floor(tier.quantity)) : 0,
       price: Number.isFinite(tier.price) ? Math.max(0, tier.price) : 0,
+      color: tier.color || SEAT_TARIFF_COLORS[index % SEAT_TARIFF_COLORS.length],
     }));
+    const eventSeats = form.eventSeats || [];
+    const seatTiers = hasSeatMap
+      ? normalizedTiers.map((tier) => ({
+          ...tier,
+          quantity: eventSeats.filter((seat) => seat.status !== "blocked" && seat.tariffName === tier.name).length,
+        }))
+      : normalizedTiers;
     return {
       ...form,
       title: normalizedTitle,
       dateSlots: [firstDateSlot, ...form.dateSlots.slice(1)],
-      ticketTiers: normalizedTiers,
-      plannedTicketsForSale: normalizedTiers.reduce((acc, tier) => acc + tier.quantity, 0),
+      ticketTiers: seatTiers,
+      plannedTicketsForSale: seatTiers.reduce((acc, tier) => acc + tier.quantity, 0),
       salesChannels: Array.from(new Set(["OWN", ...(form.salesChannels || [])])),
     };
   };
@@ -122,13 +152,42 @@ export default function OrganizerEventCompliancePage() {
   const validateTicketTiers = () => {
     const rows = form.ticketTiers || [];
     const invalidRows = rows.reduce<number[]>((acc, tier, index) => {
-      if (!tier.name?.trim() || !Number.isFinite(tier.quantity) || tier.quantity <= 0 || !Number.isFinite(tier.price) || tier.price < 0) {
+      const seatQuantity = hasSeatMap ? (form.eventSeats || []).filter((seat) => seat.status !== "blocked" && seat.tariffName === tier.name).length : tier.quantity;
+      if (!tier.name?.trim() || !Number.isFinite(seatQuantity) || seatQuantity <= 0 || !Number.isFinite(tier.price) || tier.price < 0) {
         acc.push(index);
       }
       return acc;
     }, []);
     setTierErrors(invalidRows);
-    return rows.length > 0 && totalPlannedTickets > 0 && invalidRows.length === 0;
+    if (!form.venueId) {
+      toast.error("Выберите утверждённую площадку из реестра.");
+      return false;
+    }
+    if (hasSeatMap && seatCounts.unassigned > 0) {
+      toast.error("Назначьте тариф каждому продаваемому месту или заблокируйте его.");
+      return false;
+    }
+    return rows.length > 0 && (hasSeatMap ? seatCounts.assigned > 0 : totalPlannedTickets > 0) && invalidRows.length === 0;
+  };
+
+  const selectVenue = (venueId: string) => {
+    const venue = getVenueRegistryRecord(state, venueId);
+    const hall = venue?.halls[0];
+    const layout = hall?.layoutId ? getSeatMapLayout(state, hall.layoutId) : null;
+    setForm((prev) => ({
+      ...prev,
+      venueId,
+      hallId: hall?.hallId || "",
+      layoutId: hall?.layoutId || "",
+      venueName: venue?.name || "",
+      venueAddress: venue?.address || "",
+      venueType: venue?.type || "",
+      projectedCapacity: hall?.capacity || venue?.capacity || null,
+      eventSeats: layout ? buildEventSeatsFromLayout(layout, prev.ticketTiers) : [],
+      ticketTiers: layout
+        ? prev.ticketTiers.map((tier) => ({ ...tier, quantity: 0 }))
+        : prev.ticketTiers,
+    }));
   };
 
   const addMockAttachment = (kind: string, target: "eventDocuments" | "paymentAttachments" | "notificationsAttachment", sample = false) => {
@@ -352,21 +411,53 @@ export default function OrganizerEventCompliancePage() {
           <h2 className="font-semibold">Площадка и вместимость</h2>
           <div className="grid md:grid-cols-2 gap-3">
             <div className="relative">
-              <input className="h-10 w-full rounded px-3 pr-9 bg-[#0F1620] border" placeholder="Тип площадки" value={form.venueType} onChange={(e) => setForm((p) => ({ ...p, venueType: e.target.value }))} />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2"><HelpTooltip text="Укажите тип площадки." /></div>
+              <select className="h-10 w-full rounded px-3 pr-9 bg-[#0F1620] border" value={form.venueId || ""} onChange={(e) => selectVenue(e.target.value)}>
+                <option value="">Выберите площадку из реестра</option>
+                {approvedVenues.map((venue) => (
+                  <option key={venue.venueId} value={venue.venueId}>{venue.city} · {venue.type} · {venue.name}</option>
+                ))}
+              </select>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2"><HelpTooltip text="Заявку можно отправить только по утверждённой площадке из реестра Центра Управления." /></div>
             </div>
             <div className="relative">
-              <input className="h-10 w-full rounded px-3 pr-9 bg-[#0F1620] border" type="number" placeholder="Проектная вместимость" value={form.projectedCapacity ?? ""} onChange={(e) => setForm((p) => ({ ...p, projectedCapacity: e.target.value ? Number(e.target.value) : null }))} />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2"><HelpTooltip text="Введите максимальное количество зрителей, которое может принять площадка." /></div>
+              <select className="h-10 w-full rounded px-3 pr-9 bg-[#0F1620] border" value={form.hallId || ""} onChange={(e) => {
+                const hall = selectedVenue?.halls.find((item) => item.hallId === e.target.value);
+                const layout = hall?.layoutId ? getSeatMapLayout(state, hall.layoutId) : null;
+                setForm((p) => ({
+                  ...p,
+                  hallId: hall?.hallId || "",
+                  layoutId: hall?.layoutId || "",
+                  projectedCapacity: hall?.capacity || selectedVenue?.capacity || null,
+                  eventSeats: layout ? buildEventSeatsFromLayout(layout, p.ticketTiers) : [],
+                }));
+              }}>
+                <option value="">Зал / пространство</option>
+                {(selectedVenue?.halls || []).map((hall) => (
+                  <option key={hall.hallId} value={hall.hallId}>{hall.name} · {hall.capacity} мест{hall.hasSeatMap ? " · схема" : ""}</option>
+                ))}
+              </select>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2"><HelpTooltip text="Вместимость и схема берутся из выбранного зала или пространства." /></div>
             </div>
+          </div>
+          <div className="rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
+            <div className="grid gap-2 md:grid-cols-4">
+              <div><span className="block text-xs opacity-70">Город</span>{selectedVenue?.city || "—"}</div>
+              <div><span className="block text-xs opacity-70">Тип</span>{selectedVenue?.type || form.venueType || "—"}</div>
+              <div><span className="block text-xs opacity-70">Вместимость</span>{form.projectedCapacity || "—"}</div>
+              <div><span className="block text-xs opacity-70">Схема</span>{hasSeatMap ? "есть" : "нет, capacity-only"}</div>
+            </div>
+            {!form.venueId && <p className="mt-3 text-xs text-amber-200">Свободный ввод площадки доступен только как заметка. Для отправки нужна площадка из реестра.</p>}
+            <button type="button" className="mt-3 rounded bg-[#1d2a3b] px-3 py-2 text-xs font-semibold">Запросить добавление площадки</button>
           </div>
         </section>
 
         <section className="space-y-3">
           <h2 className="font-semibold">Тарифы билетов</h2>
           <div className="inline-flex items-center gap-1">
-            <p className="text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>Количество билетов и стоимость задаются по каждому тарифу отдельно.</p>
-            <HelpTooltip text="Расчёт показывает, сколько билетов заявлено по тарифам относительно вместимости площадки." />
+            <p className="text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>
+              {hasSeatMap ? "Для события со схемой количество считается по назначенным местам." : "Количество билетов и стоимость задаются по каждому тарифу отдельно."}
+            </p>
+            <HelpTooltip text="Для схемы зала тарифы назначаются на местах; для capacity-only событий работает прежний ручной ввод количества." />
           </div>
           <div className="space-y-2">
             {form.ticketTiers.map((tier, idx) => {
@@ -390,11 +481,12 @@ export default function OrganizerEventCompliancePage() {
                     type="number"
                     min={0}
                     placeholder="Количество"
-                    value={Number.isFinite(tier.quantity) ? (tier.quantity === 0 ? "" : tier.quantity) : ""}
+                    readOnly={hasSeatMap}
+                    value={hasSeatMap ? (form.eventSeats || []).filter((seat) => seat.status !== "blocked" && seat.tariffName === tier.name).length : (Number.isFinite(tier.quantity) ? (tier.quantity === 0 ? "" : tier.quantity) : "")}
                     onFocus={(e) => e.currentTarget.select()}
-                    onChange={(e) => setForm((p) => ({ ...p, ticketTiers: p.ticketTiers.map((row, rowIdx) => rowIdx === idx ? { ...row, quantity: e.target.value ? Number(e.target.value) : 0 } : row) }))}
+                    onChange={(e) => !hasSeatMap && setForm((p) => ({ ...p, ticketTiers: p.ticketTiers.map((row, rowIdx) => rowIdx === idx ? { ...row, quantity: e.target.value ? Number(e.target.value) : 0 } : row) }))}
                   />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2"><HelpTooltip text="Количество билетов, доступное по данному тарифу." /></div>
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2"><HelpTooltip text={hasSeatMap ? "Количество считается автоматически по местам, назначенным этому тарифу." : "Количество билетов, доступное по данному тарифу."} /></div>
                   </div>
                   <div className="relative">
                     <input
@@ -433,8 +525,22 @@ export default function OrganizerEventCompliancePage() {
             </button>
               <HelpTooltip text="Добавить ещё одну ценовую категорию." />
             </div>
-            <div className="inline-flex items-center gap-1 text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>Итого планируемых билетов: {totalPlannedTickets}<HelpTooltip text="Общее количество билетов, заявленных по всем тарифам." /></div>
+            <div className="inline-flex items-center gap-1 text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>
+              Итого планируемых билетов: {hasSeatMap ? seatCounts.assigned : totalPlannedTickets}
+              <HelpTooltip text={hasSeatMap ? "Автосчёт мест, которым назначен тариф. Заблокированные места не продаются." : "Общее количество билетов, заявленных по всем тарифам."} />
+            </div>
           </div>
+          {hasSeatMap && (
+            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm">
+                  <div className="font-semibold">Схема тарифов</div>
+                  <div className="text-xs opacity-70">Назначено: {seatCounts.assigned}; без тарифа: {seatCounts.unassigned}; блок: {seatCounts.blocked}</div>
+                </div>
+                <button type="button" onClick={() => setSeatMapOpen(true)} className="rounded bg-[#1d2a3b] px-3 py-2 text-sm font-semibold">Назначить тарифы на схеме</button>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="space-y-3">
@@ -593,6 +699,28 @@ export default function OrganizerEventCompliancePage() {
           )}
         </section>
       </div>
+      <SeatMapModal
+        open={seatMapOpen}
+        title="Назначение тарифов на схеме"
+        subtitle={[selectedVenue?.name, selectedHall?.name].filter(Boolean).join(" · ")}
+        mode="assign"
+        baseSeats={selectedLayout?.seats || []}
+        eventSeats={(form.eventSeats || []) as EventSeat[]}
+        tiers={normalizedTiersWithColors}
+        onClose={() => setSeatMapOpen(false)}
+        onSaveEventSeats={(seats) => {
+          setForm((prev) => ({
+            ...prev,
+            eventSeats: seats,
+            ticketTiers: prev.ticketTiers.map((tier) => ({
+              ...tier,
+              quantity: seats.filter((seat) => seat.status !== "blocked" && seat.tariffName === tier.name).length,
+            })),
+          }));
+          setSeatMapOpen(false);
+          toast.success("Назначение тарифов сохранено в заявке.");
+        }}
+      />
     </div>
   );
 }

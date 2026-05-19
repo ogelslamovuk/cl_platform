@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { AppState, EventRecord } from "@/lib/store";
-import { getEventSalesChannels, getSalesChannelLabel, publishEvent, issueMarks } from "@/lib/store";
+import { getEventSalesChannels, getSalesChannelLabel, getEventSeatSummary, publishEvent, issueMarks } from "@/lib/store";
+import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import { toast } from "sonner";
 import { A, statusChip } from "./adminStyles";
 import { Calendar, Search, X, Ticket, Globe } from "lucide-react";
@@ -14,6 +15,7 @@ export default function AdminEvents({ state, onUpdate }: Props) {
   const [search, setSearch] = useState("");
   const [drawer, setDrawer] = useState<EventRecord | null>(null);
   const [confirmIssue, setConfirmIssue] = useState<string | null>(null);
+  const [schemeEvent, setSchemeEvent] = useState<EventRecord | null>(null);
 
   const filtered = state.events.filter(e => {
     if (!search) return true;
@@ -192,6 +194,20 @@ export default function AdminEvents({ state, onUpdate }: Props) {
                   );
                 })()}
               </div>
+              {getEventSeatSummary(drawer).hasSeatMap && (
+                <div className="rounded-lg border p-3" style={{ borderColor: A.border, background: A.surfaceBg }}>
+                  <div className="mb-2 text-sm font-semibold" style={{ color: A.textPrimary }}>Схема зала и продажи</div>
+                  <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: A.textSecondary }}>
+                    <span>Всего: {getEventSeatSummary(drawer).total}</span>
+                    <span>В продаже: {getEventSeatSummary(drawer).forSale}</span>
+                    <span>Продано: {getEventSeatSummary(drawer).sold}</span>
+                    <span>Остаток: {getEventSeatSummary(drawer).available}</span>
+                    <span>Блок: {getEventSeatSummary(drawer).blocked}</span>
+                    <span>Выручка: {getEventSeatSummary(drawer).revenue} BYN</span>
+                  </div>
+                  <button onClick={() => setSchemeEvent(drawer)} className="mt-3 rounded px-3 py-2 text-sm font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>Открыть схему</button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -217,6 +233,7 @@ export default function AdminEvents({ state, onUpdate }: Props) {
           </div>
         );
       })()}
+      <SeatMapModal open={Boolean(schemeEvent)} title="Схема зала и продажи" subtitle={schemeEvent?.title} mode="viewer" eventSeats={schemeEvent?.eventSeats || []} tiers={schemeEvent?.tiers || []} onClose={() => setSchemeEvent(null)} />
     </div>
   );
 }

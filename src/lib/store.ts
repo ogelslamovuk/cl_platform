@@ -19,6 +19,60 @@ export interface PriceTier {
   name: string;
   price: number;
   quantity: number;
+  color?: string;
+}
+
+export type SeatStatus = "available" | "sold" | "blocked";
+
+export interface SeatMapSeat {
+  seatId: string;
+  label: string;
+  row: string;
+  number: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface SeatMapHall {
+  hallId: string;
+  venueId: string;
+  name: string;
+  capacity: number;
+  hasSeatMap: boolean;
+  layoutId?: string;
+}
+
+export interface SeatMapLayout {
+  layoutId: string;
+  venueId: string;
+  hallId: string;
+  name: string;
+  seats: SeatMapSeat[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VenueRegistryRecord {
+  venueId: string;
+  name: string;
+  city: string;
+  region: string;
+  type: "концертный зал" | "театр" | "центр культуры" | "open-air" | "временная площадка";
+  address: string;
+  description: string;
+  capacity: number;
+  status: "approved" | "draft";
+  halls: SeatMapHall[];
+}
+
+export interface EventSeat extends SeatMapSeat {
+  tariffId?: string;
+  tariffName?: string;
+  price?: number;
+  color?: string;
+  status: SeatStatus;
 }
 
 export interface Application {
@@ -58,6 +112,10 @@ export interface EventRecord {
   salesChannels: string[];
   status: EventStatus;
   remaining: number;
+  venueId?: string;
+  hallId?: string;
+  layoutId?: string;
+  eventSeats?: EventSeat[];
   createdAt: string;
   updatedAt: string;
 }
@@ -69,6 +127,10 @@ export interface Ticket {
   status: TicketStatus;
   soldByChannel?: string;
   soldToUserId?: string;
+  seatId?: string;
+  seatLabel?: string;
+  row?: string;
+  seatNumber?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -123,6 +185,10 @@ export interface DemoPurchaseTicket {
   buyerName: string;
   selectedPriceCategory: string;
   quantity: number;
+  seatId?: string;
+  seatLabel?: string;
+  row?: string;
+  seatNumber?: number;
   purchasedAt: string;
   status: "confirmed" | "refunded";
 }
@@ -222,6 +288,10 @@ export interface EventComplianceData {
   dateSlots: string[];
   venueName: string;
   venueAddress: string;
+  venueId?: string;
+  hallId?: string;
+  layoutId?: string;
+  eventSeats?: EventSeat[];
   performers: EventPerformer[];
   onlyBelarusianPerformers: boolean;
   hasForeignPerformers: boolean;
@@ -283,6 +353,8 @@ export interface AppState {
   organizerApplications: OrganizerApplicationRecord[];
   eventComplianceApplications: EventComplianceApplicationRecord[];
   organizerRegistry: OrganizerRegistryRecord[];
+  venueRegistry: VenueRegistryRecord[];
+  seatMapLayouts: SeatMapLayout[];
   events: EventRecord[];
   tickets: Ticket[];
   resellers: Reseller[];
@@ -394,6 +466,100 @@ const ORGANIZER_DOCUMENT_TEMPLATES: Omit<OrganizerDocument, "organizerId" | "upd
   { documentId: "DOC-005", title: "Реквизиты", type: "реквизиты", status: "доступен" },
 ];
 
+export const SEAT_TARIFF_COLORS = ["#2563EB", "#16A34A", "#D97706", "#7C3AED", "#DC2626", "#0891B2"];
+
+export function createRectangularSeats(prefix: string, rows: number, cols: number): SeatMapSeat[] {
+  const safeRows = Math.max(1, Math.min(20, Math.floor(rows || 1)));
+  const safeCols = Math.max(1, Math.min(30, Math.floor(cols || 1)));
+  const seats: SeatMapSeat[] = [];
+  for (let rowIndex = 0; rowIndex < safeRows; rowIndex++) {
+    const row = String.fromCharCode(65 + rowIndex);
+    for (let col = 1; col <= safeCols; col++) {
+      seats.push({
+        seatId: `${prefix}-${row}-${col}`,
+        label: `${row}${col}`,
+        row,
+        number: col,
+        x: col - 1,
+        y: rowIndex,
+        w: 1,
+        h: 1,
+      });
+    }
+  }
+  return seats;
+}
+
+function defaultLayout(layoutId: string, venueId: string, hallId: string, name: string, rows: number, cols: number): SeatMapLayout {
+  const now = "2026-05-19T00:00:00.000Z";
+  return {
+    layoutId,
+    venueId,
+    hallId,
+    name,
+    seats: createRectangularSeats(layoutId, rows, cols),
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+const DEFAULT_SEAT_MAP_LAYOUTS: SeatMapLayout[] = [
+  defaultLayout("layout_palace_main", "venue_palace_republic", "hall_palace_main", "Основной зал 5x8", 5, 8),
+  defaultLayout("layout_bolshoi_demo", "venue_bolshoi_theatre", "hall_bolshoi_demo", "Демо-схема 4x6", 4, 6),
+  defaultLayout("layout_grodno_culture", "venue_grodno_culture", "hall_grodno_main", "Зал 4x5", 4, 5),
+];
+
+const DEFAULT_VENUE_REGISTRY: VenueRegistryRecord[] = [
+  {
+    venueId: "venue_palace_republic",
+    name: "Дворец Республики",
+    city: "Минск",
+    region: "Минск",
+    type: "концертный зал",
+    address: "Октябрьская площадь, 1",
+    description: "Реестровая концертная площадка с простой прямоугольной схемой для MVP.",
+    capacity: 40,
+    status: "approved",
+    halls: [{ hallId: "hall_palace_main", venueId: "venue_palace_republic", name: "Основной зал", capacity: 40, hasSeatMap: true, layoutId: "layout_palace_main" }],
+  },
+  {
+    venueId: "venue_bolshoi_theatre",
+    name: "Большой театр",
+    city: "Минск",
+    region: "Минск",
+    type: "театр",
+    address: "пл. Парижской Коммуны, 1",
+    description: "Театральная площадка. Для MVP используется простая прямоугольная демо-схема.",
+    capacity: 24,
+    status: "approved",
+    halls: [{ hallId: "hall_bolshoi_demo", venueId: "venue_bolshoi_theatre", name: "Демо-зал", capacity: 24, hasSeatMap: true, layoutId: "layout_bolshoi_demo" }],
+  },
+  {
+    venueId: "venue_grodno_culture",
+    name: "Центр культуры Гродно",
+    city: "Гродно",
+    region: "Гродненская область",
+    type: "центр культуры",
+    address: "ул. Советская, 12",
+    description: "Культурный центр с базовой схемой малого зала.",
+    capacity: 20,
+    status: "approved",
+    halls: [{ hallId: "hall_grodno_main", venueId: "venue_grodno_culture", name: "Малый зал", capacity: 20, hasSeatMap: true, layoutId: "layout_grodno_culture" }],
+  },
+  {
+    venueId: "venue_podnikolie_park",
+    name: "Парк Подниколье",
+    city: "Могилёв",
+    region: "Могилёвская область",
+    type: "open-air",
+    address: "Парк Подниколье",
+    description: "Открытая площадка без схемы, только вместимость.",
+    capacity: 1500,
+    status: "approved",
+    halls: [{ hallId: "hall_podnikolie_open", venueId: "venue_podnikolie_park", name: "Основная зона", capacity: 1500, hasSeatMap: false }],
+  },
+];
+
 function pad(n: number, len: number): string {
   return String(n).padStart(len, "0");
 }
@@ -413,6 +579,8 @@ export function defaultState(): AppState {
     organizerApplications: [],
     eventComplianceApplications: [],
     organizerRegistry: [],
+    venueRegistry: DEFAULT_VENUE_REGISTRY.map((venue) => ({ ...venue, halls: venue.halls.map((hall) => ({ ...hall })) })),
+    seatMapLayouts: DEFAULT_SEAT_MAP_LAYOUTS.map((layout) => ({ ...layout, seats: layout.seats.map((seat) => ({ ...seat })) })),
     events: [],
     tickets: [],
     resellers: DEFAULT_RESELLERS.map((reseller) => ({ ...reseller, updatedAt: createdAt })),
@@ -538,6 +706,8 @@ function migrateState(parsed: Partial<AppState>): AppState {
       organizerApplications: Array.isArray(parsed.organizerApplications) ? parsed.organizerApplications : [],
       eventComplianceApplications: Array.isArray(parsed.eventComplianceApplications) ? parsed.eventComplianceApplications : [],
       organizerRegistry: Array.isArray(parsed.organizerRegistry) ? parsed.organizerRegistry : [],
+      venueRegistry: Array.isArray((parsed as Partial<AppState>).venueRegistry) ? (parsed as Partial<AppState>).venueRegistry as VenueRegistryRecord[] : [],
+      seatMapLayouts: Array.isArray((parsed as Partial<AppState>).seatMapLayouts) ? (parsed as Partial<AppState>).seatMapLayouts as SeatMapLayout[] : [],
       events: Array.isArray(parsed.events) ? parsed.events : [],
       tickets: Array.isArray(parsed.tickets) ? parsed.tickets : [],
       resellers: Array.isArray(parsed.resellers) ? parsed.resellers : [],
@@ -548,6 +718,7 @@ function migrateState(parsed: Partial<AppState>): AppState {
       organizerDocuments: Array.isArray(parsed.organizerDocuments) ? parsed.organizerDocuments : [],
       currentOrganizerId: typeof parsed.currentOrganizerId === "string" ? parsed.currentOrganizerId : null,
     };
+    ensureSeatMapState(state);
 
     const knownOrganizerIds = new Set(state.organizers.map((o) => o.organizerId));
     for (const organizer of state.organizers) {
@@ -573,6 +744,11 @@ function migrateState(parsed: Partial<AppState>): AppState {
       event.salesChannels = Array.isArray(event.salesChannels) && event.salesChannels.length > 0
         ? normalizeSalesChannels(event.salesChannels, state)
         : buildDefaultSalesChannels(state);
+      event.eventSeats = normalizeEventSeats(event.eventSeats);
+      if (event.eventSeats.length > 0) {
+        event.capacity = event.eventSeats.filter((seat) => seat.status !== "blocked").length;
+        event.tiers = normalizeSeatEventTiers(event.eventSeats, event.tiers);
+      }
     }
     for (const app of state.eventComplianceApplications) {
       const tiers = normalizeComplianceTicketTiers(app.data);
@@ -580,6 +756,7 @@ function migrateState(parsed: Partial<AppState>): AppState {
       app.data.plannedTicketsForSale = sumTierQuantity(tiers);
       app.data.posterPath ||= "";
       app.data.salesChannels = normalizeSalesChannels(app.data.salesChannels, state);
+      app.data.eventSeats = normalizeEventSeats(app.data.eventSeats);
     }
     for (const purchase of state.demoPurchases) {
       purchase.status ||= "confirmed";
@@ -665,6 +842,161 @@ function sumTierQuantity(tiers: PriceTier[]): number {
   return tiers.reduce((acc, tier) => acc + Math.max(0, Math.floor(tier.quantity || 0)), 0);
 }
 
+function copySeat(seat: SeatMapSeat): SeatMapSeat {
+  return {
+    seatId: String(seat.seatId || quickId("SEAT")),
+    label: String(seat.label || seat.seatId || "—"),
+    row: String(seat.row || ""),
+    number: Number.isFinite(Number(seat.number)) ? Number(seat.number) : 0,
+    x: Number.isFinite(Number(seat.x)) ? Number(seat.x) : 0,
+    y: Number.isFinite(Number(seat.y)) ? Number(seat.y) : 0,
+    w: Number.isFinite(Number(seat.w)) ? Number(seat.w) : 1,
+    h: Number.isFinite(Number(seat.h)) ? Number(seat.h) : 1,
+  };
+}
+
+function normalizeEventSeats(rawSeats: unknown): EventSeat[] {
+  const source = Array.isArray(rawSeats) ? rawSeats : [];
+  return source.map((raw): EventSeat => {
+    const seat = copySeat(raw as SeatMapSeat);
+    const value = raw as Partial<EventSeat>;
+    const status: SeatStatus = value.status === "sold" || value.status === "blocked" ? value.status : "available";
+    return {
+      ...seat,
+      tariffId: typeof value.tariffId === "string" ? value.tariffId : undefined,
+      tariffName: typeof value.tariffName === "string" ? value.tariffName : undefined,
+      price: Number.isFinite(Number(value.price)) ? Number(value.price) : undefined,
+      color: typeof value.color === "string" ? value.color : undefined,
+      status,
+    };
+  });
+}
+
+function normalizeSeatEventTiers(seats: EventSeat[], fallback: PriceTier[] = []): PriceTier[] {
+  const fallbackByName = new Map(normalizeTierRows(fallback, 0).map((tier) => [tier.name, tier]));
+  const tiers = new Map<string, PriceTier>();
+  seats.filter((seat) => seat.status !== "blocked" && seat.tariffName).forEach((seat) => {
+    const name = seat.tariffName || "Стандарт";
+    const existing = tiers.get(name);
+    const source = fallbackByName.get(name);
+    if (existing) {
+      existing.quantity += 1;
+    } else {
+      tiers.set(name, {
+        name,
+        price: Number.isFinite(seat.price) ? Number(seat.price) : source?.price || 0,
+        quantity: 1,
+        color: seat.color || source?.color || SEAT_TARIFF_COLORS[tiers.size % SEAT_TARIFF_COLORS.length],
+      });
+    }
+  });
+  return tiers.size > 0 ? Array.from(tiers.values()) : normalizeTierRows(fallback, 0);
+}
+
+export function ensureSeatMapState(state: AppState): void {
+  if (!Array.isArray(state.venueRegistry)) state.venueRegistry = [];
+  if (!Array.isArray(state.seatMapLayouts)) state.seatMapLayouts = [];
+  for (const layout of DEFAULT_SEAT_MAP_LAYOUTS) {
+    if (!state.seatMapLayouts.some((item) => item.layoutId === layout.layoutId)) {
+      state.seatMapLayouts.push({ ...layout, seats: layout.seats.map((seat) => ({ ...seat })) });
+    }
+  }
+  for (const venue of DEFAULT_VENUE_REGISTRY) {
+    const existing = state.venueRegistry.find((item) => item.venueId === venue.venueId || item.name === venue.name);
+    if (!existing) {
+      state.venueRegistry.push({ ...venue, halls: venue.halls.map((hall) => ({ ...hall })) });
+      continue;
+    }
+    existing.venueId ||= venue.venueId;
+    existing.name ||= venue.name;
+    existing.city ||= venue.city;
+    existing.region ||= venue.region;
+    existing.type ||= venue.type;
+    existing.address ||= venue.address;
+    existing.description ||= venue.description;
+    existing.capacity = Number.isFinite(existing.capacity) && existing.capacity > 0 ? existing.capacity : venue.capacity;
+    existing.status ||= "approved";
+    if (!Array.isArray(existing.halls) || existing.halls.length === 0) existing.halls = venue.halls.map((hall) => ({ ...hall }));
+  }
+}
+
+export function getSeatMapLayout(state: AppState, layoutId?: string): SeatMapLayout | null {
+  if (!layoutId) return null;
+  return state.seatMapLayouts.find((layout) => layout.layoutId === layoutId) || null;
+}
+
+export function getVenueRegistryRecord(state: AppState, venueId?: string): VenueRegistryRecord | null {
+  if (!venueId) return null;
+  return state.venueRegistry.find((venue) => venue.venueId === venueId) || null;
+}
+
+export function buildEventSeatsFromLayout(layout: SeatMapLayout, tiers: PriceTier[] = []): EventSeat[] {
+  const normalized = normalizeTierRows(tiers, 0);
+  return layout.seats.map((seat, index) => {
+    const tier = normalized[index % Math.max(1, normalized.length)] || normalized[0];
+    return {
+      ...copySeat(seat),
+      tariffId: tier?.name,
+      tariffName: tier?.name,
+      price: tier?.price,
+      color: tier?.color || SEAT_TARIFF_COLORS[index % SEAT_TARIFF_COLORS.length],
+      status: "available",
+    };
+  });
+}
+
+export function getEventSeatSummary(event: Pick<EventRecord, "eventSeats" | "tiers">): {
+  hasSeatMap: boolean;
+  total: number;
+  forSale: number;
+  available: number;
+  sold: number;
+  blocked: number;
+  revenue: number;
+  byTariff: PriceTier[];
+} {
+  const seats = normalizeEventSeats(event.eventSeats);
+  const soldSeats = seats.filter((seat) => seat.status === "sold");
+  return {
+    hasSeatMap: seats.length > 0,
+    total: seats.length,
+    forSale: seats.filter((seat) => seat.status !== "blocked").length,
+    available: seats.filter((seat) => seat.status === "available").length,
+    sold: soldSeats.length,
+    blocked: seats.filter((seat) => seat.status === "blocked").length,
+    revenue: soldSeats.reduce((sum, seat) => sum + (seat.price || 0), 0),
+    byTariff: normalizeSeatEventTiers(seats, event.tiers),
+  };
+}
+
+export function saveSeatMapLayout(state: AppState, layoutId: string, seats: SeatMapSeat[]): boolean {
+  const layout = state.seatMapLayouts.find((item) => item.layoutId === layoutId);
+  if (!layout) return false;
+  layout.seats = seats.map(copySeat);
+  layout.updatedAt = nowIso();
+  const venue = state.venueRegistry.find((item) => item.venueId === layout.venueId);
+  const hall = venue?.halls.find((item) => item.hallId === layout.hallId);
+  if (hall) {
+    hall.capacity = layout.seats.length;
+    hall.hasSeatMap = layout.seats.length > 0;
+  }
+  if (venue) venue.capacity = Math.max(...venue.halls.map((item) => item.capacity), layout.seats.length);
+  saveState(state);
+  return true;
+}
+
+export function updateEventSeatMap(state: AppState, eventId: string, seats: EventSeat[]): boolean {
+  const event = state.events.find((item) => item.eventId === eventId);
+  if (!event) return false;
+  event.eventSeats = normalizeEventSeats(seats);
+  event.tiers = normalizeSeatEventTiers(event.eventSeats, event.tiers);
+  event.capacity = event.eventSeats.filter((seat) => seat.status !== "blocked").length;
+  event.remaining = event.eventSeats.filter((seat) => seat.status === "available").length;
+  event.updatedAt = nowIso();
+  saveState(state);
+  return true;
+}
+
 function normalizeTierRows(rawTiers: unknown, fallbackTotal = 0): PriceTier[] {
   const source = Array.isArray(rawTiers) ? rawTiers : [];
   if (source.length === 0) {
@@ -695,11 +1027,18 @@ function normalizeTierRows(rawTiers: unknown, fallbackTotal = 0): PriceTier[] {
 }
 
 function normalizeComplianceTicketTiers(data: EventComplianceData): PriceTier[] {
+  const eventSeats = normalizeEventSeats(data.eventSeats);
+  if (eventSeats.length > 0) return normalizeSeatEventTiers(eventSeats, data.ticketTiers);
   const fallbackLegacy = data.plannedTicketsForSale && data.plannedTicketsForSale > 0 ? data.plannedTicketsForSale : 0;
   return normalizeTierRows((data as EventComplianceData & { ticketTiers?: PriceTier[] }).ticketTiers, fallbackLegacy);
 }
 
-function validateTicketTiers(tiers: PriceTier[]): boolean {
+function validateTicketTiers(tiers: PriceTier[], data?: EventComplianceData): boolean {
+  const eventSeats = normalizeEventSeats(data?.eventSeats);
+  if (eventSeats.length > 0) {
+    if (!data?.venueId || !data.hallId || !data.layoutId) return false;
+    return eventSeats.every((seat) => seat.status === "blocked" || Boolean(seat.tariffName?.trim()));
+  }
   if (!tiers.length) return false;
   if (sumTierQuantity(tiers) <= 0) return false;
   return tiers.every((tier) =>
@@ -754,6 +1093,10 @@ export function defaultEventComplianceData(): EventComplianceData {
     dateSlots: [""],
     venueName: "",
     venueAddress: "",
+    venueId: "",
+    hallId: "",
+    layoutId: "",
+    eventSeats: [],
     performers: [],
     onlyBelarusianPerformers: false,
     hasForeignPerformers: false,
@@ -910,9 +1253,10 @@ export function createEventComplianceApplication(
   submit: boolean
 ): EventComplianceApplicationRecord {
   const normalizedTiers = normalizeComplianceTicketTiers(data);
-  const canSubmit = !submit || validateTicketTiers(normalizedTiers);
+  const canSubmit = !submit || validateTicketTiers(normalizedTiers, data);
   const nextData: EventComplianceData = {
     ...data,
+    eventSeats: normalizeEventSeats(data.eventSeats),
     ticketTiers: normalizedTiers,
     plannedTicketsForSale: sumTierQuantity(normalizedTiers),
     salesChannels: normalizeSalesChannels(data.salesChannels, state),
@@ -949,9 +1293,10 @@ export function updateEventComplianceApplication(
   if (app.status === "approved" || app.status === "rejected") return false;
   if (app.status === "submitted" && !submit) return false;
   const normalizedTiers = normalizeComplianceTicketTiers(data);
-  if (submit && !validateTicketTiers(normalizedTiers)) return false;
+  if (submit && !validateTicketTiers(normalizedTiers, data)) return false;
   const nextData: EventComplianceData = {
     ...data,
+    eventSeats: normalizeEventSeats(data.eventSeats),
     ticketTiers: normalizedTiers,
     plannedTicketsForSale: sumTierQuantity(normalizedTiers),
     salesChannels: normalizeSalesChannels(data.salesChannels, state),
@@ -981,7 +1326,7 @@ export function setEventComplianceReview(
   if ((payload.decision === "rejected" || payload.decision === "needs_rework") && !comment) return false;
   if (payload.decision === "approved") {
     const normalizedTiers = normalizeComplianceTicketTiers(app.data);
-    if (!validateTicketTiers(normalizedTiers)) return false;
+    if (!validateTicketTiers(normalizedTiers, app.data)) return false;
   }
 
   app.status = payload.decision;
@@ -998,7 +1343,8 @@ export function setEventComplianceReview(
     const existing = app.linkedEventId ? state.events.find((event) => event.eventId === app.linkedEventId) : null;
     const dateTime = app.data.dateSlots.find(Boolean) || "";
     const normalizedTiers = normalizeComplianceTicketTiers(app.data);
-    const capacity = sumTierQuantity(normalizedTiers);
+    const eventSeats = normalizeEventSeats(app.data.eventSeats);
+    const capacity = eventSeats.length > 0 ? eventSeats.filter((seat) => seat.status !== "blocked").length : sumTierQuantity(normalizedTiers);
     const posterPath = app.data.posterPath || existing?.poster || "";
     const salesChannels = normalizeSalesChannels(app.data.salesChannels, state);
     app.data.salesChannels = salesChannels;
@@ -1030,13 +1376,17 @@ export function setEventComplianceReview(
     nextEvent.dateTime = dateTime;
     nextEvent.capacity = capacity;
     nextEvent.tiers = normalizedTiers;
+    nextEvent.venueId = app.data.venueId || undefined;
+    nextEvent.hallId = app.data.hallId || undefined;
+    nextEvent.layoutId = app.data.layoutId || undefined;
+    nextEvent.eventSeats = eventSeats;
     nextEvent.city = "";
     nextEvent.category = app.data.eventType || "Иное";
     nextEvent.description = app.data.shortDescription;
     nextEvent.poster = posterPath;
     nextEvent.salesChannels = salesChannels;
     nextEvent.status = existing?.status || "approved";
-    nextEvent.remaining = existing ? state.tickets.filter((ticket) => ticket.eventId === existing.eventId && ticket.status === "issued").length : 0;
+    nextEvent.remaining = existing ? state.tickets.filter((ticket) => ticket.eventId === existing.eventId && ticket.status === "issued").length : eventSeats.filter((seat) => seat.status === "available").length;
     nextEvent.updatedAt = now;
     if (!existing) {
       state.events.push(nextEvent);
@@ -1151,6 +1501,38 @@ export function issueMarks(state: AppState, eventId: string): number {
   if (!evt || evt.status !== "published") return 0;
   const existing = state.tickets.filter((t) => t.eventId === eventId);
   if (existing.length > 0) return 0;
+  const eventSeats = normalizeEventSeats(evt.eventSeats);
+  if (eventSeats.length > 0) {
+    const now = new Date().toISOString();
+    const sellableSeats = eventSeats.filter((seat) => seat.status !== "blocked" && seat.tariffName);
+    for (const seat of sellableSeats) {
+      const status: TicketStatus = seat.status === "sold" ? "sold" : "issued";
+      const ticket: Ticket = {
+        ticketId: nextId(state, "tck", "TCK"),
+        eventId,
+        tier: seat.tariffName || "Стандарт",
+        status,
+        seatId: seat.seatId,
+        seatLabel: seat.label,
+        row: seat.row,
+        seatNumber: seat.number,
+        createdAt: now,
+        updatedAt: now,
+      };
+      if (status === "sold") {
+        ticket.soldByChannel = "B2C";
+        ticket.soldToUserId = state.users[0]?.userId;
+      }
+      state.tickets.push(ticket);
+    }
+    recalcRemaining(state, eventId);
+    evt.capacity = sellableSeats.length;
+    evt.tiers = normalizeSeatEventTiers(eventSeats, evt.tiers);
+    evt.eventSeats = eventSeats;
+    evt.updatedAt = now;
+    saveState(state);
+    return sellableSeats.length;
+  }
   const tiers = normalizeTierRows(evt.tiers, evt.capacity).filter((tier) => tier.quantity > 0);
   const totalToIssue = sumTierQuantity(tiers);
   if (totalToIssue <= 0) return 0;
@@ -1173,6 +1555,44 @@ export function issueMarks(state: AppState, eventId: string): number {
   evt.updatedAt = now;
   saveState(state);
   return totalToIssue;
+}
+
+export function sellSeat(state: AppState, eventId: string, seatId: string, channel: string, userId?: string): OpOutcome {
+  const event = state.events.find((item) => item.eventId === eventId && item.status === "published");
+  const seat = event?.eventSeats?.find((item) => item.seatId === seatId);
+  if (!event || !seat || seat.status !== "available" || !seat.tariffName) {
+    const op = addOp(state, { type: "sell", eventId, channel, result: "error", reason: "Место недоступно" });
+    saveState(state);
+    return { ok: false, reason: "Место недоступно", op };
+  }
+  let ticket = state.tickets.find((item) => item.eventId === eventId && item.seatId === seatId && item.status === "issued");
+  const now = new Date().toISOString();
+  if (!ticket) {
+    ticket = {
+      ticketId: nextId(state, "tck", "TCK"),
+      eventId,
+      tier: seat.tariffName,
+      status: "issued",
+      seatId: seat.seatId,
+      seatLabel: seat.label,
+      row: seat.row,
+      seatNumber: seat.number,
+      createdAt: now,
+      updatedAt: now,
+    };
+    state.tickets.push(ticket);
+  }
+  seat.status = "sold";
+  ticket.status = "sold";
+  ticket.tier = seat.tariffName;
+  ticket.soldByChannel = channel;
+  ticket.soldToUserId = userId || undefined;
+  ticket.updatedAt = now;
+  const op = addOp(state, { type: "sell", ticketId: ticket.ticketId, eventId, channel, result: "ok" });
+  recalcRemaining(state, eventId);
+  event.updatedAt = now;
+  saveState(state);
+  return { ok: true, ticketId: ticket.ticketId, status: ticket.status, op };
 }
 
 export function setResellerStatus(state: AppState, resellerId: string, status: ResellerStatus): boolean {
@@ -1464,10 +1884,38 @@ export function verify(state: AppState, ticketId: string, channel: string): OpOu
 
 export function createDemoPurchaseTicket(
   state: AppState,
-  data: { eventId: string; selectedPriceCategory: string; quantity: number; buyerName: string }
+  data: { eventId: string; selectedPriceCategory: string; quantity: number; buyerName: string; seatId?: string }
 ): DemoPurchaseTicket | null {
   const event = state.events.find((e) => e.eventId === data.eventId && e.status === "published");
   if (!event) return null;
+  if (data.seatId) {
+    const outcome = sellSeat(state, data.eventId, data.seatId, "B2C", state.users[0]?.userId);
+    if (!outcome.ok || !outcome.ticketId) return null;
+    const seat = event.eventSeats?.find((item) => item.seatId === data.seatId);
+    const [date = "", timeRaw = ""] = event.dateTime.split("T");
+    const now = new Date().toISOString();
+    const record: DemoPurchaseTicket = {
+      ticketId: outcome.ticketId,
+      eventId: event.eventId,
+      eventTitle: event.title,
+      date,
+      time: timeRaw ? timeRaw.slice(0, 5) : "",
+      city: event.city || "",
+      venue: event.venue,
+      buyerName: data.buyerName.trim(),
+      selectedPriceCategory: seat?.tariffName || data.selectedPriceCategory,
+      quantity: 1,
+      seatId: seat?.seatId,
+      seatLabel: seat?.label,
+      row: seat?.row,
+      seatNumber: seat?.number,
+      purchasedAt: now,
+      status: "confirmed",
+    };
+    state.demoPurchases.push(record);
+    saveState(state);
+    return record;
+  }
   const safeQty = Math.max(1, Math.min(6, Math.floor(data.quantity)));
   const availableIssued = state.tickets.filter(
     (ticket) => ticket.eventId === data.eventId && ticket.tier === data.selectedPriceCategory && ticket.status === "issued"
@@ -1496,6 +1944,10 @@ export function createDemoPurchaseTicket(
     buyerName,
     selectedPriceCategory: data.selectedPriceCategory,
     quantity: 1,
+    seatId: state.tickets.find((ticket) => ticket.ticketId === ticketId)?.seatId,
+    seatLabel: state.tickets.find((ticket) => ticket.ticketId === ticketId)?.seatLabel,
+    row: state.tickets.find((ticket) => ticket.ticketId === ticketId)?.row,
+    seatNumber: state.tickets.find((ticket) => ticket.ticketId === ticketId)?.seatNumber,
     purchasedAt: now,
     status: "confirmed",
   }));
