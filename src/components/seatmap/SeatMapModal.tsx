@@ -161,6 +161,7 @@ export default function SeatMapModal({
     },
     { available: 0, sold: 0, blocked: 0 } as Record<SeatStatus, number>,
   );
+  const buyerMode = mode === "buyer";
 
   return (
     <div className="fixed inset-0 z-[80] bg-slate-950/70 p-3 backdrop-blur-sm sm:p-5">
@@ -243,19 +244,27 @@ export default function SeatMapModal({
             </div>
           </aside>
 
-          <main className="min-h-0 overflow-auto bg-slate-50 p-4">
-            <div className="mb-3 flex items-center justify-end gap-2">
-              <button onClick={() => setZoom((value) => Math.max(0.7, value - 0.1))} className="flex h-9 w-9 items-center justify-center rounded-lg border bg-white"><Minus size={16} /></button>
-              <span className="w-14 text-center text-sm text-slate-600">{Math.round(zoom * 100)}%</span>
-              <button onClick={() => setZoom((value) => Math.min(1.8, value + 0.1))} className="flex h-9 w-9 items-center justify-center rounded-lg border bg-white"><Plus size={16} /></button>
-            </div>
-            <div className="min-w-max rounded-xl border bg-white px-6 pb-7 pt-5" style={{ transform: `scale(${zoom})`, transformOrigin: "top left", borderColor: "rgba(15,23,42,0.12)" }}>
+          <main className={buyerMode ? "min-h-0 overflow-hidden bg-slate-50 p-3 sm:p-4" : "min-h-0 overflow-auto bg-slate-50 p-4"}>
+            {!buyerMode && (
+              <div className="mb-3 flex items-center justify-end gap-2">
+                <button onClick={() => setZoom((value) => Math.max(0.7, value - 0.1))} className="flex h-9 w-9 items-center justify-center rounded-lg border bg-white"><Minus size={16} /></button>
+                <span className="w-14 text-center text-sm text-slate-600">{Math.round(zoom * 100)}%</span>
+                <button onClick={() => setZoom((value) => Math.min(1.8, value + 0.1))} className="flex h-9 w-9 items-center justify-center rounded-lg border bg-white"><Plus size={16} /></button>
+              </div>
+            )}
+            <div
+              className={buyerMode ? "h-full w-full rounded-xl border bg-white px-3 pb-5 pt-4 sm:px-5 sm:pb-7 sm:pt-5" : "min-w-max rounded-xl border bg-white px-6 pb-7 pt-5"}
+              style={{ transform: buyerMode ? undefined : `scale(${zoom})`, transformOrigin: "top left", borderColor: "rgba(15,23,42,0.12)" }}
+            >
               <div className="mx-auto mb-7 h-8 max-w-[72%] rounded-b-[48px] border border-slate-300 bg-slate-100 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shadow-inner">
                 <span className="relative top-2">Сцена</span>
               </div>
               <div
-                className="grid justify-center gap-x-2.5 gap-y-3"
-                style={{ gridTemplateColumns: `repeat(${maxX}, 42px)`, gridTemplateRows: `repeat(${maxY}, 44px)` }}
+                className={buyerMode ? "grid w-full justify-center gap-x-1 gap-y-2 sm:gap-x-2.5 sm:gap-y-3" : "grid justify-center gap-x-2.5 gap-y-3"}
+                style={{
+                  gridTemplateColumns: buyerMode ? `repeat(${maxX}, minmax(0, 1fr))` : `repeat(${maxX}, 42px)`,
+                  gridTemplateRows: buyerMode ? `repeat(${maxY}, minmax(30px, 44px))` : `repeat(${maxY}, 44px)`,
+                }}
               >
                 {seats.map((seat) => {
                   const eventSeat = workingSeats.find((item) => item.seatId === seat.seatId) || seat as EventSeat;
@@ -270,7 +279,9 @@ export default function SeatMapModal({
                       disabled={disabled}
                       onClick={() => toggleSeat(seat.seatId)}
                       title={seatTooltip(eventSeat)}
-                      className="relative flex h-9 w-10 items-center justify-center rounded-t-[18px] rounded-b-lg border text-[10px] font-semibold shadow-sm outline-none ring-offset-2 transition before:absolute before:inset-x-1.5 before:bottom-1 before:h-1 before:rounded-full before:bg-white/30 hover:-translate-y-0.5 hover:border-amber-400 hover:ring-2 hover:ring-amber-200 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-70"
+                      className={buyerMode
+                        ? "relative flex aspect-[10/9] w-full max-w-10 items-center justify-center justify-self-center rounded-b-lg rounded-t-[18px] border text-[0px] font-semibold shadow-sm outline-none ring-offset-2 transition before:absolute before:inset-x-[18%] before:bottom-[14%] before:h-[10%] before:rounded-full before:bg-white/30 hover:-translate-y-0.5 hover:border-amber-400 hover:ring-2 hover:ring-amber-200 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-70 sm:text-[10px]"
+                        : "relative flex h-9 w-10 items-center justify-center rounded-b-lg rounded-t-[18px] border text-[10px] font-semibold shadow-sm outline-none ring-offset-2 transition before:absolute before:inset-x-1.5 before:bottom-1 before:h-1 before:rounded-full before:bg-white/30 hover:-translate-y-0.5 hover:border-amber-400 hover:ring-2 hover:ring-amber-200 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-70"}
                       style={{
                         gridColumn: `${seat.x + 1} / span ${seat.w || 1}`,
                         gridRow: `${seat.y + 1} / span ${seat.h || 1}`,
