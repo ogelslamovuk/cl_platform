@@ -9,6 +9,9 @@ type Props = {
   title?: string;
   variant?: Variant;
   className?: string;
+  selectable?: boolean;
+  selectedSeatId?: string | null;
+  onSelectSeat?: (seat: EventSeat) => void;
 };
 
 const statusLabel: Record<SeatStatus, string> = {
@@ -27,21 +30,22 @@ function getCounts(seats: EventSeat[]): Record<SeatStatus, number> {
   );
 }
 
-function seatFill(seat: EventSeat): string {
-  if (seat.status === "sold") return "#CBD5E1";
-  if (seat.status === "blocked") return "#E2E8F0";
-  return seat.color || "#2563EB";
+function seatFill(seat: EventSeat, selected: boolean, isDark: boolean): string {
+  if (selected) return "#2563EB";
+  if (seat.status === "sold" || seat.status === "blocked") return isDark ? "rgba(100, 116, 139, 0.78)" : "#CBD5E1";
+  return isDark ? "rgba(248, 250, 252, 0.96)" : "#FFFFFF";
 }
 
-function seatBorder(seat: EventSeat): string {
-  if (seat.status === "sold") return "#94A3B8";
-  if (seat.status === "blocked") return "#CBD5E1";
-  return seat.color || "#1D4ED8";
+function seatBorder(seat: EventSeat, selected: boolean, isDark: boolean): string {
+  if (selected) return "#1D4ED8";
+  if (seat.status === "sold" || seat.status === "blocked") return isDark ? "rgba(148, 163, 184, 0.70)" : "#94A3B8";
+  return isDark ? "rgba(226, 232, 240, 0.95)" : "#CBD5E1";
 }
 
-function seatText(seat: EventSeat): string {
-  if (seat.status === "available") return "#FFFFFF";
-  return "#64748B";
+function seatText(seat: EventSeat, selected: boolean): string {
+  if (selected) return "#FFFFFF";
+  if (seat.status === "sold" || seat.status === "blocked") return "#475569";
+  return "#0F172A";
 }
 
 function seatTooltip(seat: EventSeat): string {
@@ -49,7 +53,16 @@ function seatTooltip(seat: EventSeat): string {
   return `Место ${seat.label} · ряд ${seat.row}, место ${seat.number} · ${tariff}`;
 }
 
-export default function SeatMapPreview({ eventSeats = [], tiers = [], title = "Схема зала", variant = "light", className = "" }: Props) {
+export default function SeatMapPreview({
+  eventSeats = [],
+  tiers = [],
+  title = "Схема зала",
+  variant = "light",
+  className = "",
+  selectable = false,
+  selectedSeatId = null,
+  onSelectSeat,
+}: Props) {
   const seats = useMemo(() => eventSeats.filter(Boolean), [eventSeats]);
   const counts = useMemo(() => getCounts(seats), [seats]);
   const maxX = Math.max(1, ...seats.map((seat) => seat.x + (seat.w || 1)));
@@ -76,9 +89,9 @@ export default function SeatMapPreview({ eventSeats = [], tiers = [], title = "�
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5 text-[11px]" style={{ color: mutedColor }}>
-          <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-blue-600" />Доступно</span>
-          <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-slate-300 ring-1 ring-slate-400" />Продано</span>
-          {counts.blocked > 0 && <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-slate-200 ring-1 ring-slate-300" />Блок</span>}
+          <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm border bg-white" style={{ borderColor: isDark ? "rgba(226,232,240,0.95)" : "#CBD5E1" }} />Свободно</span>
+          <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-slate-300 ring-1 ring-slate-400" />Занято</span>
+          {selectable && <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-blue-600" />Выбрано</span>}
         </div>
       </div>
 
@@ -96,21 +109,26 @@ export default function SeatMapPreview({ eventSeats = [], tiers = [], title = "�
         >
           {seats.map((seat) => {
             const tooltip = seatTooltip(seat);
+            const selected = selectedSeatId === seat.seatId;
+            const canSelect = selectable && seat.status === "available";
             return (
               <button
                 key={seat.seatId}
                 type="button"
                 title={tooltip}
                 aria-label={`${tooltip} · ${statusLabel[seat.status || "available"]}`}
+                aria-pressed={selected || undefined}
+                onClick={() => canSelect && onSelectSeat?.(seat)}
                 data-seat-map-preview-seat={seat.seatId}
                 data-seat-status={seat.status || "available"}
-                className="group/seat relative flex h-7 w-7 items-center justify-center rounded-b-md rounded-t-[14px] border text-[8px] font-semibold shadow-sm outline-none transition hover:-translate-y-0.5 hover:border-amber-400 hover:ring-2 hover:ring-amber-200 focus-visible:ring-2"
+                data-seat-selected={selected || undefined}
+                className={`group/seat relative flex h-7 w-7 items-center justify-center rounded-b-md rounded-t-[14px] border text-[8px] font-semibold shadow-sm outline-none transition hover:-translate-y-0.5 hover:border-blue-400 hover:ring-2 hover:ring-blue-100 focus-visible:ring-2 ${canSelect ? "cursor-pointer" : "cursor-default"}`}
                 style={{
                   gridColumn: `${seat.x + 1} / span ${seat.w || 1}`,
                   gridRow: `${seat.y + 1} / span ${seat.h || 1}`,
-                  background: seatFill(seat),
-                  borderColor: seatBorder(seat),
-                  color: seatText(seat),
+                  background: seatFill(seat, selected, isDark),
+                  borderColor: seatBorder(seat, selected, isDark),
+                  color: seatText(seat, selected),
                 }}
               >
                 <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-max max-w-[220px] -translate-x-1/2 rounded-lg bg-slate-950 px-2 py-1 text-[11px] font-medium leading-4 text-white shadow-lg group-hover/seat:block group-focus-visible/seat:block">
@@ -126,8 +144,7 @@ export default function SeatMapPreview({ eventSeats = [], tiers = [], title = "�
       {tiers.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2 text-[11px]" style={{ color: mutedColor }}>
           {tiers.map((tier, index) => (
-            <span key={`${tier.name}-${index}`} className="inline-flex items-center gap-1.5">
-              <i className="h-2.5 w-2.5 rounded-sm border border-slate-300" style={{ background: tier.color || "#2563EB" }} />
+            <span key={`${tier.name}-${index}`} className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1" style={{ borderColor: isDark ? "rgba(148, 163, 184, 0.28)" : "rgba(15, 23, 42, 0.12)" }}>
               {tier.name} · {tier.price} BYN
             </span>
           ))}
