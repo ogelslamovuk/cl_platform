@@ -146,7 +146,13 @@ export default function B2CView({ state, onUpdate }: Props) {
         category: CATEGORY_WHITELIST.includes(event.category as (typeof CATEGORY_WHITELIST)[number]) ? event.category : "Концерты",
         description: event.description || "Описание события появится позже.",
         poster: event.poster || "",
-      }));
+      }))
+      .sort((a, b) => {
+        const aHasSeatMap = Boolean(a.eventSeats?.length);
+        const bHasSeatMap = Boolean(b.eventSeats?.length);
+        if (aHasSeatMap !== bHasSeatMap) return aHasSeatMap ? -1 : 1;
+        return a.dateTime.localeCompare(b.dateTime);
+      });
   }, [state.events, state.tickets]);
 
   const filteredEvents = useMemo(() => {
