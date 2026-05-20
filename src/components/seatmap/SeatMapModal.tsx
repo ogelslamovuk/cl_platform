@@ -45,22 +45,21 @@ function toEventSeats(baseSeats: SeatMapSeat[], eventSeats: EventSeat[], tiers: 
 }
 
 function seatColor(seat: EventSeat, selected: boolean): string {
-  if (selected) return "#16A34A";
-  if (seat.status === "sold") return "#CBD5E1";
-  if (seat.status === "blocked") return "#E2E8F0";
-  return "#2563EB";
+  if (selected) return "#2563EB";
+  if (seat.status === "sold" || seat.status === "blocked") return "#CBD5E1";
+  return "#FFFFFF";
 }
 
 function seatTextColor(seat: EventSeat, selected: boolean): string {
-  if (selected || seat.status === "available") return "#FFFFFF";
-  return "#64748B";
+  if (selected) return "#FFFFFF";
+  if (seat.status === "sold" || seat.status === "blocked") return "#475569";
+  return "#0F172A";
 }
 
 function seatBorderColor(seat: EventSeat, selected: boolean): string {
-  if (selected) return "#15803D";
-  if (seat.status === "sold") return "#94A3B8";
-  if (seat.status === "blocked") return "#CBD5E1";
-  return "#1D4ED8";
+  if (selected) return "#1D4ED8";
+  if (seat.status === "sold" || seat.status === "blocked") return "#94A3B8";
+  return "#CBD5E1";
 }
 
 function seatTooltip(seat: EventSeat): string {
