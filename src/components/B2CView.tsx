@@ -249,7 +249,8 @@ export default function B2CView({ state, onUpdate }: Props) {
         }}
       >
         <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
-          <img src={resolvePublicAsset(event.poster)} alt={event.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" />
+          <img src={resolvePublicAsset(event.poster)} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-xl transition duration-300 group-hover:scale-[1.15]" />
+          <img src={resolvePublicAsset(event.poster)} alt={event.title} className="relative z-[1] h-full w-full object-contain p-1 transition duration-300 group-hover:scale-[1.02]" />
         </div>
 
         <div className="flex flex-1 flex-col p-4 sm:p-5">
@@ -270,6 +271,11 @@ export default function B2CView({ state, onUpdate }: Props) {
               <span className="w-fit rounded-full border px-2.5 py-1 text-xs font-semibold" style={{ borderColor: D.borderSoft, background: D.accentSoft, color: D.accentText }}>
                 {event.category}
               </span>
+              {event.eventSeats?.length ? (
+                <span className="w-fit rounded-full border px-2.5 py-1 text-xs font-semibold" style={{ borderColor: "rgba(4,120,87,0.18)", background: D.successSoft, color: D.success }}>
+                  Выбор мест
+                </span>
+              ) : null}
             </div>
           </div>
 
@@ -579,8 +585,9 @@ export default function B2CView({ state, onUpdate }: Props) {
               </button>
 
               <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)]">
-                <div className="relative min-h-[260px] bg-slate-100 lg:min-h-full">
-                  <img src={resolvePublicAsset(detailsEvent.poster)} alt={detailsEvent.title} className="absolute inset-0 h-full w-full object-cover" />
+                <div className="relative min-h-[320px] bg-slate-100 lg:min-h-full">
+                  <img src={resolvePublicAsset(detailsEvent.poster)} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-2xl" />
+                  <img src={resolvePublicAsset(detailsEvent.poster)} alt={detailsEvent.title} className="absolute inset-0 h-full w-full object-contain p-5" />
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/70 to-transparent p-5 text-white">
                     <div className="flex flex-wrap gap-2">
                       <span className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur">

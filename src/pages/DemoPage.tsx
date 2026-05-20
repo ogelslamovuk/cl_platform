@@ -1,10 +1,20 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import B2CView from "@/components/B2CView";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { runDemoScenario } from "@/lib/demoEngine";
 
 export default function DemoPage() {
-  const { state, update } = useStorageSync();
+  const { state, update, setState } = useStorageSync();
+  const seededEmptyState = useRef(false);
+
+  useEffect(() => {
+    if (seededEmptyState.current) return;
+    if (state.events.length || state.tickets.length || state.applications.length) return;
+
+    seededEmptyState.current = true;
+    setState({ ...runDemoScenario() });
+  }, [setState, state.applications.length, state.events.length, state.tickets.length]);
 
   return (
     <div
