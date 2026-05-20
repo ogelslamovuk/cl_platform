@@ -1,17 +1,17 @@
 import React, { useMemo, useState } from "react";
 import type { AppState, EventRecord } from "@/lib/store";
-import { getEventSalesChannels, getSalesChannelLabel, issueMarks, publishEvent } from "@/lib/store";
+import { getEventSalesChannels, getSalesChannelLabel, getEventSeatSummary, issueMarks, publishEvent } from "@/lib/store";
+import { formatDisplayId, getEventStatusLabel, getTicketStatusLabel } from "@/lib/display";
 import { A, statusChip } from "./adminStyles";
 import { Calendar, Globe, Search, Ticket, X } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import { toast } from "sonner";
+import SeatMapModal from "@/components/seatmap/SeatMapModal";
 
 interface Props {
   state: AppState;
   onUpdate: (s: AppState) => void;
 }
-
-const evtStatusLabel: Record<string, string> = { approved: "Одобрено", published: "Опубликовано" };
 
 function CardHelp({ text }: { text: string }) {
   return (
@@ -24,6 +24,7 @@ function CardHelp({ text }: { text: string }) {
 export default function AdminRegistryEvents({ state, onUpdate }: Props) {
   const [search, setSearch] = useState("");
   const [drawer, setDrawer] = useState<EventRecord | null>(null);
+  const [schemeEvent, setSchemeEvent] = useState<EventRecord | null>(null);
   const [confirmIssue, setConfirmIssue] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -63,7 +64,7 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
   const handlePublish = (eventId: string) => {
     const ok = publishEvent(state, eventId);
     if (!ok) {
-      toast.error("Публикация доступна только для approved события");
+      toast.error("Публикация доступна только для одобренного мероприятия");
       return;
     }
     toast.success(`Мероприятие ${eventId} опубликовано`);
@@ -104,22 +105,18 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
             <p style={{ color: A.textMuted }} className="text-sm">Нет мероприятий в реестре</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-hidden">
+            <table className="w-full table-fixed text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
                   {[
-                    "EventID",
+                    "ID",
                     "Название",
                     "Организатор",
                     "Дата",
-                    "Возраст",
                     "Площадка",
-                    "Вместимость",
                     "Остаток",
                     "Статус",
-                    "№ удостоверения",
-                    "Дата удостоверения",
                     "Действия",
                   ].map((h) => (
                     <th key={h} className="text-left py-3 px-4 font-medium text-xs" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
@@ -131,7 +128,6 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
               <tbody>
                 {filtered.map((event) => {
                   const chip = event.status === "published" ? statusChip("ok") : statusChip("info");
-                  const compliance = complianceByEventId.get(event.eventId);
                   return (
                     <tr
                       key={event.eventId}
@@ -141,21 +137,17 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
                       onMouseEnter={(ev) => (ev.currentTarget.style.background = A.rowHover)}
                       onMouseLeave={(ev) => (ev.currentTarget.style.background = "transparent")}
                     >
-                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.cyan }}>{event.eventId}</td>
-                      <td className="py-3 px-4" style={{ color: A.textPrimary }}>{event.title}</td>
-                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{organizerNameById.get(event.organizerId) || event.organizerId}</td>
-                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{event.dateTime?.replace("T", " ").slice(0, 16) || "—"}</td>
-                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{compliance?.data.ageCategory || "—"}</td>
-                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{event.venue}</td>
-                      <td className="py-3 px-4" style={{ color: A.textPrimary }}>{event.capacity}</td>
+                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.cyan }}>{formatDisplayId(event.eventId)}</td>
+                      <td className="py-3 px-4 truncate" style={{ color: A.textPrimary }}>{event.title}</td>
+                      <td className="py-3 px-4 truncate" style={{ color: A.textSecondary }}>{organizerNameById.get(event.organizerId) || formatDisplayId(event.organizerId)}</td>
+                      <td className="py-3 px-4 text-xs" style={{ color: A.textSecondary }}>{event.dateTime?.replace("T", " ").slice(0, 16) || "—"}</td>
+                      <td className="py-3 px-4 truncate" style={{ color: A.textSecondary }}>{event.venue}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{event.remaining}</td>
                       <td className="py-3 px-4">
                         <span style={{ background: chip.bg, color: chip.color, borderRadius: 999 }} className="text-xs px-2.5 py-0.5 font-medium">
-                          {evtStatusLabel[event.status]}
+                          {getEventStatusLabel(event.status)}
                         </span>
                       </td>
-                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.textPrimary }}>{compliance?.certificateNumber || "—"}</td>
-                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{compliance?.certificateDate || "—"}</td>
                       <td className="py-3 px-4 space-x-2" onClick={(ev) => ev.stopPropagation()}>
                         {event.status === "approved" && (
                           <button type="button" onClick={() => handlePublish(event.eventId)} className="rounded-lg px-2.5 py-1 text-xs font-medium" style={{ background: A.statusInfoBg, color: A.statusInfo }}>
@@ -186,7 +178,7 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 z-10 flex items-center justify-between p-5" style={{ background: A.topbarBg, backdropFilter: "blur(16px)", borderBottom: `1px solid ${A.border}` }}>
-              <h3 style={{ color: A.textPrimary }} className="text-base font-semibold">Мероприятие {drawer.eventId}</h3>
+              <h3 style={{ color: A.textPrimary }} className="text-base font-semibold">Мероприятие {formatDisplayId(drawer.eventId)}</h3>
               <button onClick={() => setDrawer(null)} style={{ color: A.textMuted }}><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
@@ -197,17 +189,17 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
                   <>
                     {([
                       ["Название", drawer.title],
-                      ["Организатор", organizerNameById.get(drawer.organizerId) || drawer.organizerId],
+                      ["Организатор", organizerNameById.get(drawer.organizerId) || formatDisplayId(drawer.organizerId)],
                       ["Площадка", drawer.venue],
                       ["Дата", drawer.dateTime?.replace("T", " ") || "—"],
                       ["Возрастная категория", compliance?.data.ageCategory || "—"],
                       ["Вместимость", String(drawer.capacity)],
                       ["Остаток", String(drawer.remaining)],
-                      ["Статус", evtStatusLabel[drawer.status] || drawer.status],
+                      ["Статус", getEventStatusLabel(drawer.status)],
                       ["Номер удостоверения", compliance?.certificateNumber || "—"],
                       ["Дата удостоверения", compliance?.certificateDate || "—"],
                       ["Каналы продаж", salesChannels.join(", ")],
-                      ["Заявка на согласование", drawer.complianceApplicationId || compliance?.eventComplianceApplicationId || "—"],
+                      ["Заявка на согласование", formatDisplayId(drawer.complianceApplicationId || compliance?.eventComplianceApplicationId)],
                     ] as [string, string][]).map(([k, v]) => (
                       <div key={k}>
                         <div style={{ color: A.textMuted }} className="text-xs font-medium mb-1">{k}</div>
@@ -228,6 +220,42 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
                         })}
                       </div>
                     </div>
+                    <div>
+                      <div style={{ color: A.textMuted }} className="text-xs font-medium mb-2">Билеты по статусу</div>
+                      {(() => {
+                        const counts = state.tickets
+                          .filter((ticket) => ticket.eventId === drawer.eventId)
+                          .reduce<Record<string, number>>((acc, ticket) => {
+                            acc[ticket.status] = (acc[ticket.status] || 0) + 1;
+                            return acc;
+                          }, {});
+                        const entries = ["issued", "sold", "redeemed", "refunded"].map((status) => [status, counts[status] || 0] as const);
+                        return (
+                          <div className="grid grid-cols-2 gap-2">
+                            {entries.map(([status, count]) => (
+                              <div key={status} className="rounded-lg px-2 py-1.5 text-xs" style={{ background: A.surfaceBg, color: A.textSecondary }}>
+                                <span style={{ color: A.textPrimary }} className="mr-1 font-semibold">{count}</span>{getTicketStatusLabel(status)}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    {getEventSeatSummary(drawer).hasSeatMap && (() => {
+                      const summary = getEventSeatSummary(drawer);
+                      return (
+                        <div className="rounded-lg border p-3" style={{ borderColor: A.border, background: A.surfaceBg }}>
+                          <div className="mb-2 text-sm font-semibold" style={{ color: A.textPrimary }}>Схема зала</div>
+                          <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: A.textSecondary }}>
+                            <span>Всего: {summary.total}</span>
+                            <span>Доступно: {summary.available}</span>
+                            <span>Продано: {summary.sold}</span>
+                            <span>Блок: {summary.blocked}</span>
+                          </div>
+                          <button onClick={() => setSchemeEvent(drawer)} className="mt-3 rounded px-3 py-2 text-sm font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>Открыть схему</button>
+                        </div>
+                      );
+                    })()}
                   </>
                 );
               })()}
@@ -260,6 +288,15 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
           </div>
         );
       })()}
+      <SeatMapModal
+        open={Boolean(schemeEvent)}
+        title="Схема зала"
+        subtitle={schemeEvent?.title}
+        mode="viewer"
+        eventSeats={schemeEvent?.eventSeats || []}
+        tiers={schemeEvent?.tiers || []}
+        onClose={() => setSchemeEvent(null)}
+      />
     </div>
   );
 }

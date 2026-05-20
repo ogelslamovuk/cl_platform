@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import type { AppState, EventRecord, EventSeat } from "@/lib/store";
 import { createDemoPurchaseTicket, getTicketRefundBlockReason, refund } from "@/lib/store";
+import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import { toast } from "sonner";
 import { Search, MapPin, Tag, Ticket, X, ChevronRight, Sparkles, TrendingUp, Star, User, Calendar, CheckCircle2 } from "lucide-react";
 import platformLogo from "../../logo.jpg";
@@ -31,6 +32,9 @@ function getPriceFrom(event: DemoEvent): number | null {
 }
 
 function getAvailability(state: AppState, event: DemoEvent): "Available" | "Sold out" {
+  if (event.eventSeats?.length) {
+    return event.eventSeats.some((seat) => seat.status === "available") ? "Available" : "Sold out";
+  }
   if (!event.tiers.length) return "Available";
   const soldOut = event.tiers.every((tier) => {
     return getTierIssuedCount(state, event.eventId, tier.name) === 0;
@@ -44,6 +48,13 @@ function getTierIssuedCount(state: AppState, eventId: string, tierName: string):
 
 function getEventIssuedCount(state: AppState, eventId: string): number {
   return state.tickets.filter((ticket) => ticket.eventId === eventId && ticket.status === "issued").length;
+}
+
+function getEventAvailableCount(state: AppState, event: DemoEvent): number {
+  if (event.eventSeats?.length) {
+    return event.eventSeats.filter((seat) => seat.status === "available").length;
+  }
+  return getEventIssuedCount(state, event.eventId);
 }
 
 function getEventAgeCategory(state: AppState, event: EventRecord): AgeCategory | null {
@@ -110,91 +121,6 @@ const D = {
   radius: "12px",
 };
 
-function seatPickerColor(seat: EventSeat, selected: boolean): string {
-  if (selected) return D.text;
-  if (seat.status === "sold") return "#A8B2C1";
-  if (seat.status === "blocked") return "#F59E0B";
-  return D.accent;
-}
-
-function B2CSeatPicker({
-  seats,
-  selectedSeat,
-  onSelect,
-}: {
-  seats: EventSeat[];
-  selectedSeat: EventSeat | null;
-  onSelect: (seat: EventSeat) => void;
-}) {
-  const maxX = Math.max(1, ...seats.map((seat) => seat.x + (seat.w || 1)));
-  const maxY = Math.max(1, ...seats.map((seat) => seat.y + (seat.h || 1)));
-  const counts = seats.reduce(
-    (acc, seat) => {
-      acc[seat.status] += 1;
-      return acc;
-    },
-    { available: 0, sold: 0, blocked: 0 } as Record<EventSeat["status"], number>,
-  );
-  const selectedLabel = selectedSeat
-    ? selectedSeat.label + " · " + selectedSeat.tariffName + " · " + (selectedSeat.price || 0) + " BYN"
-    : "Выберите доступное место прямо на схеме.";
-
-  return (
-    <div className="mb-4 rounded-xl border p-3 sm:p-4" style={{ borderColor: D.borderSoft, background: D.panel }}>
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="text-sm font-semibold" style={{ color: D.text }}>Схема зала</div>
-          <div className="mt-1 text-xs" style={{ color: D.textMuted }}>{selectedLabel}</div>
-        </div>
-        <div className="flex flex-wrap gap-2 text-[11px]" style={{ color: D.textMuted }}>
-          <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm" style={{ background: D.accent }} />{counts.available}</span>
-          <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-slate-400" />{counts.sold}</span>
-          <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-amber-500" />{counts.blocked}</span>
-        </div>
-      </div>
-
-      <div className="rounded-xl border bg-white p-3" style={{ borderColor: D.borderSoft }}>
-        <div className="mx-auto mb-4 h-7 max-w-sm rounded-b-[32px] text-center text-[11px] font-semibold uppercase leading-7 tracking-[0.18em]" style={{ background: D.panelStrong, color: D.textMuted }}>
-          Сцена
-        </div>
-        <div className="mx-auto w-full max-w-[520px]">
-          <div
-            className="grid w-full gap-1.5 sm:gap-2"
-            style={{
-              gridTemplateColumns: "repeat(" + maxX + ", minmax(0, 1fr))",
-              gridTemplateRows: "repeat(" + maxY + ", minmax(0, 1fr))",
-              aspectRatio: maxX + " / " + Math.max(1, maxY),
-            }}
-          >
-            {seats.map((seat) => {
-              const selected = selectedSeat?.seatId === seat.seatId;
-              const disabled = seat.status !== "available";
-              return (
-                <button
-                  key={seat.seatId}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onSelect(seat)}
-                  className="flex min-h-0 min-w-0 items-center justify-center rounded-md border text-[9px] font-semibold text-white shadow-sm outline-none transition hover:brightness-95 focus-visible:ring-2 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-55 sm:text-[10px]"
-                  style={{
-                    gridColumn: (seat.x + 1) + " / span " + (seat.w || 1),
-                    gridRow: (seat.y + 1) + " / span " + (seat.h || 1),
-                    background: seatPickerColor(seat, selected),
-                    borderColor: selected ? "#FACC15" : "rgba(15,23,42,0.14)",
-                    boxShadow: selected ? "0 0 0 3px rgba(250,204,21,0.28)" : "0 1px 2px rgba(15,23,42,0.08)",
-                  }}
-                >
-                  {seat.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function B2CView({ state, onUpdate }: Props) {
   const [search, setSearch] = useState("");
   const [city, setCity] = useState<"" | (typeof CITY_WHITELIST)[number]>("");
@@ -202,6 +128,7 @@ export default function B2CView({ state, onUpdate }: Props) {
   const [detailsEventId, setDetailsEventId] = useState<string | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [ticketsOpen, setTicketsOpen] = useState(false);
+  const [seatMapOpen, setSeatMapOpen] = useState(false);
   const [successTicketId, setSuccessTicketId] = useState<string | null>(null);
   const [selectedSeat, setSelectedSeat] = useState<EventSeat | null>(null);
   const [selectedTier, setSelectedTier] = useState("");
@@ -233,10 +160,10 @@ export default function B2CView({ state, onUpdate }: Props) {
 
   const detailsEvent = detailsEventId ? filteredEvents.find((event) => event.eventId === detailsEventId) || null : null;
   const selectedTierPrice = detailsEvent?.tiers.find((tier) => tier.name === selectedTier)?.price || 0;
-  const totalPrice = selectedTierPrice * quantity;
+  const totalPrice = (selectedSeat?.price || selectedTierPrice) * quantity;
   const hasActiveFilters = Boolean(search.trim() || city || category);
   const availableTicketCount = useMemo(() => {
-    return publishedEvents.reduce((sum, event) => sum + getEventIssuedCount(state, event.eventId), 0);
+    return publishedEvents.reduce((sum, event) => sum + getEventAvailableCount(state, event), 0);
   }, [publishedEvents, state]);
 
   const myTickets = useMemo(() => {
@@ -249,13 +176,16 @@ export default function B2CView({ state, onUpdate }: Props) {
     setCategory("");
   };
 
-  const openDetails = (event: DemoEvent) => {
-    const firstAvailableTier = event.tiers.find((tier) => getTierIssuedCount(state, event.eventId, tier.name) > 0)?.name || event.tiers[0]?.name || "";
+  const openDetails = (event: DemoEvent, openSeatMap = false) => {
+    const firstAvailableTier = event.eventSeats?.length
+      ? event.eventSeats.find((seat) => seat.status === "available")?.tariffName || event.tiers[0]?.name || ""
+      : event.tiers.find((tier) => getTierIssuedCount(state, event.eventId, tier.name) > 0)?.name || event.tiers[0]?.name || "";
     setDetailsEventId(event.eventId);
     setSelectedTier(firstAvailableTier);
     setQuantity(1);
     setBuyerName("");
     setCheckoutOpen(false);
+    setSeatMapOpen(openSeatMap && Boolean(event.eventSeats?.length));
     setSelectedSeat(null);
     setSuccessTicketId(null);
   };
@@ -269,7 +199,7 @@ export default function B2CView({ state, onUpdate }: Props) {
       toast.error("Выберите место на схеме");
       return;
     }
-    if (getTierIssuedCount(state, detailsEvent.eventId, selectedTier) < quantity) {
+    if (!detailsEvent.eventSeats?.length && getTierIssuedCount(state, detailsEvent.eventId, selectedTier) < quantity) {
       toast.error("По выбранному тарифу нет доступных билетов");
       return;
     }
@@ -313,7 +243,7 @@ export default function B2CView({ state, onUpdate }: Props) {
     const dt = formatDateTime(event.dateTime);
     const priceFrom = getPriceFrom(event);
     const isSoldOut = getAvailability(state, event) === "Sold out";
-    const remaining = getEventIssuedCount(state, event.eventId);
+    const remaining = getEventAvailableCount(state, event);
     const ageCategory = getEventAgeCategory(state, event);
 
     return (
@@ -405,7 +335,7 @@ export default function B2CView({ state, onUpdate }: Props) {
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (!isSoldOut) openDetails(event);
+                  if (!isSoldOut) openDetails(event, Boolean(event.eventSeats?.length));
                 }}
               >
                 {isSoldOut ? "Нет мест" : event.eventSeats?.length ? "Выбрать место" : "Купить"}
@@ -740,21 +670,31 @@ export default function B2CView({ state, onUpdate }: Props) {
                           </p>
                         </div>
                    <div className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: D.accentSoft, color: D.accentText }}>
-                     {getEventIssuedCount(state, detailsEvent.eventId)} {formatTicketWord(getEventIssuedCount(state, detailsEvent.eventId))}
+                     {getEventAvailableCount(state, detailsEvent)} {formatTicketWord(getEventAvailableCount(state, detailsEvent))}
                    </div>
                  </div>
 
                   {detailsEvent.eventSeats?.length ? (
-                    <B2CSeatPicker
-                      seats={detailsEvent.eventSeats}
-                      selectedSeat={selectedSeat}
-                      onSelect={(seat) => {
-                        setSelectedSeat(seat);
-                        setSelectedTier(seat.tariffName || detailsEvent.tiers[0]?.name || "");
-                        setQuantity(1);
-                        setCheckoutOpen(false);
-                      }}
-                    />
+                    <div className="mb-4 rounded-xl border p-3 sm:p-4" style={{ borderColor: D.borderSoft, background: D.panel }}>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="text-sm font-semibold" style={{ color: D.text }}>Схема зала</div>
+                          <div className="mt-1 text-xs" style={{ color: D.textMuted }}>
+                            {selectedSeat
+                              ? `${selectedSeat.label} · ${selectedSeat.tariffName || "Тариф не назначен"} · ${selectedSeat.price || 0} BYN`
+                              : "Выберите доступное место на схеме."}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSeatMapOpen(true)}
+                          className="h-10 rounded-lg px-4 text-sm font-semibold transition hover:brightness-95"
+                          style={{ background: D.accent, color: "#FFFFFF" }}
+                        >
+                          {selectedSeat ? "Изменить место" : "Выбрать место"}
+                        </button>
+                      </div>
+                    </div>
                   ) : null}
 
                       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_130px]">
@@ -893,6 +833,25 @@ export default function B2CView({ state, onUpdate }: Props) {
           </div>
         </div>
       )}
+
+      {detailsEvent?.eventSeats?.length ? (
+        <SeatMapModal
+          open={seatMapOpen}
+          title="Выбор места"
+          subtitle={detailsEvent.title}
+          mode="buyer"
+          eventSeats={detailsEvent.eventSeats}
+          tiers={detailsEvent.tiers}
+          onClose={() => setSeatMapOpen(false)}
+          onBuySeat={(seat) => {
+            setSelectedSeat(seat);
+            setSelectedTier(seat.tariffName || detailsEvent.tiers[0]?.name || "");
+            setQuantity(1);
+            setCheckoutOpen(false);
+            setSeatMapOpen(false);
+          }}
+        />
+      ) : null}
 
       {ticketsOpen && (
         <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setTicketsOpen(false)}>

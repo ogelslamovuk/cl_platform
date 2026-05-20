@@ -5,7 +5,6 @@ import { A } from "@/components/admin/adminStyles";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AdminOrganizerApplications from "@/components/admin/AdminOrganizerApplications";
 import AdminEventComplianceApplications from "@/components/admin/AdminEventComplianceApplications";
-import AdminEvents from "@/components/admin/AdminEvents";
 import AdminTickets from "@/components/admin/AdminTickets";
 import AdminOperations from "@/components/admin/AdminOperations";
 import AdminResellers from "@/components/admin/AdminResellers";
@@ -17,13 +16,13 @@ import AdminReports from "@/components/admin/AdminReports";
 import AdminRegistryEvents from "@/components/admin/AdminRegistryEvents";
 import {
   LayoutDashboard, FileText, Calendar, ShieldAlert, BookOpen, Building2, MapPin,
-  Globe, Ticket, Activity, BarChart3, Bell, Zap, Network,
+  Ticket, Activity, BarChart3, Bell, Zap, Network,
 } from "lucide-react";
 
 type AdminTab =
   | "dashboard" | "calendar" | "control" | "decisions"
   | "organizerApplications" | "eventComplianceApplications"
-  | "orgRegistry" | "venueRegistry" | "registryEvents" | "events" | "tickets" | "operations" | "resellers" | "reports";
+  | "orgRegistry" | "venueRegistry" | "registryEvents" | "tickets" | "operations" | "resellers" | "reports";
 
 const sidebarSections: { label?: string; items: { key: AdminTab; label: string; icon: React.ElementType }[] }[] = [
   {
@@ -48,12 +47,6 @@ const sidebarSections: { label?: string; items: { key: AdminTab; label: string; 
       { key: "venueRegistry", label: "Площадки", icon: MapPin },
       { key: "registryEvents", label: "Мероприятия", icon: Calendar },
       { key: "resellers", label: "Реселлеры", icon: Network },
-    ],
-  },
-  {
-    label: "by Cinemalab",
-    items: [
-      { key: "events", label: "События", icon: Globe },
       { key: "tickets", label: "Билеты", icon: Ticket },
       { key: "operations", label: "Операции", icon: Activity },
     ],
@@ -75,7 +68,6 @@ const tabTitles: Record<AdminTab, string> = {
   orgRegistry: "Реестр организаторов",
   venueRegistry: "Реестр площадок",
   registryEvents: "Мероприятия",
-  events: "Реестр событий",
   tickets: "Реестр билетов",
   operations: "Журнал операций",
   resellers: "Реселлеры",
@@ -109,7 +101,7 @@ export default function AdminPage() {
             </div>
             <div>
               <div className="text-sm font-bold tracking-tight" style={{ color: A.textPrimary, letterSpacing: '-0.2px' }}>Центр Управления</div>
-              <div className="text-[10px]" style={{ color: A.textMuted }}>by Cinemalab</div>
+              <div className="text-[10px]" style={{ color: A.textMuted }}>операционный контур</div>
             </div>
           </div>
         </div>
@@ -187,7 +179,6 @@ export default function AdminPage() {
           {tab === "orgRegistry" && <AdminOrgRegistry state={state} />}
           {tab === "venueRegistry" && <AdminVenueRegistry state={state} onUpdate={update} />}
           {tab === "registryEvents" && <AdminRegistryEvents state={state} onUpdate={update} />}
-          {tab === "events" && <AdminEvents state={state} onUpdate={update} />}
           {tab === "tickets" && <AdminTickets state={state} />}
           {tab === "operations" && <AdminOperations state={state} />}
           {tab === "resellers" && <AdminResellers state={state} onUpdate={update} />}

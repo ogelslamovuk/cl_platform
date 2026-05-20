@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { AppState } from "@/lib/store";
 import { getEventSalesChannels, getSalesChannelLabel, getTicketRefundBlockReason, isSalesChannelAllowedForEvent, refundTicketByReseller, sellTicketsByReseller } from "@/lib/store";
+import { formatDisplayId } from "@/lib/display";
 import PartnerModuleDrawer, { ModuleDrawerContent } from "@/components/channel/PartnerModuleDrawer";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
 
@@ -300,7 +301,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
 
   const webhookRows = useMemo(() => {
     const statuses: WebhookStatus[] = ["Доставлено", "Ошибка", "В очереди"];
-    const eventsFeed = ["sale.created", "ticket.refunded", "inventory.updated", "ticket.redeemed"];
+    const eventsFeed = ["Продажа создана", "Билет возвращён", "Остатки обновлены", "Билет погашен"];
 
     return channelOps.slice(0, 12).map((op, idx) => {
       const webhookStatus = op.result === "error" ? "Ошибка" : idx % 5 === 0 ? "В очереди" : statuses[0];
@@ -333,7 +334,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
     { left: "Версия API", right: "v2.1" },
     { left: "Проверка подписи", right: "Включена" },
     { left: "Лимит запросов", right: "1200 req/мин" },
-    { left: "Доступные операции", right: "sell, refund, redeem, verify" },
+    { left: "Доступные операции", right: "продажа, возврат, погашение, проверка" },
     { left: "Последний успешный запрос", right: formatDate(todayOps.find((op) => op.result === "ok")?.ts || state.meta.updatedAt) },
     { left: "Последняя синхронизация", right: formatDate(state.meta.updatedAt) },
   ];
@@ -475,8 +476,8 @@ export default function ChannelView({ state, onUpdate }: Props) {
             />
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as EventStatusFilter)} className="h-10 rounded-lg border border-white/15 bg-slate-900 px-3 text-sm">
               <option value="all">Все статусы</option>
-              <option value="published">published</option>
-              <option value="approved">approved</option>
+              <option value="published">Опубликовано</option>
+              <option value="approved">Одобрено</option>
             </select>
             <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="h-10 rounded-lg border border-white/15 bg-slate-900 px-3 text-sm" />
             <select value={organizerFilter} onChange={(e) => setOrganizerFilter(e.target.value)} className="h-10 rounded-lg border border-white/15 bg-slate-900 px-3 text-sm">
@@ -487,11 +488,11 @@ export default function ChannelView({ state, onUpdate }: Props) {
             </select>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+          <div className="overflow-hidden">
+            <table className="w-full table-fixed text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-slate-400">
                 <tr className="border-b border-white/10">
-                  <th className="px-2 py-2">EventID</th><th className="px-2 py-2">Событие</th><th className="px-2 py-2">Организатор</th><th className="px-2 py-2">Дата/время</th><th className="px-2 py-2">Площадка</th><th className="px-2 py-2">Остаток</th><th className="px-2 py-2">Статус синхронизации</th>
+                  <th className="w-[86px] px-2 py-2">ID</th><th className="px-2 py-2">Событие</th><th className="px-2 py-2">Организатор</th><th className="w-[132px] px-2 py-2">Дата/время</th><th className="px-2 py-2">Площадка</th><th className="w-[78px] px-2 py-2">Остаток</th><th className="w-[150px] px-2 py-2">Статус</th>
                 </tr>
               </thead>
               <tbody>
@@ -502,12 +503,19 @@ export default function ChannelView({ state, onUpdate }: Props) {
                   const isSelected = selectedEventId === event.eventId;
                   const organizer = organizerMap.get(event.organizerId) || `Организатор ${event.organizerId}`;
                   return (
-                    <tr key={event.eventId} onClick={() => setSelectedEventId(event.eventId)} className={`cursor-pointer border-b border-white/5 transition-colors ${isSelected ? "bg-cyan-500/15" : "hover:bg-slate-800/55"}`}>
-                      <td className="px-2 py-2 font-mono text-xs text-slate-200">{event.eventId}</td>
-                      <td className="px-2 py-2 text-slate-100">{event.title}</td>
-                      <td className="px-2 py-2 text-xs text-slate-300">{organizer}</td>
+                    <tr
+                      key={event.eventId}
+                      onClick={() => {
+                        setSelectedEventId(event.eventId);
+                        if (event.eventSeats?.length) setSchemeOpen(true);
+                      }}
+                      className={`cursor-pointer border-b border-white/5 transition-colors ${isSelected ? "bg-cyan-500/15" : "hover:bg-slate-800/55"}`}
+                    >
+                      <td className="px-2 py-2 font-mono text-xs text-slate-200">{formatDisplayId(event.eventId)}</td>
+                      <td className="truncate px-2 py-2 text-slate-100">{event.title}</td>
+                      <td className="truncate px-2 py-2 text-xs text-slate-300">{organizer}</td>
                       <td className="px-2 py-2 text-xs text-slate-300">{formatDate(event.dateTime)}</td>
-                      <td className="px-2 py-2 text-xs text-slate-300">{event.venue}</td>
+                      <td className="truncate px-2 py-2 text-xs text-slate-300">{event.venue}</td>
                       <td className="px-2 py-2 font-semibold text-white">{event.remaining}</td>
                       <td className="px-2 py-2"><span className={`rounded-md border px-2 py-1 text-xs ${event.status === "published" ? "border-emerald-300/40 bg-emerald-500/10 text-emerald-100" : "border-amber-300/40 bg-amber-500/10 text-amber-100"}`}>{event.status === "published" ? "Синхронизировано" : "Ожидает публикации"}</span></td>
                     </tr>
@@ -518,7 +526,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
           </div>
           {selectedEvent && (
             <div className="mt-3 rounded-lg border border-cyan-300/20 bg-cyan-500/5 p-3 text-xs text-slate-200">
-              Выбрано событие: <span className="font-semibold">{selectedEvent.title}</span> · EventID: {selectedEvent.eventId}
+              Выбрано событие: <span className="font-semibold">{selectedEvent.title}</span> · ID: {formatDisplayId(selectedEvent.eventId)}
               <div className="mt-1 text-slate-400">
                 Каналы продаж: {getEventSalesChannels(state, selectedEvent).map((code) => getSalesChannelLabel(state, code)).join(", ")}
               </div>
@@ -565,7 +573,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">API Sandbox / Тестовая продажа</h2>
-                <p className="mt-1 text-xs text-slate-400">Demo-продажа меняет статусы билетов и создаёт операцию sell.</p>
+                <p className="mt-1 text-xs text-slate-400">Demo-продажа меняет статусы билетов и создаёт операцию продажи.</p>
               </div>
               <select
                 value={activeResellerCode}
