@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import type { AppState, EventComplianceApplicationRecord, EventRecord, OrganizerDocument, OrganizerSaleRecord } from "@/lib/store";
-import { calculateComplianceFee, getSalesChannelLabel, logoutOrganizer } from "@/lib/store";
+import { calculateComplianceFee, getEventSeatSummary, getSalesChannelLabel, logoutOrganizer } from "@/lib/store";
+import { formatDisplayId, getEventStatusLabel, getOperationTypeLabel } from "@/lib/display";
 import {
   calculateOrganizerFinance,
   calculateOrganizerSettlementReport,
@@ -136,6 +138,7 @@ export default function OrganizerPage() {
 
   const [activeSection, setActiveSection] = useState<Section>("dashboard");
   const [drawerApp, setDrawerApp] = useState<EventComplianceApplicationRecord | null>(null);
+  const [drawerEvent, setDrawerEvent] = useState<EventRecord | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileCardOpen, setProfileCardOpen] = useState(false);
 
@@ -497,7 +500,7 @@ export default function OrganizerPage() {
                         {recentOps.map((op) => (
                           <div key={op.opId} className="flex items-center justify-between py-2 border-b" style={{ borderColor: T.border }}>
                             <span className="text-[12px]" style={{ color: T.textSecondary }}>
-                              {op.type} · {op.ticketId || op.eventId}
+                              {getOperationTypeLabel(op.type)} · {formatDisplayId(op.ticketId || op.eventId)}
                             </span>
                             <span className="text-[11px] px-2 py-0.5 rounded-full" style={op.result === "ok" ? { background: "rgba(34,197,94,0.18)", color: "#22C55E" } : { background: "rgba(239,68,68,0.18)", color: "#EF4444" }}>
                               {op.result === "ok" ? "Успешно" : "Ошибка"}
@@ -555,7 +558,7 @@ export default function OrganizerPage() {
             )}
 
             {activeSection === "events" && isOrganizerApproved && (
-              <EventsSection rows={filteredEvents} state={state} sort={eventSort} setSort={setEventSort} />
+              <EventsSection rows={filteredEvents} state={state} sort={eventSort} setSort={setEventSort} onOpen={setDrawerEvent} />
             )}
 
             {activeSection === "sales" && isOrganizerApproved && (
@@ -583,6 +586,10 @@ export default function OrganizerPage() {
 
       {drawerApp && (
         <ApplicationDetailsDrawer app={drawerApp} state={state} onClose={() => setDrawerApp(null)} />
+      )}
+
+      {drawerEvent && (
+        <EventDetailsDrawer event={drawerEvent} state={state} onClose={() => setDrawerEvent(null)} />
       )}
 
       {profileCardOpen && (
@@ -769,8 +776,15 @@ function ApplicationsTable({
             </thead>
             <tbody>
               {rows.map((a) => (
-                <tr key={a.eventComplianceApplicationId} className="border-b" style={{ borderColor: T.border }}>
-                  <td className="py-2.5 px-3 font-mono text-xs" style={{ color: T.textSecondary }}>{a.eventComplianceApplicationId}</td>
+                <tr
+                  key={a.eventComplianceApplicationId}
+                  className="cursor-pointer border-b transition-colors"
+                  style={{ borderColor: T.border }}
+                  onClick={() => onOpen(a)}
+                  onMouseEnter={(event) => (event.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                  onMouseLeave={(event) => (event.currentTarget.style.background = "transparent")}
+                >
+                  <td className="py-2.5 px-3 font-mono text-xs" style={{ color: T.textSecondary }}>{formatDisplayId(a.eventComplianceApplicationId)}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>{a.data.title || "—"}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{a.data.venueName || "—"}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{fmtDateTime(a.data.dateSlots[0] || "")}</td>
@@ -779,7 +793,7 @@ function ApplicationsTable({
                     <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold" style={statusStyle[a.status]}>{statusLabel[a.status]}</span>
                   </td>
                   <td className="py-2.5 px-3 text-xs" style={{ color: T.textSecondary }}>{a.adminComment || "—"}</td>
-                  <td className="py-2.5 px-3 space-x-2 whitespace-nowrap">
+                  <td className="py-2.5 px-3 space-x-2 whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                     <span className="inline-flex items-center gap-1">
                       <button onClick={() => onOpen(a)} className="h-7 px-3 rounded-lg border text-[12px]" style={{ borderColor: T.btnSecondaryBorder, color: T.textSecondary }}>Просмотр</button>
                       <HelpTooltip text="Открыть карточку заявки для просмотра подробностей." />
@@ -803,11 +817,12 @@ function ApplicationsTable({
   );
 }
 
-function EventsSection({ rows, state, sort, setSort }: {
+function EventsSection({ rows, state, sort, setSort, onOpen }: {
   rows: EventRecord[];
   state: ReturnType<typeof useStorageSync>["state"];
   sort: { key: "title" | "city" | "dateTime" | "capacity" | "status"; dir: SortDirection } | null;
   setSort: (s: { key: "title" | "city" | "dateTime" | "capacity" | "status"; dir: SortDirection } | null) => void;
+  onOpen: (event: EventRecord) => void;
 }) {
   const setColumnSort = (key: "title" | "city" | "dateTime" | "capacity" | "status") => {
     if (!sort || sort.key !== key) {
@@ -843,11 +858,18 @@ function EventsSection({ rows, state, sort, setSort }: {
             </thead>
             <tbody>
               {rows.map((e) => (
-                <tr key={e.eventId} className="border-b" style={{ borderColor: T.border }}>
+                <tr
+                  key={e.eventId}
+                  className="cursor-pointer border-b transition-colors"
+                  style={{ borderColor: T.border }}
+                  onClick={() => onOpen(e)}
+                  onMouseEnter={(event) => (event.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                  onMouseLeave={(event) => (event.currentTarget.style.background = "transparent")}
+                >
                   <td className="py-2.5 px-3">
                     <img src={resolvePublicAsset(e.poster)} alt={e.title} className="h-12 w-20 rounded-lg object-cover" />
                   </td>
-                  <td className="py-2.5 px-3 font-mono text-xs" style={{ color: T.textSecondary }}>{e.eventId}</td>
+                  <td className="py-2.5 px-3 font-mono text-xs" style={{ color: T.textSecondary }}>{formatDisplayId(e.eventId)}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>{e.title}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.venue}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.city || "—"}</td>
@@ -856,7 +878,7 @@ function EventsSection({ rows, state, sort, setSort }: {
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{(e.salesChannels?.length ? e.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code)).join(", ")}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{fmtDateTime(e.dateTime)}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.capacity}</td>
-                  <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.status === "published" ? "Опубликовано" : "Одобрено"}</td>
+                  <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{getEventStatusLabel(e.status)}</td>
                 </tr>
               ))}
             </tbody>
@@ -893,13 +915,13 @@ function EventsTable({ rows, state, compact = false }: { rows: EventRecord[]; st
               <td className="py-2.5 px-3">
                 <img src={resolvePublicAsset(e.poster)} alt={e.title} className="h-11 w-16 rounded-lg object-cover" />
               </td>
-              <td className="py-2.5 px-3 font-mono text-xs" style={{ color: T.textSecondary }}>{e.eventId}</td>
+              <td className="py-2.5 px-3 font-mono text-xs" style={{ color: T.textSecondary }}>{formatDisplayId(e.eventId)}</td>
               <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>{e.title}</td>
               <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{fmtDateTime(e.dateTime)}</td>
               <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{getEventAgeCategory(state, e)}</td>
               {!compact && <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.venue}</td>}
               {!compact && <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{(e.salesChannels?.length ? e.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code)).join(", ")}</td>}
-              <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.status === "published" ? "Опубликовано" : "Одобрено"}</td>
+              <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{getEventStatusLabel(e.status)}</td>
               <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{e.remaining}/{e.capacity}</td>
             </tr>
           ))}
@@ -1235,10 +1257,15 @@ const approvalModeLabel: Record<string, string> = {
 };
 
 function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianceApplicationRecord; state: ReturnType<typeof useStorageSync>["state"]; onClose: () => void }) {
+  const [schemeOpen, setSchemeOpen] = useState(false);
   const fee = app.data.approvalMode === "certificate_required"
     ? `${calculateComplianceFee(app.data.projectedCapacity, app.data.plannedTicketsForSale, app.data.ticketTiers)} БВ`
     : "—";
   const salesChannels = (app.data.salesChannels?.length ? app.data.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code));
+  const linkedEvent = app.linkedEventId ? state.events.find((event) => event.eventId === app.linkedEventId) || null : null;
+  const schemeSeats = linkedEvent?.eventSeats?.length ? linkedEvent.eventSeats : app.data.eventSeats || [];
+  const schemeTiers = linkedEvent?.tiers?.length ? linkedEvent.tiers : app.data.ticketTiers || [];
+  const schemeSummary = getEventSeatSummary({ eventSeats: schemeSeats, tiers: schemeTiers });
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
@@ -1251,8 +1278,8 @@ function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianc
         <div className="space-y-5 p-6">
           <div className="mb-4"><span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={statusStyle[app.status]}>{statusLabel[app.status]}</span></div>
           <dl className="space-y-3 text-[13px]">
-            <Item k="ID заявки" v={app.eventComplianceApplicationId} />
-            <Item k="ID организатора" v={app.organizerId} />
+            <Item k="ID заявки" v={formatDisplayId(app.eventComplianceApplicationId)} />
+            <Item k="ID организатора" v={formatDisplayId(app.organizerId)} />
             <Item k="Название" v={app.data.title || "—"} />
             <Item k="Статус" v={statusLabel[app.status] || app.status} />
             <Item k="Дата подачи" v={fmtDateTime(app.submittedAt || app.createdAt)} />
@@ -1277,6 +1304,20 @@ function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianc
               ))}
             </div>
           </section>
+          {schemeSummary.hasSeatMap && (
+            <section className="rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
+              <div className="mb-2 text-xs" style={{ color: T.textSecondary }}>Схема зала</div>
+              <div className="grid grid-cols-2 gap-2 text-[12px]" style={{ color: T.textSecondary }}>
+                <span>Всего: {schemeSummary.total}</span>
+                <span>Доступно: {schemeSummary.available}</span>
+                <span>Продано: {schemeSummary.sold}</span>
+                <span>Блок: {schemeSummary.blocked}</span>
+              </div>
+              <button onClick={() => setSchemeOpen(true)} className="mt-3 h-9 rounded-lg px-3 text-sm font-semibold" style={{ background: T.goldBg, color: T.gold }}>
+                Открыть схему
+              </button>
+            </section>
+          )}
           <section className="rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
             <div className="mb-2 text-xs" style={{ color: T.textSecondary }}>Постер</div>
             {app.data.posterPath ? (
@@ -1289,6 +1330,85 @@ function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianc
           </section>
         </div>
       </div>
+      <SeatMapModal
+        open={schemeOpen}
+        title="Схема заявки"
+        subtitle={app.data.title}
+        mode="viewer"
+        eventSeats={schemeSeats}
+        tiers={schemeTiers}
+        onClose={() => setSchemeOpen(false)}
+      />
+    </div>
+  );
+}
+
+function EventDetailsDrawer({ event, state, onClose }: { event: EventRecord; state: ReturnType<typeof useStorageSync>["state"]; onClose: () => void }) {
+  const [schemeOpen, setSchemeOpen] = useState(false);
+  const compliance = getComplianceByEvent(state, event);
+  const salesChannels = (event.salesChannels?.length ? event.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code));
+  const summary = getEventSeatSummary(event);
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
+      <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.55)" }} />
+      <div className="relative h-full w-full max-w-xl overflow-y-auto" style={{ background: T.cardBg, boxShadow: "-10px 0 50px rgba(0,0,0,0.4)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b px-6 py-4" style={{ background: T.cardBg, borderColor: T.border }}>
+          <h3 className="text-lg font-semibold" style={{ color: T.textPrimary }}>Карточка мероприятия</h3>
+          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg"><X size={18} /></button>
+        </div>
+        <div className="space-y-5 p-6">
+          <dl className="space-y-3 text-[13px]">
+            <Item k="ID мероприятия" v={formatDisplayId(event.eventId)} />
+            <Item k="Название" v={event.title || "—"} />
+            <Item k="Статус" v={getEventStatusLabel(event.status)} />
+            <Item k="Площадка" v={event.venue || "—"} />
+            <Item k="Дата и время" v={fmtDateTime(event.dateTime)} />
+            <Item k="Возрастная категория" v={compliance?.data.ageCategory || "—"} />
+            <Item k="Вместимость" v={String(event.capacity)} />
+            <Item k="Остаток" v={String(event.remaining)} />
+            <Item k="Каналы продаж" v={salesChannels.join(", ")} />
+            <Item k="Заявка" v={formatDisplayId(event.complianceApplicationId || event.appId)} />
+          </dl>
+
+          <section className="rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
+            <div className="mb-2 text-xs" style={{ color: T.textSecondary }}>Тарифы</div>
+            <div className="space-y-1">
+              {event.tiers.map((tier, index) => (
+                <div key={`${tier.name}-${index}`} className="flex justify-between gap-3 text-[13px]">
+                  <span style={{ color: T.textPrimary }}>{tier.name || "—"}</span>
+                  <span style={{ color: T.textSecondary }}>{tier.quantity || 0} × {tier.price || 0} BYN</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {summary.hasSeatMap && (
+            <section className="rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
+              <div className="mb-2 text-xs" style={{ color: T.textSecondary }}>Схема зала</div>
+              <div className="grid grid-cols-2 gap-2 text-[12px]" style={{ color: T.textSecondary }}>
+                <span>Всего: {summary.total}</span>
+                <span>Доступно: {summary.available}</span>
+                <span>Продано: {summary.sold}</span>
+                <span>Блок: {summary.blocked}</span>
+                <span>Выручка: {summary.revenue} BYN</span>
+              </div>
+              <button onClick={() => setSchemeOpen(true)} className="mt-3 h-9 rounded-lg px-3 text-sm font-semibold" style={{ background: T.goldBg, color: T.gold }}>
+                Открыть схему
+              </button>
+            </section>
+          )}
+        </div>
+      </div>
+      <SeatMapModal
+        open={schemeOpen}
+        title="Схема мероприятия"
+        subtitle={event.title}
+        mode="viewer"
+        eventSeats={event.eventSeats || []}
+        tiers={event.tiers}
+        onClose={() => setSchemeOpen(false)}
+      />
     </div>
   );
 }

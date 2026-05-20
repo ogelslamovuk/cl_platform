@@ -61,7 +61,7 @@ function seatBorderColor(seat: EventSeat, selected: boolean): string {
 
 function seatTooltip(seat: EventSeat): string {
   const tariff = seat.tariffName ? `${seat.tariffName} · ${seat.price || 0} BYN` : "Тариф не назначен";
-  return `${seat.label} · ряд ${seat.row}, место ${seat.number}\n${tariff}`;
+  return `Место ${seat.label} · ряд ${seat.row}, место ${seat.number} · ${tariff}`;
 }
 
 export default function SeatMapModal({
@@ -270,6 +270,7 @@ export default function SeatMapModal({
                   const eventSeat = workingSeats.find((item) => item.seatId === seat.seatId) || seat as EventSeat;
                   const selected = selectedIds.includes(seat.seatId);
                   const disabled = mode === "buyer" && eventSeat.status !== "available";
+                  const tooltipText = seatTooltip(eventSeat);
                   const centerOffset = Math.abs((seat.x + (seat.w || 1) / 2) - maxX / 2);
                   const rowOffset = centerOffset * Math.min(8, 22 / Math.max(maxX, 1)) + seat.y * 1.5;
                   return (
@@ -278,10 +279,10 @@ export default function SeatMapModal({
                       type="button"
                       disabled={disabled}
                       onClick={() => toggleSeat(seat.seatId)}
-                      title={seatTooltip(eventSeat)}
+                      aria-label={tooltipText}
                       className={buyerMode
-                        ? "relative flex aspect-[10/9] w-full max-w-10 items-center justify-center justify-self-center rounded-b-lg rounded-t-[18px] border text-[0px] font-semibold shadow-sm outline-none ring-offset-2 transition before:absolute before:inset-x-[18%] before:bottom-[14%] before:h-[10%] before:rounded-full before:bg-white/30 hover:-translate-y-0.5 hover:border-amber-400 hover:ring-2 hover:ring-amber-200 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-70 sm:text-[10px]"
-                        : "relative flex h-9 w-10 items-center justify-center rounded-b-lg rounded-t-[18px] border text-[10px] font-semibold shadow-sm outline-none ring-offset-2 transition before:absolute before:inset-x-1.5 before:bottom-1 before:h-1 before:rounded-full before:bg-white/30 hover:-translate-y-0.5 hover:border-amber-400 hover:ring-2 hover:ring-amber-200 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-70"}
+                        ? "group/seat relative flex aspect-[10/9] w-full max-w-10 items-center justify-center justify-self-center rounded-b-lg rounded-t-[18px] border text-[0px] font-semibold shadow-sm outline-none ring-offset-2 transition before:absolute before:inset-x-[18%] before:bottom-[14%] before:h-[10%] before:rounded-full before:bg-white/30 hover:-translate-y-0.5 hover:border-amber-400 hover:ring-2 hover:ring-amber-200 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-70 sm:text-[10px]"
+                        : "group/seat relative flex h-9 w-10 items-center justify-center rounded-b-lg rounded-t-[18px] border text-[10px] font-semibold shadow-sm outline-none ring-offset-2 transition before:absolute before:inset-x-1.5 before:bottom-1 before:h-1 before:rounded-full before:bg-white/30 hover:-translate-y-0.5 hover:border-amber-400 hover:ring-2 hover:ring-amber-200 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-70"}
                       style={{
                         gridColumn: `${seat.x + 1} / span ${seat.w || 1}`,
                         gridRow: `${seat.y + 1} / span ${seat.h || 1}`,
@@ -292,6 +293,9 @@ export default function SeatMapModal({
                       }}
                     >
                       <span className="sr-only">{eventSeat.label}, {statusLabel[eventSeat.status || "available"]}</span>
+                      <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-max max-w-[220px] -translate-x-1/2 rounded-lg bg-slate-950 px-2 py-1 text-[11px] font-medium leading-4 text-white shadow-lg group-hover/seat:block group-focus-visible/seat:block">
+                        {tooltipText}
+                      </span>
                       {eventSeat.label}
                     </button>
                   );

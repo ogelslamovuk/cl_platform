@@ -2,11 +2,12 @@ import React, { useEffect, useRef } from "react";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import B2CView from "@/components/B2CView";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { runDemoScenario } from "@/lib/demoEngine";
+import { ensureSeatMapDemoFlow, runDemoScenario } from "@/lib/demoEngine";
 
 export default function DemoPage() {
   const { state, update, setState } = useStorageSync();
   const seededEmptyState = useRef(false);
+  const enrichedSeatMapState = useRef(false);
 
   useEffect(() => {
     if (seededEmptyState.current) return;
@@ -15,6 +16,19 @@ export default function DemoPage() {
     seededEmptyState.current = true;
     setState({ ...runDemoScenario() });
   }, [setState, state.applications.length, state.events.length, state.tickets.length]);
+
+  useEffect(() => {
+    if (enrichedSeatMapState.current) return;
+    if (!state.events.length && !state.tickets.length && !state.applications.length) return;
+    if (state.events.some((event) =>
+      event.status === "published" &&
+      event.eventSeats?.length &&
+      state.tickets.some((ticket) => ticket.eventId === event.eventId)
+    )) return;
+
+    enrichedSeatMapState.current = true;
+    setState({ ...ensureSeatMapDemoFlow(state) });
+  }, [setState, state]);
 
   return (
     <div

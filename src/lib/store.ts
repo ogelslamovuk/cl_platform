@@ -786,11 +786,15 @@ export function loadState(): AppState {
 export function saveState(state: AppState): void {
   if (suppressPersistence) return;
   state.meta.updatedAt = new Date().toISOString();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {}
 }
 
 export function resetState(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {}
 }
 
 // ===== Business Logic =====
@@ -995,6 +999,69 @@ export function updateEventSeatMap(state: AppState, eventId: string, seats: Even
   event.updatedAt = nowIso();
   saveState(state);
   return true;
+}
+
+export type CreateVenueRegistryInput = {
+  name: string;
+  city: string;
+  region: string;
+  type: VenueRegistryRecord["type"];
+  address: string;
+  description: string;
+  hallName: string;
+  rows: number;
+  cols: number;
+  hasSeatMap: boolean;
+};
+
+export function createVenueRegistryRecord(state: AppState, input: CreateVenueRegistryInput): VenueRegistryRecord | null {
+  const name = input.name.trim();
+  const city = input.city.trim();
+  const address = input.address.trim();
+  if (!name || !city || !address) return null;
+
+  const now = nowIso();
+  const venueId = quickId("VENUE");
+  const hallId = quickId("HALL");
+  const layoutId = input.hasSeatMap ? quickId("LAYOUT") : undefined;
+  const seats = input.hasSeatMap ? createRectangularSeats(layoutId || hallId, input.rows, input.cols) : [];
+  const capacity = input.hasSeatMap ? seats.length : Math.max(1, Math.floor(input.rows || 1) * Math.floor(input.cols || 1));
+
+  if (layoutId) {
+    state.seatMapLayouts.push({
+      layoutId,
+      venueId,
+      hallId,
+      name: `${input.hallName.trim() || "Основной зал"} ${Math.max(1, Math.floor(input.rows || 1))}x${Math.max(1, Math.floor(input.cols || 1))}`,
+      seats,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  const venue: VenueRegistryRecord = {
+    venueId,
+    name,
+    city,
+    region: input.region.trim() || city,
+    type: input.type,
+    address,
+    description: input.description.trim() || "Demo-площадка, созданная в реестре Центра Управления.",
+    capacity,
+    status: "approved",
+    halls: [{
+      hallId,
+      venueId,
+      name: input.hallName.trim() || "Основной зал",
+      capacity,
+      hasSeatMap: Boolean(layoutId),
+      layoutId,
+    }],
+  };
+
+  state.venueRegistry.push(venue);
+  saveState(state);
+  return venue;
 }
 
 function normalizeTierRows(rawTiers: unknown, fallbackTotal = 0): PriceTier[] {

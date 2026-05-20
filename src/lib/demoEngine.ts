@@ -564,6 +564,15 @@ function ensureApprovedUnpublishedEvent(state: AppState): void {
   const eventTitle = "Вечер симфонической музыки во Дворце Республики";
   const dateTime = toDateTime(15, "19:30");
   const tiers = [{ ...APPROVED_UNPUBLISHED_TIER }];
+  const layout = getSeatMapLayout(state, "layout_palace_main");
+  const eventSeats = layout ? buildEventSeatsFromLayout(layout, tiers).map((seat) => ({ ...seat, status: "available" as const })) : [];
+  const tierCounts = eventSeats.length > 0
+    ? tiers.map((tier) => ({
+        ...tier,
+        quantity: eventSeats.filter((seat) => seat.status !== "blocked" && seat.tariffName === tier.name).length,
+      }))
+    : tiers;
+  const capacity = eventSeats.length > 0 ? eventSeats.filter((seat) => seat.status !== "blocked").length : APPROVED_UNPUBLISHED_TIER.quantity;
 
   const nextApp = {
     appId: APPROVED_UNPUBLISHED_APP_ID,
@@ -571,8 +580,8 @@ function ensureApprovedUnpublishedEvent(state: AppState): void {
     title: eventTitle,
     venue: "Дворец Республики",
     dateTime,
-    capacity: APPROVED_UNPUBLISHED_TIER.quantity,
-    tiers,
+    capacity,
+    tiers: tierCounts,
     city: "Минск",
     category: "Концерты",
     description: "Одобренное мероприятие, которое ещё не опубликовано и не выпустило билеты.",
@@ -595,15 +604,19 @@ function ensureApprovedUnpublishedEvent(state: AppState): void {
     title: eventTitle,
     venue: "Дворец Республики",
     dateTime,
-    capacity: APPROVED_UNPUBLISHED_TIER.quantity,
-    tiers,
+    capacity,
+    tiers: tierCounts,
     city: "Минск",
     category: "Концерты",
     description: "Одобренное мероприятие, которое ещё не опубликовано и не выпустило билеты.",
     poster: DEMO_POSTERS.belarusUSertsy,
     salesChannels: ["OWN", "ByCard", "TicketPro"],
     status: "approved" as const,
-    remaining: 0,
+    remaining: eventSeats.filter((seat) => seat.status === "available").length,
+    venueId: "venue_palace_republic",
+    hallId: "hall_palace_main",
+    layoutId: "layout_palace_main",
+    eventSeats,
     createdAt: now,
     updatedAt: now,
   };
@@ -617,6 +630,7 @@ function ensureApprovedUnpublishedEvent(state: AppState): void {
 
 function seedDemoCatalog(state: AppState): AppState {
   ensureDefaultResellers(state);
+  ensureSeatMapState(state);
   cleanupLegacyDemoData(state);
   state.organizers = DEMO_ORGANIZERS.map((organizer) => ({ ...organizer }));
   state.organizerRegistry = REGISTERED_DEMO_ORGANIZERS.map((organizer, index) => ({
@@ -656,6 +670,7 @@ function seedDemoCatalog(state: AppState): AppState {
 
   ensureOrganizerApplications(state);
   ensureEventComplianceApplications(state);
+  ensureSeatMapDemoEvent(state);
   ensureTodayNearSoldOutEvent(state);
   ensureSoldOutEvent(state);
   ensureApprovedUnpublishedEvent(state);
@@ -675,6 +690,20 @@ export function resetDemoData(): AppState {
 export function generateDemoData(): AppState {
   const state = buildBaselineState();
   enrichDemoData(state);
+  saveState(state);
+  return state;
+}
+
+export function ensureSeatMapDemoFlow(state: AppState): AppState {
+  ensureDefaultResellers(state);
+  ensureSeatMapState(state);
+  ensureDemoOrganizers(state);
+  ensureOrganizerRegistry(state);
+  ensureDemoOrganizerDocuments(state);
+  ensureSeatMapDemoEvent(state);
+  ensureApprovedUnpublishedEvent(state);
+  ensureCertificatesForPublishedEvents(state);
+  ensureTicketsForPublishedEvents(state);
   saveState(state);
   return state;
 }

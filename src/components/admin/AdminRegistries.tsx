@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
-import type { AppState, VenueRegistryRecord } from "@/lib/store";
-import { getSeatMapLayout, saveSeatMapLayout } from "@/lib/store";
+import type { AppState, CreateVenueRegistryInput, VenueRegistryRecord } from "@/lib/store";
+import { createVenueRegistryRecord, getSeatMapLayout, saveSeatMapLayout } from "@/lib/store";
 import { A, statusChip } from "./adminStyles";
-import { Building2, MapPin, X } from "lucide-react";
+import { Building2, MapPin, Plus, X } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
 
@@ -19,6 +19,23 @@ const riskLabel: Record<string, string> = {
   medium: "Средний",
   low: "Низкий",
 };
+
+const venueTypeOptions: CreateVenueRegistryInput["type"][] = ["концертный зал", "театр", "центр культуры", "open-air", "временная площадка"];
+
+function defaultVenueForm(): CreateVenueRegistryInput {
+  return {
+    name: "",
+    city: "Минск",
+    region: "Минск",
+    type: "концертный зал",
+    address: "",
+    description: "",
+    hallName: "Основной зал",
+    rows: 5,
+    cols: 8,
+    hasSeatMap: true,
+  };
+}
 
 // Organizer Registry
 export function AdminOrgRegistry({ state }: { state: AppState }) {
@@ -138,20 +155,7 @@ export function AdminOrgRegistry({ state }: { state: AppState }) {
           </div>
         </div>
       )}
-      <SeatMapModal
-        open={Boolean(schemeVenue && activeLayout)}
-        title={schemeVenue?.name || "Схема площадки"}
-        subtitle={activeHall?.name}
-        mode="layout"
-        baseSeats={activeLayout?.seats || []}
-        onClose={() => setSchemeVenue(null)}
-        onSaveLayout={(seats) => {
-          if (activeLayout && saveSeatMapLayout(state, activeLayout.layoutId, seats)) {
-            onUpdate({ ...state });
-          }
-          setSchemeVenue(null);
-        }}
-      />
+
     </div>
   );
 }
@@ -160,6 +164,8 @@ export function AdminOrgRegistry({ state }: { state: AppState }) {
 export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpdate: (s: AppState) => void }) {
   const [drawer, setDrawer] = useState<VenueRegistryRecord | null>(null);
   const [schemeVenue, setSchemeVenue] = useState<VenueRegistryRecord | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm] = useState<CreateVenueRegistryInput>(() => defaultVenueForm());
   const [cityFilter, setCityFilter] = useState("");
 
   const venues = useMemo(() => {
@@ -171,15 +177,30 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
   const cityOptions = useMemo(() => Array.from(new Set(state.venueRegistry.map((venue) => venue.city))).sort(), [state.venueRegistry]);
   const activeHall = schemeVenue?.halls.find((hall) => hall.layoutId) || null;
   const activeLayout = getSeatMapLayout(state, activeHall?.layoutId);
+  const inputStyle = { background: A.surfaceBg, borderColor: A.border, color: A.textPrimary };
+
+  const handleCreateVenue = () => {
+    const created = createVenueRegistryRecord(state, form);
+    if (!created) return;
+    onUpdate({ ...state });
+    setDrawer(created);
+    setCreateOpen(false);
+    setForm(defaultVenueForm());
+  };
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs" style={{ color: A.textSecondary }}>Реестр площадок</span>
-        <HelpTooltip text="Нажмите на строку площадки, чтобы открыть подробные сведения в боковой панели." />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs" style={{ color: A.textSecondary }}>Реестр площадок</span>
+          <HelpTooltip text="Нажмите на строку площадки, чтобы открыть подробные сведения в боковой панели." />
+        </div>
+        <button onClick={() => setCreateOpen(true)} className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>
+          <Plus size={15} /> Создать площадку
+        </button>
       </div>
       <div className="max-w-xs">
-        <select value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} className="h-9 w-full rounded-lg border px-3 text-sm outline-none" style={{ background: A.surfaceBg, borderColor: A.border, color: A.textPrimary }}>
+        <select value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} className="h-9 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle}>
           <option value="">Все города / регионы</option>
           {cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}
         </select>
@@ -253,6 +274,97 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
           </div>
         </div>
       )}
+
+      {createOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setCreateOpen(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            className="relative w-full max-w-2xl rounded-2xl border p-5"
+            style={{ background: A.glassGradient + ", " + A.cardBg, borderColor: A.borderGlass, boxShadow: A.cardShadow }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold" style={{ color: A.textPrimary }}>Создать площадку</h3>
+                <p className="mt-1 text-xs" style={{ color: A.textSecondary }}>Площадка появится в реестре Центра Управления.</p>
+              </div>
+              <button onClick={() => setCreateOpen(false)} style={{ color: A.textMuted }}><X size={18} /></button>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="text-xs" style={{ color: A.textSecondary }}>
+                Название
+                <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle} />
+              </label>
+              <label className="text-xs" style={{ color: A.textSecondary }}>
+                Тип
+                <select value={form.type} onChange={(event) => setForm((prev) => ({ ...prev, type: event.target.value as CreateVenueRegistryInput["type"] }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle}>
+                  {venueTypeOptions.map((type) => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </label>
+              <label className="text-xs" style={{ color: A.textSecondary }}>
+                Город
+                <input value={form.city} onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle} />
+              </label>
+              <label className="text-xs" style={{ color: A.textSecondary }}>
+                Регион
+                <input value={form.region} onChange={(event) => setForm((prev) => ({ ...prev, region: event.target.value }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle} />
+              </label>
+              <label className="text-xs md:col-span-2" style={{ color: A.textSecondary }}>
+                Адрес
+                <input value={form.address} onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle} />
+              </label>
+              <label className="text-xs md:col-span-2" style={{ color: A.textSecondary }}>
+                Описание
+                <textarea value={form.description} onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))} className="mt-1 min-h-20 w-full rounded-lg border px-3 py-2 text-sm outline-none" style={inputStyle} />
+              </label>
+              <label className="text-xs" style={{ color: A.textSecondary }}>
+                Зал / пространство
+                <input value={form.hallName} onChange={(event) => setForm((prev) => ({ ...prev, hallName: event.target.value }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle} />
+              </label>
+              <label className="flex items-center gap-2 pt-6 text-sm" style={{ color: A.textPrimary }}>
+                <input type="checkbox" checked={form.hasSeatMap} onChange={(event) => setForm((prev) => ({ ...prev, hasSeatMap: event.target.checked }))} />
+                Сгенерировать простую схему мест
+              </label>
+              <label className="text-xs" style={{ color: A.textSecondary }}>
+                Ряды
+                <input type="number" min={1} max={20} value={form.rows} onChange={(event) => setForm((prev) => ({ ...prev, rows: Number(event.target.value) || 1 }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle} />
+              </label>
+              <label className="text-xs" style={{ color: A.textSecondary }}>
+                Места в ряду
+                <input type="number" min={1} max={30} value={form.cols} onChange={(event) => setForm((prev) => ({ ...prev, cols: Number(event.target.value) || 1 }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle} />
+              </label>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setCreateOpen(false)} className="h-9 rounded-lg border px-4 text-sm" style={{ borderColor: A.borderLight, color: A.textPrimary }}>Отмена</button>
+              <button
+                onClick={handleCreateVenue}
+                disabled={!form.name.trim() || !form.city.trim() || !form.address.trim()}
+                className="h-9 rounded-lg px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: A.statusInfoBg, color: A.statusInfo }}
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <SeatMapModal
+        open={Boolean(schemeVenue && activeLayout)}
+        title={schemeVenue?.name || "Схема площадки"}
+        subtitle={activeHall?.name}
+        mode="layout"
+        baseSeats={activeLayout?.seats || []}
+        onClose={() => setSchemeVenue(null)}
+        onSaveLayout={(seats) => {
+          if (activeLayout && saveSeatMapLayout(state, activeLayout.layoutId, seats)) {
+            onUpdate({ ...state });
+          }
+          setSchemeVenue(null);
+        }}
+      />
     </div>
   );
 }
