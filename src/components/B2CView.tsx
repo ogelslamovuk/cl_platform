@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import type { AppState, EventRecord, EventSeat } from "@/lib/store";
 import { createDemoPurchaseTicket, getTicketRefundBlockReason, refund } from "@/lib/store";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
+import SeatMapPreview from "@/components/seatmap/SeatMapPreview";
 import { toast } from "sonner";
 import { Search, MapPin, Tag, Ticket, X, ChevronRight, Sparkles, TrendingUp, Star, User, Calendar, CheckCircle2 } from "lucide-react";
 import platformLogo from "../../logo.jpg";
@@ -659,6 +660,10 @@ export default function B2CView({ state, onUpdate }: Props) {
                       {detailsEvent.description}
                     </p>
 
+                    {detailsEvent.eventSeats?.length ? (
+                      <SeatMapPreview eventSeats={detailsEvent.eventSeats} tiers={detailsEvent.tiers} title="Схема зала" />
+                    ) : null}
+
                     <div className="rounded-xl border p-4" style={{ borderColor: D.borderSoft, background: D.card }}>
                       <div className="mb-4 flex items-center justify-between gap-3">
                         <div>
@@ -675,10 +680,10 @@ export default function B2CView({ state, onUpdate }: Props) {
                  </div>
 
                   {detailsEvent.eventSeats?.length ? (
-                    <div className="mb-4 rounded-xl border p-3 sm:p-4" style={{ borderColor: D.borderSoft, background: D.panel }}>
+                    <div className="mb-4 space-y-3 rounded-xl border p-3 sm:p-4" style={{ borderColor: D.borderSoft, background: D.panel }}>
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                          <div className="text-sm font-semibold" style={{ color: D.text }}>Схема зала</div>
+                          <div className="text-sm font-semibold" style={{ color: D.text }}>Выбранное место</div>
                           <div className="mt-1 text-xs" style={{ color: D.textMuted }}>
                             {selectedSeat
                               ? `${selectedSeat.label} · ${selectedSeat.tariffName || "Тариф не назначен"} · ${selectedSeat.price || 0} BYN`
@@ -687,6 +692,7 @@ export default function B2CView({ state, onUpdate }: Props) {
                         </div>
                         <button
                           type="button"
+                          data-b2c-open-seat-map
                           onClick={() => setSeatMapOpen(true)}
                           className="h-10 rounded-lg px-4 text-sm font-semibold transition hover:brightness-95"
                           style={{ background: D.accent, color: "#FFFFFF" }}
@@ -748,6 +754,7 @@ export default function B2CView({ state, onUpdate }: Props) {
                         </div>
                         <button
                           onClick={openCheckout}
+                          data-b2c-buy-ticket
                           className="h-11 rounded-lg px-5 text-sm font-semibold transition hover:brightness-95 sm:min-w-[160px]"
                           style={{ background: D.accent, color: "#FFFFFF" }}
                         >
@@ -778,6 +785,7 @@ export default function B2CView({ state, onUpdate }: Props) {
                             Имя покупателя
                           </span>
                           <input
+                            data-b2c-buyer-name
                             value={buyerName}
                             onChange={(e) => setBuyerName(e.target.value)}
                             placeholder="Введите имя"
@@ -794,7 +802,7 @@ export default function B2CView({ state, onUpdate }: Props) {
                           >
                             Отмена
                           </button>
-                          <button onClick={confirmPurchase} className="h-10 rounded-lg px-5 text-sm font-semibold" style={{ background: D.accent, color: "#FFFFFF" }}>
+                          <button data-b2c-confirm-purchase onClick={confirmPurchase} className="h-10 rounded-lg px-5 text-sm font-semibold" style={{ background: D.accent, color: "#FFFFFF" }}>
                             Подтвердить
                           </button>
                         </div>

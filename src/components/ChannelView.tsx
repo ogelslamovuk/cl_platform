@@ -5,6 +5,7 @@ import { getEventSalesChannels, getSalesChannelLabel, getTicketRefundBlockReason
 import { formatDisplayId } from "@/lib/display";
 import PartnerModuleDrawer, { ModuleDrawerContent } from "@/components/channel/PartnerModuleDrawer";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
+import SeatMapPreview from "@/components/seatmap/SeatMapPreview";
 
 interface Props {
   state: AppState;
@@ -488,11 +489,46 @@ export default function ChannelView({ state, onUpdate }: Props) {
             </select>
           </div>
 
+          {selectedEvent && (
+            <div className="mb-3 rounded-lg border border-cyan-300/20 bg-cyan-500/5 p-3 text-xs text-slate-200">
+              <div className="leading-5">
+                Выбрано событие: <span className="font-semibold">{selectedEvent.title}</span> · ID: {formatDisplayId(selectedEvent.eventId)}
+              </div>
+              <div className="mt-1 text-slate-400">
+                Каналы продаж: {getEventSalesChannels(state, selectedEvent).map((code) => getSalesChannelLabel(state, code)).join(", ")}
+              </div>
+              {selectedEvent.eventSeats?.length ? (
+                <div className="mt-3 rounded-lg border border-cyan-200/20 bg-slate-900/55 p-3">
+                  <SeatMapPreview eventSeats={selectedEvent.eventSeats} tiers={selectedEvent.tiers} title="Схема мероприятия" variant="dark" />
+                  <div className="mt-2 text-slate-400">Доступно: {selectedEvent.eventSeats.filter((seat) => seat.status === "available").length} · Продано: {selectedEvent.eventSeats.filter((seat) => seat.status === "sold").length} · Блок: {selectedEvent.eventSeats.filter((seat) => seat.status === "blocked").length}</div>
+                  <button onClick={() => setSchemeOpen(true)} className="mt-2 rounded bg-cyan-400 px-3 py-1.5 text-xs font-semibold text-slate-950">Открыть схему</button>
+                </div>
+              ) : null}
+              <div className="mt-2 space-y-1">
+                {selectedEvent.tiers.map((tier, index) => (
+                  <div key={`${tier.name}-${index}`} className="flex items-center justify-between rounded border border-cyan-200/20 bg-slate-900/55 px-2 py-1">
+                    <span>{tier.name} · {tier.price} BYN</span>
+                    <span>Остаток: {tierRemaining(selectedEvent.eventId, tier.name)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="overflow-hidden">
             <table className="w-full table-fixed text-left text-sm">
+              <colgroup>
+                <col style={{ width: "9%" }} />
+                <col style={{ width: "24%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "13%" }} />
+              </colgroup>
               <thead className="text-xs uppercase tracking-wide text-slate-400">
                 <tr className="border-b border-white/10">
-                  <th className="w-[86px] px-2 py-2">ID</th><th className="px-2 py-2">Событие</th><th className="px-2 py-2">Организатор</th><th className="w-[132px] px-2 py-2">Дата/время</th><th className="px-2 py-2">Площадка</th><th className="w-[78px] px-2 py-2">Остаток</th><th className="w-[150px] px-2 py-2">Статус</th>
+                  <th className="px-2 py-2">ID</th><th className="px-2 py-2">Событие</th><th className="px-2 py-2">Организатор</th><th className="px-2 py-2">Дата/время</th><th className="px-2 py-2">Площадка</th><th className="px-2 py-2">Остаток</th><th className="px-2 py-2">Статус</th>
                 </tr>
               </thead>
               <tbody>
@@ -511,11 +547,11 @@ export default function ChannelView({ state, onUpdate }: Props) {
                       }}
                       className={`cursor-pointer border-b border-white/5 transition-colors ${isSelected ? "bg-cyan-500/15" : "hover:bg-slate-800/55"}`}
                     >
-                      <td className="px-2 py-2 font-mono text-xs text-slate-200">{formatDisplayId(event.eventId)}</td>
-                      <td className="truncate px-2 py-2 text-slate-100">{event.title}</td>
-                      <td className="truncate px-2 py-2 text-xs text-slate-300">{organizer}</td>
+                      <td className="px-2 py-2 align-top font-mono text-xs text-slate-200">{formatDisplayId(event.eventId)}</td>
+                      <td className="px-2 py-2 align-top leading-5 text-slate-100"><div className="break-words">{event.title}</div></td>
+                      <td className="px-2 py-2 align-top text-xs leading-5 text-slate-300">{organizer}</td>
                       <td className="px-2 py-2 text-xs text-slate-300">{formatDate(event.dateTime)}</td>
-                      <td className="truncate px-2 py-2 text-xs text-slate-300">{event.venue}</td>
+                      <td className="px-2 py-2 align-top text-xs leading-5 text-slate-300">{event.venue}</td>
                       <td className="px-2 py-2 font-semibold text-white">{event.remaining}</td>
                       <td className="px-2 py-2"><span className={`rounded-md border px-2 py-1 text-xs ${event.status === "published" ? "border-emerald-300/40 bg-emerald-500/10 text-emerald-100" : "border-amber-300/40 bg-amber-500/10 text-amber-100"}`}>{event.status === "published" ? "Синхронизировано" : "Ожидает публикации"}</span></td>
                     </tr>
@@ -524,29 +560,6 @@ export default function ChannelView({ state, onUpdate }: Props) {
               </tbody>
             </table>
           </div>
-          {selectedEvent && (
-            <div className="mt-3 rounded-lg border border-cyan-300/20 bg-cyan-500/5 p-3 text-xs text-slate-200">
-              Выбрано событие: <span className="font-semibold">{selectedEvent.title}</span> · ID: {formatDisplayId(selectedEvent.eventId)}
-              <div className="mt-1 text-slate-400">
-                Каналы продаж: {getEventSalesChannels(state, selectedEvent).map((code) => getSalesChannelLabel(state, code)).join(", ")}
-              </div>
-              <div className="mt-2 space-y-1">
-                {selectedEvent.tiers.map((tier, index) => (
-                  <div key={`${tier.name}-${index}`} className="flex items-center justify-between rounded border border-cyan-200/20 bg-slate-900/55 px-2 py-1">
-                    <span>{tier.name} · {tier.price} BYN</span>
-                    <span>Остаток: {tierRemaining(selectedEvent.eventId, tier.name)}</span>
-                  </div>
-                ))}
-              </div>
-              {selectedEvent.eventSeats?.length ? (
-                <div className="mt-3 rounded-lg border border-cyan-200/20 bg-slate-900/55 p-3">
-                  <div className="font-semibold text-slate-100">Схема мероприятия</div>
-                  <div className="mt-1 text-slate-400">Доступно: {selectedEvent.eventSeats.filter((seat) => seat.status === "available").length} · Продано: {selectedEvent.eventSeats.filter((seat) => seat.status === "sold").length} · Блок: {selectedEvent.eventSeats.filter((seat) => seat.status === "blocked").length}</div>
-                  <button onClick={() => setSchemeOpen(true)} className="mt-2 rounded bg-cyan-400 px-3 py-1.5 text-xs font-semibold text-slate-950">Открыть схему</button>
-                </div>
-              ) : null}
-            </div>
-          )}
         </article>
 
         <div className="xl:col-span-5 space-y-4">

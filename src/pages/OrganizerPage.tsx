@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
+import SeatMapPreview from "@/components/seatmap/SeatMapPreview";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import type { AppState, EventComplianceApplicationRecord, EventRecord, OrganizerDocument, OrganizerSaleRecord } from "@/lib/store";
 import { calculateComplianceFee, getEventSeatSummary, getSalesChannelLabel, logoutOrganizer } from "@/lib/store";
@@ -1277,6 +1278,14 @@ function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianc
         </div>
         <div className="space-y-5 p-6">
           <div className="mb-4"><span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={statusStyle[app.status]}>{statusLabel[app.status]}</span></div>
+          {schemeSummary.hasSeatMap && (
+            <section className="space-y-3 rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
+              <SeatMapPreview eventSeats={schemeSeats} tiers={schemeTiers} title="Схема зала в заявке" />
+              <button onClick={() => setSchemeOpen(true)} className="h-9 rounded-lg px-3 text-sm font-semibold" style={{ background: T.goldBg, color: T.gold }}>
+                Открыть схему
+              </button>
+            </section>
+          )}
           <dl className="space-y-3 text-[13px]">
             <Item k="ID заявки" v={formatDisplayId(app.eventComplianceApplicationId)} />
             <Item k="ID организатора" v={formatDisplayId(app.organizerId)} />
@@ -1304,20 +1313,6 @@ function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianc
               ))}
             </div>
           </section>
-          {schemeSummary.hasSeatMap && (
-            <section className="rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
-              <div className="mb-2 text-xs" style={{ color: T.textSecondary }}>Схема зала</div>
-              <div className="grid grid-cols-2 gap-2 text-[12px]" style={{ color: T.textSecondary }}>
-                <span>Всего: {schemeSummary.total}</span>
-                <span>Доступно: {schemeSummary.available}</span>
-                <span>Продано: {schemeSummary.sold}</span>
-                <span>Блок: {schemeSummary.blocked}</span>
-              </div>
-              <button onClick={() => setSchemeOpen(true)} className="mt-3 h-9 rounded-lg px-3 text-sm font-semibold" style={{ background: T.goldBg, color: T.gold }}>
-                Открыть схему
-              </button>
-            </section>
-          )}
           <section className="rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
             <div className="mb-2 text-xs" style={{ color: T.textSecondary }}>Постер</div>
             {app.data.posterPath ? (
@@ -1358,6 +1353,15 @@ function EventDetailsDrawer({ event, state, onClose }: { event: EventRecord; sta
           <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg"><X size={18} /></button>
         </div>
         <div className="space-y-5 p-6">
+          {summary.hasSeatMap && (
+            <section className="space-y-3 rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
+              <SeatMapPreview eventSeats={event.eventSeats || []} tiers={event.tiers} title="Схема зала мероприятия" />
+              <div className="text-[12px]" style={{ color: T.textSecondary }}>Выручка: {summary.revenue} BYN</div>
+              <button onClick={() => setSchemeOpen(true)} className="h-9 rounded-lg px-3 text-sm font-semibold" style={{ background: T.goldBg, color: T.gold }}>
+                Открыть схему
+              </button>
+            </section>
+          )}
           <dl className="space-y-3 text-[13px]">
             <Item k="ID мероприятия" v={formatDisplayId(event.eventId)} />
             <Item k="Название" v={event.title || "—"} />
@@ -1383,21 +1387,6 @@ function EventDetailsDrawer({ event, state, onClose }: { event: EventRecord; sta
             </div>
           </section>
 
-          {summary.hasSeatMap && (
-            <section className="rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
-              <div className="mb-2 text-xs" style={{ color: T.textSecondary }}>Схема зала</div>
-              <div className="grid grid-cols-2 gap-2 text-[12px]" style={{ color: T.textSecondary }}>
-                <span>Всего: {summary.total}</span>
-                <span>Доступно: {summary.available}</span>
-                <span>Продано: {summary.sold}</span>
-                <span>Блок: {summary.blocked}</span>
-                <span>Выручка: {summary.revenue} BYN</span>
-              </div>
-              <button onClick={() => setSchemeOpen(true)} className="mt-3 h-9 rounded-lg px-3 text-sm font-semibold" style={{ background: T.goldBg, color: T.gold }}>
-                Открыть схему
-              </button>
-            </section>
-          )}
         </div>
       </div>
       <SeatMapModal

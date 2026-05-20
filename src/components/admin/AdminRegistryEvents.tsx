@@ -7,6 +7,7 @@ import { Calendar, Globe, Search, Ticket, X } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import { toast } from "sonner";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
+import SeatMapPreview from "@/components/seatmap/SeatMapPreview";
 
 interface Props {
   state: AppState;
@@ -107,6 +108,16 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
         ) : (
           <div className="overflow-hidden">
             <table className="w-full table-fixed text-sm">
+              <colgroup>
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "24%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "7%" }} />
+                <col style={{ width: "9%" }} />
+                <col style={{ width: "11%" }} />
+              </colgroup>
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
                   {[
@@ -137,18 +148,18 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
                       onMouseEnter={(ev) => (ev.currentTarget.style.background = A.rowHover)}
                       onMouseLeave={(ev) => (ev.currentTarget.style.background = "transparent")}
                     >
-                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.cyan }}>{formatDisplayId(event.eventId)}</td>
-                      <td className="py-3 px-4 truncate" style={{ color: A.textPrimary }}>{event.title}</td>
-                      <td className="py-3 px-4 truncate" style={{ color: A.textSecondary }}>{organizerNameById.get(event.organizerId) || formatDisplayId(event.organizerId)}</td>
-                      <td className="py-3 px-4 text-xs" style={{ color: A.textSecondary }}>{event.dateTime?.replace("T", " ").slice(0, 16) || "—"}</td>
-                      <td className="py-3 px-4 truncate" style={{ color: A.textSecondary }}>{event.venue}</td>
-                      <td className="py-3 px-4" style={{ color: A.textPrimary }}>{event.remaining}</td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-3 align-top font-mono text-xs" style={{ color: A.cyan }}>{formatDisplayId(event.eventId)}</td>
+                      <td className="py-3 px-3 align-top leading-5" style={{ color: A.textPrimary }}><div className="break-words">{event.title}</div></td>
+                      <td className="py-3 px-3 align-top leading-5" style={{ color: A.textSecondary }}>{organizerNameById.get(event.organizerId) || formatDisplayId(event.organizerId)}</td>
+                      <td className="py-3 px-3 align-top text-xs" style={{ color: A.textSecondary }}>{event.dateTime?.replace("T", " ").slice(0, 16) || "—"}</td>
+                      <td className="py-3 px-3 align-top leading-5" style={{ color: A.textSecondary }}>{event.venue}</td>
+                      <td className="py-3 px-3 align-top" style={{ color: A.textPrimary }}>{event.remaining}</td>
+                      <td className="py-3 px-3 align-top">
                         <span style={{ background: chip.bg, color: chip.color, borderRadius: 999 }} className="text-xs px-2.5 py-0.5 font-medium">
                           {getEventStatusLabel(event.status)}
                         </span>
                       </td>
-                      <td className="py-3 px-4 space-x-2" onClick={(ev) => ev.stopPropagation()}>
+                      <td className="space-y-2 py-3 px-3 align-top" onClick={(ev) => ev.stopPropagation()}>
                         {event.status === "approved" && (
                           <button type="button" onClick={() => handlePublish(event.eventId)} className="rounded-lg px-2.5 py-1 text-xs font-medium" style={{ background: A.statusInfoBg, color: A.statusInfo }}>
                             <Globe size={12} className="inline mr-1" />Опубликовать мероприятие
@@ -173,7 +184,7 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
         <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setDrawer(null)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <div
-            className="relative w-full max-w-md h-full overflow-y-auto animate-in slide-in-from-right duration-300"
+            className="relative h-full w-full max-w-xl overflow-y-auto animate-in slide-in-from-right duration-300"
             style={{ background: A.glassGradient + ", " + A.sidebarBg, borderLeft: `1px solid ${A.borderGlass}` }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -182,6 +193,12 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
               <button onClick={() => setDrawer(null)} style={{ color: A.textMuted }}><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
+              {getEventSeatSummary(drawer).hasSeatMap && (
+                <div className="space-y-3 rounded-lg border p-3" style={{ borderColor: A.border, background: A.surfaceBg }}>
+                  <SeatMapPreview eventSeats={drawer.eventSeats || []} tiers={drawer.tiers} title="Схема зала" />
+                  <button onClick={() => setSchemeEvent(drawer)} className="rounded px-3 py-2 text-sm font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>Открыть схему</button>
+                </div>
+              )}
               {(() => {
                 const compliance = complianceByEventId.get(drawer.eventId);
                 const salesChannels = getEventSalesChannels(state, drawer).map((code) => getSalesChannelLabel(state, code));
@@ -241,21 +258,6 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
                         );
                       })()}
                     </div>
-                    {getEventSeatSummary(drawer).hasSeatMap && (() => {
-                      const summary = getEventSeatSummary(drawer);
-                      return (
-                        <div className="rounded-lg border p-3" style={{ borderColor: A.border, background: A.surfaceBg }}>
-                          <div className="mb-2 text-sm font-semibold" style={{ color: A.textPrimary }}>Схема зала</div>
-                          <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: A.textSecondary }}>
-                            <span>Всего: {summary.total}</span>
-                            <span>Доступно: {summary.available}</span>
-                            <span>Продано: {summary.sold}</span>
-                            <span>Блок: {summary.blocked}</span>
-                          </div>
-                          <button onClick={() => setSchemeEvent(drawer)} className="mt-3 rounded px-3 py-2 text-sm font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>Открыть схему</button>
-                        </div>
-                      );
-                    })()}
                   </>
                 );
               })()}
