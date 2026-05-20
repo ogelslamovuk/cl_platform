@@ -19,6 +19,10 @@ type Props = {
   onBuySeat?: (seat: EventSeat) => void;
 };
 
+const EMPTY_BASE_SEATS: SeatMapSeat[] = [];
+const EMPTY_EVENT_SEATS: EventSeat[] = [];
+const EMPTY_TIERS: PriceTier[] = [];
+
 const statusLabel: Record<SeatStatus, string> = {
   available: "доступно",
   sold: "продано",
@@ -69,9 +73,9 @@ export default function SeatMapModal({
   title,
   subtitle,
   mode,
-  baseSeats = [],
-  eventSeats = [],
-  tiers = [],
+  baseSeats = EMPTY_BASE_SEATS,
+  eventSeats = EMPTY_EVENT_SEATS,
+  tiers = EMPTY_TIERS,
   onClose,
   onSaveLayout,
   onSaveEventSeats,
@@ -164,8 +168,8 @@ export default function SeatMapModal({
   const buyerMode = mode === "buyer";
 
   return (
-    <div className="fixed inset-0 z-[80] bg-slate-950/70 p-3 backdrop-blur-sm sm:p-5">
-      <div className="mx-auto flex h-full max-w-7xl flex-col overflow-hidden rounded-xl border bg-white shadow-2xl" style={{ borderColor: "rgba(15,23,42,0.14)" }}>
+    <div data-seat-map-modal={mode} className="fixed inset-0 z-[80] bg-slate-950/70 p-3 backdrop-blur-sm sm:p-5">
+      <div className="mx-auto flex h-full w-full max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-xl border bg-white shadow-2xl sm:max-w-[calc(100vw-40px)] xl:max-w-7xl" style={{ borderColor: "rgba(15,23,42,0.14)" }}>
         <header className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "rgba(15,23,42,0.12)" }}>
           <div className="min-w-0">
             <h2 className="truncate text-lg font-semibold text-slate-950">{title}</h2>
@@ -176,8 +180,8 @@ export default function SeatMapModal({
           </button>
         </header>
 
-        <div className="grid min-h-0 flex-1 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="space-y-4 overflow-y-auto border-b p-4 lg:border-b-0 lg:border-r" style={{ borderColor: "rgba(15,23,42,0.12)" }}>
+        <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(220px,260px)_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="min-w-0 space-y-4 overflow-y-auto border-b p-4 md:border-b-0 md:border-r" style={{ borderColor: "rgba(15,23,42,0.12)" }}>
             {mode === "layout" && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-slate-900">Базовая схема</div>
@@ -219,7 +223,7 @@ export default function SeatMapModal({
                     <div>{selectedEventSeat.tariffName} · {selectedEventSeat.price || 0} BYN</div>
                   </div>
                 ) : <p className="text-sm text-slate-500">Нажмите доступное место на схеме.</p>}
-                <button disabled={!selectedEventSeat} onClick={() => selectedEventSeat && onBuySeat?.(selectedEventSeat)} className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Подтвердить место</button>
+                <button data-seat-map-confirm-seat disabled={!selectedEventSeat} onClick={() => selectedEventSeat && onBuySeat?.(selectedEventSeat)} className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Подтвердить место</button>
               </div>
             )}
 
@@ -244,7 +248,7 @@ export default function SeatMapModal({
             </div>
           </aside>
 
-          <main className={buyerMode ? "min-h-0 overflow-hidden bg-slate-50 p-3 sm:p-4" : "min-h-0 overflow-auto bg-slate-50 p-4"}>
+          <main className={buyerMode ? "min-h-0 min-w-0 overflow-hidden bg-slate-50 p-3 sm:p-4" : "min-h-0 min-w-0 overflow-auto bg-slate-50 p-4"}>
             {!buyerMode && (
               <div className="mb-3 flex items-center justify-end gap-2">
                 <button onClick={() => setZoom((value) => Math.max(0.7, value - 0.1))} className="flex h-9 w-9 items-center justify-center rounded-lg border bg-white"><Minus size={16} /></button>
@@ -280,6 +284,8 @@ export default function SeatMapModal({
                       disabled={disabled}
                       onClick={() => toggleSeat(seat.seatId)}
                       aria-label={tooltipText}
+                      data-seat-map-seat={seat.seatId}
+                      data-seat-status={eventSeat.status || "available"}
                       className={buyerMode
                         ? "group/seat relative flex aspect-[10/9] w-full max-w-10 items-center justify-center justify-self-center rounded-b-lg rounded-t-[18px] border text-[0px] font-semibold shadow-sm outline-none ring-offset-2 transition before:absolute before:inset-x-[18%] before:bottom-[14%] before:h-[10%] before:rounded-full before:bg-white/30 hover:-translate-y-0.5 hover:border-amber-400 hover:ring-2 hover:ring-amber-200 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-70 sm:text-[10px]"
                         : "group/seat relative flex h-9 w-10 items-center justify-center rounded-b-lg rounded-t-[18px] border text-[10px] font-semibold shadow-sm outline-none ring-offset-2 transition before:absolute before:inset-x-1.5 before:bottom-1 before:h-1 before:rounded-full before:bg-white/30 hover:-translate-y-0.5 hover:border-amber-400 hover:ring-2 hover:ring-amber-200 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-70"}
