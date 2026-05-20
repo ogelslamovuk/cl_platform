@@ -59,3 +59,52 @@ Codex сначала читает этот файл, затем GitHub issue/tas
 Raw technical labels не показывать в пользовательском UI, если есть человекочитаемый аналог: `sell`, `redeem`, `refund`, `issue`, `published`, `approved`, `issued`. Для таблиц использовать короткий display ID, не меняя исходный ID в state.
 
 Результат flow-задачи не принимается, если build не проходил, smoke не проходил, есть partial вместо pass/fail, изменены файлы вне scope, появились дубли JSX/массивов/кнопок, или проблема закрыта заглушкой вместо исправления.
+
+---
+
+## 19. Delivery / live-deploy gate
+
+Этот раздел обязателен для задач, где ожидаемый результат должен быть виден на live-сайте.
+
+Если task package, issue или пользовательская команда содержит слова `deploy`, `live`, `на сайте`, `видно на сайте`, `GitHub Pages`, `задеплоить`, `довести до сайта`, то задача работает в режиме live-delivery.
+
+В режиме live-delivery задача не считается завершённой, пока изменения не прошли полный путь:
+
+1. изменения внесены в рабочей ветке;
+2. изменения staged;
+3. изменения committed;
+4. ветка pushed в GitHub;
+5. создан PR в `main` или выполнен другой стандартный путь проекта в `main`;
+6. build/checks passed;
+7. изменения попали в `main`;
+8. GitHub Pages deploy completed;
+9. live URLs проверены;
+10. пользовательский результат реально виден на live-сайте.
+
+Запрещено сдавать live-delivery задачу со статусами:
+- `изменения в working tree`;
+- `not staged`;
+- `not committed`;
+- `локально готово`;
+- `dev server доступен`;
+- `build passed`, если нет push/PR/main/deploy/live-check;
+- `PR создан`, если нет merge/deploy/live-check.
+
+Для live-delivery задач финальный отчёт должен содержать:
+- commit SHA;
+- branch;
+- PR link, если PR использовался;
+- merge/deploy status;
+- live URLs;
+- результат live-проверки по каждому маршруту;
+- список изменённых файлов;
+- `npm run build: passed`.
+
+Если Codex не может выполнить push, PR, merge или deploy из-за прав/настроек, он обязан остановиться и явно написать, на каком точном шаге остановился и какая команда/действие требуется. Нельзя писать `готово`.
+
+Для `cl_platform` live routes по умолчанию:
+- `https://ogelslamovuk.github.io/cl_platform/#/main`
+- `https://ogelslamovuk.github.io/cl_platform/#/demo`
+- `https://ogelslamovuk.github.io/cl_platform/#/organizer`
+- `https://ogelslamovuk.github.io/cl_platform/#/admin`
+- `https://ogelslamovuk.github.io/cl_platform/#/channel`
