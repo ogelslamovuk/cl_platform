@@ -973,9 +973,93 @@ export function getEventSeatSummary(event: Pick<EventRecord, "eventSeats" | "tie
   };
 }
 
+function legacySeatRowLabel(rowIndex: number): string {
+  let n = Math.max(0, Math.floor(rowIndex));
+  let label = "";
+  do {
+    label = String.fromCharCode(65 + (n % 26)) + label;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return label;
+}
+
+function legacySeatPosition(index: number, total: number): Pick<SeatMapSeat, "label" | "row" | "number" | "x" | "y" | "w" | "h"> {
+  const cols = Math.max(1, Math.min(20, Math.ceil(Math.sqrt(Math.max(1, total)))));
+  const rowIndex = Math.floor(index / cols);
+  const row = legacySeatRowLabel(rowIndex);
+  const number = (index % cols) + 1;
+  return {
+    label: `${row}${number}`,
+    row,
+    number,
+    x: number - 1,
+    y: rowIndex,
+    w: 1,
+    h: 1,
+  };
+}
+
+function ticketSeatStatus(status: TicketStatus): SeatStatus {
+  return status === "sold" || status === "redeemed" ? "sold" : "available";
+}
+
+function buildLegacyEventSeatsWithSalesState(
+  tickets: Ticket[],
+  event: Pick<EventRecord, "eventId" | "tiers" | "capacity">
+): EventSeat[] {
+  const tiers = normalizeTierRows(event.tiers, event.capacity);
+  const tierByName = new Map(tiers.map((tier, index) => [tier.name, { ...tier, index }]));
+  const eventTickets = tickets.filter((ticket) => ticket.eventId === event.eventId);
+
+  if (eventTickets.length > 0) {
+    return eventTickets.map((ticket, index) => {
+      const tier = tierByName.get(ticket.tier) || tiers[0];
+      const position = legacySeatPosition(index, eventTickets.length);
+      const row = ticket.row || position.row;
+      const number = ticket.seatNumber || position.number;
+      return {
+        seatId: ticket.seatId || `legacy-${event.eventId}-${ticket.ticketId || index}`,
+        label: ticket.seatLabel || `${row}${number}`,
+        row,
+        number,
+        x: position.x,
+        y: position.y,
+        w: 1,
+        h: 1,
+        tariffId: ticket.tier,
+        tariffName: ticket.tier,
+        price: tier?.price || 0,
+        color: tier?.color || SEAT_TARIFF_COLORS[(tier?.index || 0) % SEAT_TARIFF_COLORS.length],
+        status: ticketSeatStatus(ticket.status),
+      };
+    });
+  }
+
+  const plannedSeats = tiers.flatMap((tier, tierIndex) => (
+    Array.from({ length: Math.max(0, Math.floor(tier.quantity || 0)) }, () => ({ tier, tierIndex }))
+  ));
+  const fallbackTotal = plannedSeats.length || Math.max(0, Math.floor(event.capacity || 0));
+  const sourceSeats = plannedSeats.length > 0
+    ? plannedSeats
+    : Array.from({ length: fallbackTotal }, (_, index) => ({ tier: tiers[index % Math.max(1, tiers.length)], tierIndex: index % Math.max(1, tiers.length) }));
+
+  return sourceSeats.map(({ tier, tierIndex }, index) => {
+    const position = legacySeatPosition(index, sourceSeats.length);
+    return {
+      seatId: `legacy-${event.eventId}-${index + 1}`,
+      ...position,
+      tariffId: tier?.name,
+      tariffName: tier?.name,
+      price: tier?.price || 0,
+      color: tier?.color || SEAT_TARIFF_COLORS[tierIndex % SEAT_TARIFF_COLORS.length],
+      status: "available",
+    };
+  });
+}
+
 export function getEventSeatsWithSalesState(
   state: Pick<AppState, "seatMapLayouts" | "tickets">,
-  event: Pick<EventRecord, "eventId" | "eventSeats" | "tiers" | "layoutId">
+  event: Pick<EventRecord, "eventId" | "eventSeats" | "tiers" | "layoutId" | "capacity">
 ): EventSeat[] {
   const normalizedSeats = normalizeEventSeats(event.eventSeats);
   const layout = normalizedSeats.length === 0 && event.layoutId
@@ -987,7 +1071,7 @@ export function getEventSeatsWithSalesState(
       ? buildEventSeatsFromLayout(layout, event.tiers)
       : [];
 
-  if (seats.length === 0) return [];
+  if (seats.length === 0) return buildLegacyEventSeatsWithSalesState(state.tickets, event);
 
   const statusBySeatId = new Map<string, SeatStatus>();
   state.tickets.forEach((ticket) => {
