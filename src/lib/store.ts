@@ -973,6 +973,41 @@ export function getEventSeatSummary(event: Pick<EventRecord, "eventSeats" | "tie
   };
 }
 
+export function getEventSeatsWithSalesState(
+  state: Pick<AppState, "seatMapLayouts" | "tickets">,
+  event: Pick<EventRecord, "eventId" | "eventSeats" | "tiers" | "layoutId">
+): EventSeat[] {
+  const normalizedSeats = normalizeEventSeats(event.eventSeats);
+  const layout = normalizedSeats.length === 0 && event.layoutId
+    ? state.seatMapLayouts.find((item) => item.layoutId === event.layoutId)
+    : null;
+  const seats = normalizedSeats.length > 0
+    ? normalizedSeats
+    : layout
+      ? buildEventSeatsFromLayout(layout, event.tiers)
+      : [];
+
+  if (seats.length === 0) return [];
+
+  const statusBySeatId = new Map<string, SeatStatus>();
+  state.tickets.forEach((ticket) => {
+    if (ticket.eventId !== event.eventId || !ticket.seatId) return;
+    if (ticket.status === "sold" || ticket.status === "redeemed") {
+      statusBySeatId.set(ticket.seatId, "sold");
+      return;
+    }
+    if (!statusBySeatId.has(ticket.seatId)) {
+      statusBySeatId.set(ticket.seatId, "available");
+    }
+  });
+
+  return seats.map((seat) => {
+    if (seat.status === "blocked") return seat;
+    const ticketStatus = statusBySeatId.get(seat.seatId);
+    return ticketStatus ? { ...seat, status: ticketStatus } : seat;
+  });
+}
+
 export function saveSeatMapLayout(state: AppState, layoutId: string, seats: SeatMapSeat[]): boolean {
   const layout = state.seatMapLayouts.find((item) => item.layoutId === layoutId);
   if (!layout) return false;
@@ -1060,6 +1095,98 @@ export function createVenueRegistryRecord(state: AppState, input: CreateVenueReg
   };
 
   state.venueRegistry.push(venue);
+  saveState(state);
+  return venue;
+}
+
+export function ensureMockVenueRegistryRecord(state: AppState): VenueRegistryRecord {
+  ensureSeatMapState(state);
+
+  const now = nowIso();
+  const venueId = "venue_mock_seatmap_demo";
+  const hallId = "hall_mock_seatmap_demo";
+  const layoutId = "layout_mock_seatmap_demo";
+  const venueName = "Demo-площадка со схемой";
+  const hallName = "Demo-зал";
+  const seats = createRectangularSeats(layoutId, 4, 6);
+  const capacity = seats.length;
+
+  let layout = state.seatMapLayouts.find((item) => item.layoutId === layoutId);
+  if (!layout) {
+    layout = {
+      layoutId,
+      venueId,
+      hallId,
+      name: "Demo-схема 4x6",
+      seats,
+      createdAt: now,
+      updatedAt: now,
+    };
+    state.seatMapLayouts.push(layout);
+  } else {
+    layout.venueId = venueId;
+    layout.hallId = hallId;
+    layout.name ||= "Demo-схема 4x6";
+    if (!Array.isArray(layout.seats) || layout.seats.length === 0) {
+      layout.seats = seats;
+    }
+    layout.updatedAt = now;
+  }
+
+  let venue = state.venueRegistry.find((item) => item.venueId === venueId || item.name === venueName);
+  if (!venue) {
+    venue = {
+      venueId,
+      name: venueName,
+      city: "Минск",
+      region: "Минск",
+      type: "концертный зал",
+      address: "ул. Demo, 1",
+      description: "Demo-площадка для проверки схемы зала в реестре.",
+      capacity,
+      status: "approved",
+      halls: [{
+        hallId,
+        venueId,
+        name: hallName,
+        capacity,
+        hasSeatMap: true,
+        layoutId,
+      }],
+    };
+    state.venueRegistry.push(venue);
+  } else {
+    venue.venueId = venueId;
+    venue.name = venueName;
+    venue.city ||= "Минск";
+    venue.region ||= venue.city;
+    venue.type ||= "концертный зал";
+    venue.address ||= "ул. Demo, 1";
+    venue.description ||= "Demo-площадка для проверки схемы зала в реестре.";
+    venue.capacity = Math.max(venue.capacity || 0, capacity);
+    venue.status = "approved";
+    if (!Array.isArray(venue.halls)) venue.halls = [];
+    let hall = venue.halls.find((item) => item.hallId === hallId || item.layoutId === layoutId);
+    if (!hall) {
+      hall = {
+        hallId,
+        venueId,
+        name: hallName,
+        capacity,
+        hasSeatMap: true,
+        layoutId,
+      };
+      venue.halls.push(hall);
+    } else {
+      hall.hallId = hallId;
+      hall.venueId = venueId;
+      hall.name ||= hallName;
+      hall.capacity = Math.max(hall.capacity || 0, capacity);
+      hall.hasSeatMap = true;
+      hall.layoutId = layoutId;
+    }
+  }
+
   saveState(state);
   return venue;
 }

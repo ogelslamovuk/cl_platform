@@ -7,7 +7,7 @@ import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import SeatMapPreview from "@/components/seatmap/SeatMapPreview";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import type { AppState, EventComplianceApplicationRecord, EventRecord, OrganizerDocument, OrganizerSaleRecord } from "@/lib/store";
-import { calculateComplianceFee, getEventSeatSummary, getSalesChannelLabel, logoutOrganizer } from "@/lib/store";
+import { calculateComplianceFee, getEventSeatsWithSalesState, getEventSeatSummary, getSalesChannelLabel, logoutOrganizer } from "@/lib/store";
 import { formatDisplayId, getEventStatusLabel, getOperationTypeLabel } from "@/lib/display";
 import {
   calculateOrganizerFinance,
@@ -1342,7 +1342,8 @@ function EventDetailsDrawer({ event, state, onClose }: { event: EventRecord; sta
   const [schemeOpen, setSchemeOpen] = useState(false);
   const compliance = getComplianceByEvent(state, event);
   const salesChannels = (event.salesChannels?.length ? event.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code));
-  const summary = getEventSeatSummary(event);
+  const eventSeats = getEventSeatsWithSalesState(state, event);
+  const summary = getEventSeatSummary({ eventSeats, tiers: event.tiers });
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
@@ -1355,7 +1356,7 @@ function EventDetailsDrawer({ event, state, onClose }: { event: EventRecord; sta
         <div className="space-y-5 p-6">
           {summary.hasSeatMap && (
             <section className="space-y-3 rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
-              <SeatMapPreview eventSeats={event.eventSeats || []} tiers={event.tiers} title="Схема зала мероприятия" />
+              <SeatMapPreview eventSeats={eventSeats} tiers={event.tiers} title="Схема зала мероприятия" />
               <div className="text-[12px]" style={{ color: T.textSecondary }}>Выручка: {summary.revenue} BYN</div>
               <button onClick={() => setSchemeOpen(true)} className="h-9 rounded-lg px-3 text-sm font-semibold" style={{ background: T.goldBg, color: T.gold }}>
                 Открыть схему
@@ -1394,7 +1395,7 @@ function EventDetailsDrawer({ event, state, onClose }: { event: EventRecord; sta
         title="Схема мероприятия"
         subtitle={event.title}
         mode="viewer"
-        eventSeats={event.eventSeats || []}
+        eventSeats={eventSeats}
         tiers={event.tiers}
         onClose={() => setSchemeOpen(false)}
       />
