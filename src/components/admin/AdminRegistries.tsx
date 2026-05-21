@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from "react";
 import type { AppState, CreateVenueRegistryInput, VenueRegistryRecord } from "@/lib/store";
-import { createVenueRegistryRecord, getSeatMapLayout, saveSeatMapLayout } from "@/lib/store";
+import { createVenueRegistryRecord, ensureMockVenueRegistryRecord, getSeatMapLayout, saveSeatMapLayout } from "@/lib/store";
 import { A, statusChip } from "./adminStyles";
-import { Building2, MapPin, Plus, X } from "lucide-react";
+import { Building2, Database, MapPin, Plus, X } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
+import { toast } from "sonner";
 
 function CardHelp({ text }: { text: string }) {
   return (
@@ -188,6 +189,14 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
     setForm(defaultVenueForm());
   };
 
+  const handleEnsureMockVenues = () => {
+    const venue = ensureMockVenueRegistryRecord(state);
+    setCityFilter("");
+    setDrawer(venue);
+    onUpdate({ ...state });
+    toast.success("Mock-площадка со схемой добавлена в реестр");
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -195,9 +204,14 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
           <span className="text-xs" style={{ color: A.textSecondary }}>Реестр площадок</span>
           <HelpTooltip text="Нажмите на строку площадки, чтобы открыть подробные сведения в боковой панели." />
         </div>
-        <button onClick={() => setCreateOpen(true)} className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>
-          <Plus size={15} /> Создать площадку
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => setCreateOpen(true)} className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>
+            <Plus size={15} /> Создать площадку
+          </button>
+          <button onClick={handleEnsureMockVenues} className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold" style={{ background: A.statusOkBg, color: A.statusOk }}>
+            <Database size={15} /> Заполнить mock-данными
+          </button>
+        </div>
       </div>
       <div className="max-w-xs">
         <select value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} className="h-9 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle}>
