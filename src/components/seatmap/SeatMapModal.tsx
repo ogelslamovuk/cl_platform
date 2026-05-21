@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Minus, Plus, Save, Trash2, X } from "lucide-react";
 import type { EventSeat, PriceTier, SeatMapSeat, SeatStatus } from "@/lib/store";
 import { SEAT_TARIFF_COLORS, createRectangularSeats } from "@/lib/store";
@@ -104,7 +105,7 @@ export default function SeatMapModal({
     [selectedIds, workingSeats],
   );
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const toggleSeat = (seatId: string) => {
     const seat = workingSeats.find((item) => item.seatId === seatId);
@@ -166,7 +167,7 @@ export default function SeatMapModal({
   );
   const buyerMode = mode === "buyer";
 
-  return (
+  return createPortal(
     <div data-seat-map-modal={mode} className="fixed inset-0 z-[80] bg-slate-950/70 p-3 backdrop-blur-sm sm:p-5">
       <div className="mx-auto flex h-full w-full max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-xl border bg-white shadow-2xl sm:max-w-[calc(100vw-40px)] xl:max-w-7xl" style={{ borderColor: "rgba(15,23,42,0.14)" }}>
         <header className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "rgba(15,23,42,0.12)" }}>
@@ -310,6 +311,7 @@ export default function SeatMapModal({
           </main>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
