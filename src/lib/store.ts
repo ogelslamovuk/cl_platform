@@ -5,6 +5,7 @@ import {
   cloneSeatMapLayoutV2,
   createGrandTheatreLayoutV2,
   flattenSeatMapLayoutV2,
+  flattenSeatMapLayoutV2ToLegacySeats,
   type SeatMapLayoutV2,
 } from "@/lib/seatMapV2";
 
@@ -1196,6 +1197,7 @@ export type CreateVenueRegistryInput = {
   rows: number;
   cols: number;
   hasSeatMap: boolean;
+  layoutV2?: SeatMapLayoutV2;
 };
 
 export function createVenueRegistryRecord(state: AppState, input: CreateVenueRegistryInput): VenueRegistryRecord | null {
@@ -1208,7 +1210,14 @@ export function createVenueRegistryRecord(state: AppState, input: CreateVenueReg
   const venueId = quickId("VENUE");
   const hallId = quickId("HALL");
   const layoutId = input.hasSeatMap ? quickId("LAYOUT") : undefined;
-  const seats = input.hasSeatMap ? createRectangularSeats(layoutId || hallId, input.rows, input.cols) : [];
+  const layoutV2 = input.hasSeatMap && input.layoutV2 ? cloneSeatMapLayoutV2(input.layoutV2) : undefined;
+  if (layoutV2 && layoutId) layoutV2.layoutId = layoutId;
+  const seats = input.hasSeatMap
+    ? layoutV2
+      ? flattenSeatMapLayoutV2ToLegacySeats(layoutV2)
+      : createRectangularSeats(layoutId || hallId, input.rows, input.cols)
+    : [];
+  if (layoutV2 && seats.length > 500) return null;
   const capacity = input.hasSeatMap ? seats.length : Math.max(1, Math.floor(input.rows || 1) * Math.floor(input.cols || 1));
 
   if (layoutId) {
@@ -1216,8 +1225,11 @@ export function createVenueRegistryRecord(state: AppState, input: CreateVenueReg
       layoutId,
       venueId,
       hallId,
-      name: `${input.hallName.trim() || "Основной зал"} ${Math.max(1, Math.floor(input.rows || 1))}x${Math.max(1, Math.floor(input.cols || 1))}`,
+      name: layoutV2
+        ? `${input.hallName.trim() || "Основной зал"} · сложная схема`
+        : `${input.hallName.trim() || "Основной зал"} ${Math.max(1, Math.floor(input.rows || 1))}x${Math.max(1, Math.floor(input.cols || 1))}`,
       seats,
+      layoutV2,
       createdAt: now,
       updatedAt: now,
     });

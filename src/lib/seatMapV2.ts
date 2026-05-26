@@ -1,6 +1,6 @@
 export type SeatMapBlockV2Type = "straight" | "diagonal" | "arc" | "balcony" | "box" | "openArea";
 export type SeatMapSectorV2Type = "parterre" | "side" | "balcony" | "box" | "arena";
-export type SeatMapObjectV2Type = "stage" | "pit" | "label" | "aisle";
+export type SeatMapObjectV2Type = "stage" | "pit" | "arena" | "label" | "aisle";
 
 export interface SeatMapSeatV2 {
   seatId: string;
@@ -29,6 +29,10 @@ export interface SeatMapBlockV2 {
   y: number;
   rotation: number;
   accent: string;
+  rowSpacing?: number;
+  seatSpacing?: number;
+  tariffName?: string;
+  price?: number;
   rows: SeatMapRowV2[];
 }
 
@@ -80,6 +84,8 @@ export interface LegacySeatLike {
 }
 
 export const COMPLEX_THEATRE_LAYOUT_ID = "layout_grand_theatre_v2";
+export const MAX_COMPLEX_LAYOUT_SEATS = 500;
+export type SeatMapConstructorBlockType = Extract<SeatMapBlockV2Type, "straight" | "diagonal" | "balcony" | "box">;
 
 type TariffStyle = {
   name: string;
@@ -88,6 +94,7 @@ type TariffStyle = {
 };
 
 type BuildBlockOptions = {
+  layoutId?: string;
   id: string;
   name: string;
   type: SeatMapBlockV2Type;
@@ -112,6 +119,7 @@ const BOX: TariffStyle = { name: "Ложа", price: 240, color: "#EA580C" };
 function buildBlock(options: BuildBlockOptions): SeatMapBlockV2 {
   const seatGap = options.seatGap ?? 27;
   const rowGap = options.rowGap ?? 29;
+  const firstTariff = options.tariffForRow(0);
   return {
     id: options.id,
     name: options.name,
@@ -120,6 +128,10 @@ function buildBlock(options: BuildBlockOptions): SeatMapBlockV2 {
     y: options.y,
     rotation: options.rotation ?? 0,
     accent: options.accent,
+    rowSpacing: rowGap,
+    seatSpacing: seatGap,
+    tariffName: firstTariff.name,
+    price: firstTariff.price,
     rows: Array.from({ length: options.rows }, (_, rowIndex) => {
       const row = `${options.rowPrefix}${rowIndex + 1}`;
       const tariff = options.tariffForRow(rowIndex);
@@ -128,7 +140,7 @@ function buildBlock(options: BuildBlockOptions): SeatMapBlockV2 {
         id: `${options.id}-${row}`,
         label: row,
         seats: Array.from({ length: options.seatsPerRow }, (_, seatIndex) => ({
-          seatId: `${COMPLEX_THEATRE_LAYOUT_ID}-${options.id}-${row}-${seatIndex + 1}`,
+          seatId: `${options.layoutId || COMPLEX_THEATRE_LAYOUT_ID}-${options.id}-${row}-${seatIndex + 1}`,
           label: `${row}-${seatIndex + 1}`,
           row,
           number: seatIndex + 1,
@@ -285,6 +297,19 @@ export function countSeatMapLayoutV2Seats(layout: SeatMapLayoutV2): number {
   return flattenSeatMapLayoutV2(layout).length;
 }
 
+export function flattenSeatMapLayoutV2ToLegacySeats(layout: SeatMapLayoutV2): Array<LegacySeatLike & { w: number; h: number }> {
+  return flattenSeatMapLayoutV2(layout).map((seat, index) => ({
+    seatId: seat.seatId,
+    label: seat.label,
+    row: seat.row,
+    number: seat.number,
+    x: index % 20,
+    y: Math.floor(index / 20),
+    w: 1,
+    h: 1,
+  }));
+}
+
 export function cloneSeatMapLayoutV2(layout: SeatMapLayoutV2): SeatMapLayoutV2 {
   return {
     ...layout,
@@ -299,6 +324,262 @@ export function cloneSeatMapLayoutV2(layout: SeatMapLayoutV2): SeatMapLayoutV2 {
         })),
       })),
     })),
+  };
+}
+
+type ConstructorTariff = TariffStyle & { id: string };
+
+export const CONSTRUCTOR_TARIFFS: ConstructorTariff[] = [
+  { id: "standard", name: "Стандарт", price: 70, color: "#2563EB" },
+  { id: "premium", name: "Премиум", price: 120, color: "#8B5CF6" },
+  { id: "vip", name: "VIP", price: 180, color: "#F59E0B" },
+  { id: "box", name: "Ложа", price: 240, color: "#EA580C" },
+];
+
+export type SeatMapConstructorBlockSettings = {
+  name: string;
+  rows: number;
+  seatsPerRow: number;
+  rowSpacing: number;
+  seatSpacing: number;
+  rotation: number;
+  tariffId: string;
+};
+
+type ConstructorTemplate = {
+  name: string;
+  sectorId: string;
+  sectorName: string;
+  sectorType: SeatMapSectorV2Type;
+  labelX: number;
+  labelY: number;
+  accent: string;
+  x: number;
+  y: number;
+  rotation: number;
+  rows: number;
+  seatsPerRow: number;
+  rowPrefix: string;
+  tariffId: string;
+};
+
+const CONSTRUCTOR_TEMPLATES: Record<SeatMapConstructorBlockType, ConstructorTemplate> = {
+  straight: {
+    name: "Центральный партер",
+    sectorId: "constructor-parterre",
+    sectorName: "ПАРТЕР",
+    sectorType: "parterre",
+    labelX: 560,
+    labelY: 212,
+    accent: "#2563EB",
+    x: 452,
+    y: 258,
+    rotation: 0,
+    rows: 6,
+    seatsPerRow: 10,
+    rowPrefix: "P",
+    tariffId: "standard",
+  },
+  diagonal: {
+    name: "Боковой сектор",
+    sectorId: "constructor-side",
+    sectorName: "БОКОВЫЕ СЕКТОРА",
+    sectorType: "side",
+    labelX: 48,
+    labelY: 212,
+    accent: "#38BDF8",
+    x: 148,
+    y: 284,
+    rotation: -12,
+    rows: 5,
+    seatsPerRow: 5,
+    rowPrefix: "S",
+    tariffId: "premium",
+  },
+  balcony: {
+    name: "Балкон",
+    sectorId: "constructor-balcony",
+    sectorName: "БАЛКОН",
+    sectorType: "balcony",
+    labelX: 570,
+    labelY: 578,
+    accent: "#8B5CF6",
+    x: 374,
+    y: 622,
+    rotation: 0,
+    rows: 3,
+    seatsPerRow: 15,
+    rowPrefix: "B",
+    tariffId: "premium",
+  },
+  box: {
+    name: "Ложа",
+    sectorId: "constructor-boxes",
+    sectorName: "ЛОЖИ",
+    sectorType: "box",
+    labelX: 62,
+    labelY: 155,
+    accent: "#F97316",
+    x: 82,
+    y: 205,
+    rotation: -5,
+    rows: 1,
+    seatsPerRow: 5,
+    rowPrefix: "Л",
+    tariffId: "box",
+  },
+};
+
+function constructorTariff(tariffId: string): ConstructorTariff {
+  return CONSTRUCTOR_TARIFFS.find((tariff) => tariff.id === tariffId) || CONSTRUCTOR_TARIFFS[0];
+}
+
+function constructorBlockCount(layout: SeatMapLayoutV2, type: SeatMapConstructorBlockType): number {
+  return layout.sectors.flatMap((sector) => sector.blocks).filter((block) => block.type === type).length;
+}
+
+function buildConstructorBlock(
+  layout: SeatMapLayoutV2,
+  type: SeatMapConstructorBlockType,
+  id: string,
+  settings: SeatMapConstructorBlockSettings,
+  x: number,
+  y: number,
+): SeatMapBlockV2 {
+  const template = CONSTRUCTOR_TEMPLATES[type];
+  const tariff = constructorTariff(settings.tariffId);
+  return buildBlock({
+    layoutId: layout.layoutId,
+    id,
+    name: settings.name,
+    type,
+    x,
+    y,
+    rotation: settings.rotation,
+    accent: tariff.color || template.accent,
+    rows: type === "box" ? 1 : settings.rows,
+    seatsPerRow: settings.seatsPerRow,
+    rowPrefix: template.rowPrefix,
+    tariffForRow: () => tariff,
+    seatGap: settings.seatSpacing,
+    rowGap: settings.rowSpacing,
+    indentForRow: type === "balcony" ? (row) => Math.max(0, settings.rows - row - 1) * 8 : undefined,
+  });
+}
+
+export function createConstructorLayoutV2(layoutId: string, name: string): SeatMapLayoutV2 {
+  const base: SeatMapLayoutV2 = {
+    version: 2,
+    layoutId,
+    name,
+    style: "theatre",
+    width: 1220,
+    height: 790,
+    objects: [{
+      id: `${layoutId}-object-stage`,
+      type: "stage",
+      x: 388,
+      y: 46,
+      width: 444,
+      height: 84,
+      radius: 40,
+      label: "СЦЕНА",
+      fill: "#172554",
+      stroke: "#60A5FA",
+    }],
+    sectors: [],
+  };
+  return addConstructorBlockV2(base, "straight");
+}
+
+export function addConstructorBlockV2(layout: SeatMapLayoutV2, type: SeatMapConstructorBlockType): SeatMapLayoutV2 {
+  const template = CONSTRUCTOR_TEMPLATES[type];
+  const count = constructorBlockCount(layout, type);
+  let number = count + 1;
+  const blocks = layout.sectors.flatMap((sector) => sector.blocks);
+  while (blocks.some((block) => block.id === `${type}-${number}`)) number += 1;
+  const id = `${type}-${number}`;
+  const settings: SeatMapConstructorBlockSettings = {
+    name: count === 0 ? template.name : `${template.name} ${number}`,
+    rows: template.rows,
+    seatsPerRow: template.seatsPerRow,
+    rowSpacing: 29,
+    seatSpacing: 27,
+    rotation: type === "diagonal" && count % 2 === 1 ? Math.abs(template.rotation) : template.rotation,
+    tariffId: template.tariffId,
+  };
+  const offsetX = type === "diagonal" ? (count % 2 === 1 ? 730 : 0) : count * 34;
+  const offsetY = type === "box" ? count * 94 : count * 32;
+  const block = buildConstructorBlock(layout, type, id, settings, template.x + offsetX, template.y + offsetY);
+  const sector = layout.sectors.find((item) => item.id === template.sectorId);
+  if (sector) {
+    return {
+      ...layout,
+      sectors: layout.sectors.map((item) => item.id === sector.id ? { ...item, blocks: [...item.blocks, block] } : item),
+    };
+  }
+  return {
+    ...layout,
+    sectors: [...layout.sectors, {
+      id: template.sectorId,
+      name: template.sectorName,
+      type: template.sectorType,
+      x: 0,
+      y: 0,
+      rotation: 0,
+      labelX: template.labelX,
+      labelY: template.labelY,
+      accent: template.accent,
+      blocks: [block],
+    }],
+  };
+}
+
+export function getConstructorBlockSettings(block: SeatMapBlockV2): SeatMapConstructorBlockSettings {
+  const firstSeat = block.rows[0]?.seats[0];
+  const tariff = CONSTRUCTOR_TARIFFS.find((item) => item.name === (block.tariffName || firstSeat?.tariffName));
+  return {
+    name: block.name,
+    rows: Math.max(1, block.rows.length),
+    seatsPerRow: Math.max(1, block.rows[0]?.seats.length || 1),
+    rowSpacing: block.rowSpacing || 29,
+    seatSpacing: block.seatSpacing || 27,
+    rotation: block.rotation,
+    tariffId: tariff?.id || "standard",
+  };
+}
+
+export function updateConstructorBlockV2(
+  layout: SeatMapLayoutV2,
+  blockId: string,
+  patch: Partial<SeatMapConstructorBlockSettings> & Partial<Pick<SeatMapBlockV2, "x" | "y">>,
+): SeatMapLayoutV2 {
+  return {
+    ...layout,
+    sectors: layout.sectors.map((sector) => ({
+      ...sector,
+      blocks: sector.blocks.map((block) => {
+        if (block.id !== blockId || !["straight", "diagonal", "balcony", "box"].includes(block.type)) return block;
+        const settings = { ...getConstructorBlockSettings(block), ...patch };
+        return buildConstructorBlock(
+          layout,
+          block.type as SeatMapConstructorBlockType,
+          block.id,
+          settings,
+          patch.x ?? block.x,
+          patch.y ?? block.y,
+        );
+      }),
+    })),
+  };
+}
+
+export function removeConstructorBlockV2(layout: SeatMapLayoutV2, blockId: string): SeatMapLayoutV2 {
+  return {
+    ...layout,
+    sectors: layout.sectors
+      .map((sector) => ({ ...sector, blocks: sector.blocks.filter((block) => block.id !== blockId) }))
+      .filter((sector) => sector.blocks.length > 0),
   };
 }
 

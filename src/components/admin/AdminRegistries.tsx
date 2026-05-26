@@ -4,7 +4,9 @@ import { createVenueRegistryRecord, ensureMockVenueRegistryRecord, getSeatMapLay
 import { A, statusChip } from "./adminStyles";
 import { Building2, Database, MapPin, Plus, X } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import SeatMapConstructorCanvas from "@/components/seatmap/SeatMapConstructorCanvas";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
+import type { SeatMapLayoutV2 } from "@/lib/seatMapV2";
 import { toast } from "sonner";
 
 function CardHelp({ text }: { text: string }) {
@@ -22,6 +24,7 @@ const riskLabel: Record<string, string> = {
 };
 
 const venueTypeOptions: CreateVenueRegistryInput["type"][] = ["концертный зал", "театр", "центр культуры", "open-air", "временная площадка"];
+type VenueLayoutMode = "simple" | "complex" | "capacity";
 
 function defaultVenueForm(): CreateVenueRegistryInput {
   return {
@@ -167,6 +170,9 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
   const [schemeVenue, setSchemeVenue] = useState<VenueRegistryRecord | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState<CreateVenueRegistryInput>(() => defaultVenueForm());
+  const [layoutMode, setLayoutMode] = useState<VenueLayoutMode>("simple");
+  const [constructorOpen, setConstructorOpen] = useState(false);
+  const [constructorLayoutId, setConstructorLayoutId] = useState("");
   const [cityFilter, setCityFilter] = useState("");
 
   const venues = useMemo(() => {
@@ -181,12 +187,33 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
   const inputStyle = { background: A.surfaceBg, borderColor: A.border, color: A.textPrimary };
 
   const handleCreateVenue = () => {
-    const created = createVenueRegistryRecord(state, form);
+    const created = createVenueRegistryRecord(state, { ...form, hasSeatMap: layoutMode === "simple" });
     if (!created) return;
     onUpdate({ ...state });
     setDrawer(created);
     setCreateOpen(false);
     setForm(defaultVenueForm());
+    setLayoutMode("simple");
+  };
+
+  const handleOpenConstructor = () => {
+    setConstructorLayoutId(`constructor-${Date.now()}`);
+    setConstructorOpen(true);
+  };
+
+  const handleSaveComplexVenue = (layoutV2: SeatMapLayoutV2) => {
+    const created = createVenueRegistryRecord(state, { ...form, hasSeatMap: true, layoutV2 });
+    if (!created) {
+      toast.error("Не удалось сохранить сложную схему. Проверьте лимит 500 мест.");
+      return;
+    }
+    onUpdate({ ...state });
+    setDrawer(created);
+    setConstructorOpen(false);
+    setCreateOpen(false);
+    setForm(defaultVenueForm());
+    setLayoutMode("simple");
+    toast.success("Площадка со сложной схемой сохранена в реестре");
   };
 
   const handleEnsureMockVenues = () => {
@@ -205,7 +232,7 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
           <HelpTooltip text="Нажмите на строку площадки, чтобы открыть подробные сведения в боковой панели." />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => setCreateOpen(true)} className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>
+          <button onClick={() => { setCreateOpen(true); setLayoutMode("simple"); }} className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>
             <Plus size={15} /> Создать площадку
           </button>
           <button onClick={handleEnsureMockVenues} className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold" style={{ background: A.statusOkBg, color: A.statusOk }}>
@@ -336,33 +363,92 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
                 Зал / пространство
                 <input value={form.hallName} onChange={(event) => setForm((prev) => ({ ...prev, hallName: event.target.value }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle} />
               </label>
-              <label className="flex items-center gap-2 pt-6 text-sm" style={{ color: A.textPrimary }}>
-                <input type="checkbox" checked={form.hasSeatMap} onChange={(event) => setForm((prev) => ({ ...prev, hasSeatMap: event.target.checked }))} />
-                Сгенерировать простую схему мест
-              </label>
-              <label className="text-xs" style={{ color: A.textSecondary }}>
-                Ряды
-                <input type="number" min={1} max={20} value={form.rows} onChange={(event) => setForm((prev) => ({ ...prev, rows: Number(event.target.value) || 1 }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle} />
-              </label>
-              <label className="text-xs" style={{ color: A.textSecondary }}>
-                Места в ряду
-                <input type="number" min={1} max={30} value={form.cols} onChange={(event) => setForm((prev) => ({ ...prev, cols: Number(event.target.value) || 1 }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle} />
-              </label>
+              <div className="md:col-span-2">
+                <div className="mb-2 text-xs" style={{ color: A.textSecondary }}>Режим схемы</div>
+                <div className="grid gap-2 md:grid-cols-3">
+                  {([
+                    ["simple", "Простая схема", "Ряды и места"],
+                    ["complex", "Сложная схема / конструктор", "Блоки и сцена"],
+                    ["capacity", "Open-air / без мест", "Только вместимость"],
+                  ] as Array<[VenueLayoutMode, string, string]>).map(([mode, title, caption]) => (
+                    <button
+                      data-venue-layout-mode={mode}
+                      key={mode}
+                      type="button"
+                      onClick={() => setLayoutMode(mode)}
+                      className="rounded-xl border px-3 py-3 text-left transition-colors"
+                      style={{
+                        borderColor: layoutMode === mode ? A.statusInfo : A.border,
+                        background: layoutMode === mode ? A.statusInfoBg : A.surfaceBg,
+                        color: A.textPrimary,
+                      }}
+                    >
+                      <span className="block text-xs font-semibold">{title}</span>
+                      <span className="mt-1 block text-[11px]" style={{ color: A.textSecondary }}>{caption}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {layoutMode === "simple" && (
+                <>
+                  <label className="text-xs" style={{ color: A.textSecondary }}>
+                    Ряды
+                    <input type="number" min={1} max={20} value={form.rows} onChange={(event) => setForm((prev) => ({ ...prev, rows: Number(event.target.value) || 1 }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle} />
+                  </label>
+                  <label className="text-xs" style={{ color: A.textSecondary }}>
+                    Места в ряду
+                    <input type="number" min={1} max={30} value={form.cols} onChange={(event) => setForm((prev) => ({ ...prev, cols: Number(event.target.value) || 1 }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle} />
+                  </label>
+                </>
+              )}
+              {layoutMode === "capacity" && (
+                <label className="text-xs md:col-span-2" style={{ color: A.textSecondary }}>
+                  Вместимость без визуализации мест
+                  <input type="number" min={1} max={100000} value={form.rows} onChange={(event) => setForm((prev) => ({ ...prev, rows: Number(event.target.value) || 1, cols: 1 }))} className="mt-1 h-10 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle} />
+                  <span className="mt-1 block text-[11px]">Для open-air не создаётся схема и не отрисовываются отдельные места.</span>
+                </label>
+              )}
+              {layoutMode === "complex" && (
+                <div className="md:col-span-2 rounded-xl border p-3" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
+                  <p className="text-xs leading-5">Откройте конструктор и соберите зал из партера, боковых секторов, балкона, лож и объектов сцены. Максимум: 500 мест.</p>
+                  <button
+                    data-open-seatmap-constructor
+                    type="button"
+                    disabled={!form.name.trim() || !form.city.trim() || !form.address.trim()}
+                    onClick={handleOpenConstructor}
+                    className="mt-3 h-9 rounded-lg px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{ background: A.statusInfoBg, color: A.statusInfo }}
+                  >
+                    Открыть визуальный конструктор
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => setCreateOpen(false)} className="h-9 rounded-lg border px-4 text-sm" style={{ borderColor: A.borderLight, color: A.textPrimary }}>Отмена</button>
-              <button
-                onClick={handleCreateVenue}
-                disabled={!form.name.trim() || !form.city.trim() || !form.address.trim()}
-                className="h-9 rounded-lg px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ background: A.statusInfoBg, color: A.statusInfo }}
-              >
-                Сохранить
-              </button>
+              {layoutMode !== "complex" && (
+                <button
+                  onClick={handleCreateVenue}
+                  disabled={!form.name.trim() || !form.city.trim() || !form.address.trim()}
+                  className="h-9 rounded-lg px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ background: A.statusInfoBg, color: A.statusInfo }}
+                >
+                  Сохранить
+                </button>
+              )}
             </div>
           </div>
         </div>
+      )}
+
+      {constructorOpen && (
+        <SeatMapConstructorCanvas
+          layoutId={constructorLayoutId}
+          layoutName={form.hallName.trim() || form.name.trim() || "Сложная схема"}
+          onClose={() => setConstructorOpen(false)}
+          onSave={handleSaveComplexVenue}
+        />
       )}
 
       <SeatMapModal

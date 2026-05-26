@@ -4,13 +4,21 @@ import { useStorageSync } from "@/hooks/useStorageSync";
 import {
   buildEventSeatsFromLayout,
   createDemoPurchaseTicket,
+  createVenueRegistryRecord,
   defaultState,
   getSeatMapLayout,
   issueMarks,
   type EventRecord,
   type PriceTier,
 } from "@/lib/store";
-import { countSeatMapLayoutV2Seats, createGrandTheatreLayoutV2 } from "@/lib/seatMapV2";
+import {
+  MAX_COMPLEX_LAYOUT_SEATS,
+  addConstructorBlockV2,
+  countSeatMapLayoutV2Seats,
+  createConstructorLayoutV2,
+  createGrandTheatreLayoutV2,
+  updateConstructorBlockV2,
+} from "@/lib/seatMapV2";
 
 const STORAGE_KEY = "ticket_hub_state_v1";
 
@@ -25,6 +33,57 @@ describe("SeatMap V2 demo contract", () => {
     expect(countSeatMapLayoutV2Seats(layout)).toBeLessThanOrEqual(500);
     expect(layout.sectors.map((sector) => sector.type)).toEqual(expect.arrayContaining(["parterre", "balcony", "box"]));
     expect(layout.sectors.flatMap((sector) => sector.blocks).some((block) => block.type === "diagonal")).toBe(true);
+  });
+
+  it("builds and persists a constructor layout through the existing venue registry", () => {
+    const state = defaultState();
+    let layout = createConstructorLayoutV2("draft-constructor-test", "Конструктор");
+    layout = addConstructorBlockV2(layout, "diagonal");
+    layout = addConstructorBlockV2(layout, "balcony");
+    layout = addConstructorBlockV2(layout, "box");
+    layout = updateConstructorBlockV2(layout, "diagonal-1", { x: 222, y: 333, rotation: 18 });
+
+    const venue = createVenueRegistryRecord(state, {
+      name: "Новый сложный театр",
+      city: "Минск",
+      region: "Минск",
+      type: "театр",
+      address: "Тестовая, 1",
+      description: "",
+      hallName: "Сцена конструктора",
+      rows: 1,
+      cols: 1,
+      hasSeatMap: true,
+      layoutV2: layout,
+    });
+
+    expect(venue).not.toBeNull();
+    const stored = getSeatMapLayout(state, venue!.halls[0].layoutId);
+    const diagonal = stored?.layoutV2?.sectors.flatMap((sector) => sector.blocks).find((block) => block.id === "diagonal-1");
+    expect(diagonal).toMatchObject({ x: 222, y: 333, rotation: 18 });
+    expect(stored?.seats).toHaveLength(countSeatMapLayoutV2Seats(layout));
+    expect(stored?.seats.length).toBeLessThanOrEqual(MAX_COMPLEX_LAYOUT_SEATS);
+    expect(buildEventSeatsFromLayout(stored!, [{ name: "Стандарт", price: 70, quantity: 0, color: "#2563EB" }])).toHaveLength(stored!.seats.length);
+  });
+
+  it("rejects constructor layouts that exceed the rendered-seat cap", () => {
+    const state = defaultState();
+    const oversized = updateConstructorBlockV2(createConstructorLayoutV2("too-large", "Too large"), "straight-1", { rows: 20, seatsPerRow: 30 });
+
+    expect(countSeatMapLayoutV2Seats(oversized)).toBeGreaterThan(MAX_COMPLEX_LAYOUT_SEATS);
+    expect(createVenueRegistryRecord(state, {
+      name: "Oversized",
+      city: "Минск",
+      region: "Минск",
+      type: "театр",
+      address: "Oversized, 1",
+      description: "",
+      hallName: "Oversized",
+      rows: 1,
+      cols: 1,
+      hasSeatMap: true,
+      layoutV2: oversized,
+    })).toBeNull();
   });
 
   it("keeps capacity-only venues free of rendered layouts", () => {
