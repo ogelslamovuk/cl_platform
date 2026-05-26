@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import type { AppState, EventRecord } from "@/lib/store";
-import { getEventSalesChannels, getEventSeatsWithSalesState, getSalesChannelLabel, getEventSeatSummary, issueMarks, publishEvent } from "@/lib/store";
+import { getEventSalesChannels, getEventSeatsWithSalesState, getSalesChannelLabel, getEventSeatSummary, getSeatMapLayout, issueMarks, publishEvent } from "@/lib/store";
 import { formatDisplayId, getEventStatusLabel, getTicketStatusLabel } from "@/lib/display";
 import { A, statusChip } from "./adminStyles";
 import { Calendar, Globe, Search, Ticket, X } from "lucide-react";
@@ -62,6 +62,7 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
     return { issued, sold, remaining };
   };
   const hasTickets = (eventId: string) => state.tickets.some((ticket) => ticket.eventId === eventId);
+  const getLayoutV2 = (event: EventRecord) => getSeatMapLayout(state, event.layoutId)?.layoutV2;
   const handlePublish = (eventId: string) => {
     const ok = publishEvent(state, eventId);
     if (!ok) {
@@ -198,7 +199,7 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
                 const summary = getEventSeatSummary({ eventSeats, tiers: drawer.tiers });
                 return summary.hasSeatMap ? (
                   <div className="space-y-3 rounded-lg border p-3" style={{ borderColor: A.border, background: A.surfaceBg }}>
-                    <SeatMapPreview eventSeats={eventSeats} tiers={drawer.tiers} title="Схема зала" />
+                    <SeatMapPreview eventSeats={eventSeats} tiers={drawer.tiers} title="Схема зала" layoutV2={getLayoutV2(drawer)} />
                     <button onClick={() => setSchemeEvent(drawer)} className="rounded px-3 py-2 text-sm font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>Открыть схему</button>
                   </div>
                 ) : null;
@@ -300,6 +301,7 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
         subtitle={schemeEvent?.title}
         mode="viewer"
         eventSeats={schemeEvent ? getEventSeatsWithSalesState(state, schemeEvent) : []}
+        layoutV2={schemeEvent ? getLayoutV2(schemeEvent) : undefined}
         tiers={schemeEvent?.tiers || []}
         onClose={() => setSchemeEvent(null)}
       />

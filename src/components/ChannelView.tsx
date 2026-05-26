@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { AppState } from "@/lib/store";
-import { getEventSalesChannels, getSalesChannelLabel, getTicketRefundBlockReason, isSalesChannelAllowedForEvent, refundTicketByReseller, sellTicketsByReseller } from "@/lib/store";
+import { getEventSalesChannels, getSalesChannelLabel, getSeatMapLayout, getTicketRefundBlockReason, isSalesChannelAllowedForEvent, refundTicketByReseller, sellTicketsByReseller } from "@/lib/store";
 import { formatDisplayId } from "@/lib/display";
 import PartnerModuleDrawer, { ModuleDrawerContent } from "@/components/channel/PartnerModuleDrawer";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
@@ -499,7 +499,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
               </div>
               {selectedEvent.eventSeats?.length ? (
                 <div className="mt-3 rounded-lg border border-cyan-200/20 bg-slate-900/55 p-3">
-                  <SeatMapPreview eventSeats={selectedEvent.eventSeats} tiers={selectedEvent.tiers} title="Схема мероприятия" variant="dark" />
+                  <SeatMapPreview eventSeats={selectedEvent.eventSeats} tiers={selectedEvent.tiers} title="Схема мероприятия" variant="dark" layoutV2={getSeatMapLayout(state, selectedEvent.layoutId)?.layoutV2} />
                   <div className="mt-2 text-slate-400">Доступно: {selectedEvent.eventSeats.filter((seat) => seat.status === "available").length} · Продано: {selectedEvent.eventSeats.filter((seat) => seat.status === "sold").length} · Блок: {selectedEvent.eventSeats.filter((seat) => seat.status === "blocked").length}</div>
                   <button onClick={() => setSchemeOpen(true)} className="mt-2 rounded bg-cyan-400 px-3 py-1.5 text-xs font-semibold text-slate-950">Открыть схему</button>
                 </div>
@@ -781,7 +781,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
         onAction={(_, actionLabel) => toast.info(`Действие: ${actionLabel}`)}
       />
       {selectedEvent && (
-        <SeatMapModal open={schemeOpen} title="Схема мероприятия" subtitle={selectedEvent.title} mode="viewer" eventSeats={selectedEvent.eventSeats || []} tiers={selectedEvent.tiers} onClose={() => setSchemeOpen(false)} />
+        <SeatMapModal open={schemeOpen} title="Схема мероприятия" subtitle={selectedEvent.title} mode="viewer" eventSeats={selectedEvent.eventSeats || []} layoutV2={getSeatMapLayout(state, selectedEvent.layoutId)?.layoutV2} tiers={selectedEvent.tiers} onClose={() => setSchemeOpen(false)} />
       )}
     </div>
   );

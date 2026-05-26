@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { AppState, EventRecord, EventSeat } from "@/lib/store";
-import { createDemoPurchaseTicket, getTicketRefundBlockReason, refund } from "@/lib/store";
+import { createDemoPurchaseTicket, getSeatMapLayout, getTicketRefundBlockReason, refund } from "@/lib/store";
 import SeatMapPreview from "@/components/seatmap/SeatMapPreview";
 import { toast } from "sonner";
 import { Search, MapPin, Tag, Ticket, X, ChevronRight, Sparkles, TrendingUp, Star, User, Calendar, CheckCircle2 } from "lucide-react";
@@ -151,7 +151,7 @@ export default function B2CView({ state, onUpdate }: Props) {
         if (aHasSeatMap !== bHasSeatMap) return aHasSeatMap ? -1 : 1;
         return a.dateTime.localeCompare(b.dateTime);
       });
-  }, [state.events, state.tickets]);
+  }, [state]);
 
   const filteredEvents = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -174,6 +174,17 @@ export default function B2CView({ state, onUpdate }: Props) {
   const myTickets = useMemo(() => {
     return [...state.demoPurchases].reverse();
   }, [state.demoPurchases]);
+
+  useEffect(() => {
+    if (!detailsEvent || !selectedSeat) return;
+    const currentSeat = detailsEvent.eventSeats?.find((seat) => seat.seatId === selectedSeat.seatId);
+    if (!currentSeat || currentSeat.status !== "available") {
+      setSelectedSeat(null);
+      setCheckoutOpen(false);
+      return;
+    }
+    if (currentSeat !== selectedSeat) setSelectedSeat(currentSeat);
+  }, [detailsEvent, selectedSeat]);
 
   const resetFilters = () => {
     setSearch("");
@@ -668,6 +679,7 @@ export default function B2CView({ state, onUpdate }: Props) {
                         eventSeats={detailsEvent.eventSeats}
                         tiers={detailsEvent.tiers}
                         title="Схема зала"
+                        layoutV2={getSeatMapLayout(state, detailsEvent.layoutId)?.layoutV2}
                         selectable
                         selectedSeatId={selectedSeat?.seatId}
                         onSelectSeat={(seat) => {

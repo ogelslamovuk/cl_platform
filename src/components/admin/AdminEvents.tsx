@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { AppState, EventRecord } from "@/lib/store";
-import { getEventSalesChannels, getSalesChannelLabel, getEventSeatSummary, publishEvent, issueMarks } from "@/lib/store";
+import { getEventSalesChannels, getSalesChannelLabel, getEventSeatSummary, getSeatMapLayout, publishEvent, issueMarks } from "@/lib/store";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import { toast } from "sonner";
 import { A, statusChip } from "./adminStyles";
@@ -233,7 +233,7 @@ export default function AdminEvents({ state, onUpdate }: Props) {
           </div>
         );
       })()}
-      <SeatMapModal open={Boolean(schemeEvent)} title="Схема зала и продажи" subtitle={schemeEvent?.title} mode="viewer" eventSeats={schemeEvent?.eventSeats || []} tiers={schemeEvent?.tiers || []} onClose={() => setSchemeEvent(null)} />
+      <SeatMapModal open={Boolean(schemeEvent)} title="Схема зала и продажи" subtitle={schemeEvent?.title} mode="viewer" eventSeats={schemeEvent?.eventSeats || []} layoutV2={getSeatMapLayout(state, schemeEvent?.layoutId)?.layoutV2} tiers={schemeEvent?.tiers || []} onClose={() => setSchemeEvent(null)} />
     </div>
   );
 }

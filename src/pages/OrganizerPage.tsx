@@ -7,7 +7,7 @@ import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import SeatMapPreview from "@/components/seatmap/SeatMapPreview";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import type { AppState, EventComplianceApplicationRecord, EventRecord, OrganizerDocument, OrganizerSaleRecord } from "@/lib/store";
-import { calculateComplianceFee, getEventSeatsWithSalesState, getEventSeatSummary, getSalesChannelLabel, logoutOrganizer } from "@/lib/store";
+import { calculateComplianceFee, getEventSeatsWithSalesState, getEventSeatSummary, getSalesChannelLabel, getSeatMapLayout, logoutOrganizer } from "@/lib/store";
 import { formatDisplayId, getEventStatusLabel, getOperationTypeLabel } from "@/lib/display";
 import {
   calculateOrganizerFinance,
@@ -1267,6 +1267,7 @@ function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianc
   const schemeSeats = linkedEvent?.eventSeats?.length ? linkedEvent.eventSeats : app.data.eventSeats || [];
   const schemeTiers = linkedEvent?.tiers?.length ? linkedEvent.tiers : app.data.ticketTiers || [];
   const schemeSummary = getEventSeatSummary({ eventSeats: schemeSeats, tiers: schemeTiers });
+  const schemeLayoutV2 = getSeatMapLayout(state, linkedEvent?.layoutId || app.data.layoutId)?.layoutV2;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
@@ -1280,7 +1281,7 @@ function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianc
           <div className="mb-4"><span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={statusStyle[app.status]}>{statusLabel[app.status]}</span></div>
           {schemeSummary.hasSeatMap && (
             <section className="space-y-3 rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
-              <SeatMapPreview eventSeats={schemeSeats} tiers={schemeTiers} title="Схема зала в заявке" />
+              <SeatMapPreview eventSeats={schemeSeats} tiers={schemeTiers} title="Схема зала в заявке" layoutV2={schemeLayoutV2} />
               <button onClick={() => setSchemeOpen(true)} className="h-9 rounded-lg px-3 text-sm font-semibold" style={{ background: T.goldBg, color: T.gold }}>
                 Открыть схему
               </button>
@@ -1331,6 +1332,7 @@ function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianc
         subtitle={app.data.title}
         mode="viewer"
         eventSeats={schemeSeats}
+        layoutV2={schemeLayoutV2}
         tiers={schemeTiers}
         onClose={() => setSchemeOpen(false)}
       />
@@ -1344,6 +1346,7 @@ function EventDetailsDrawer({ event, state, onClose }: { event: EventRecord; sta
   const salesChannels = (event.salesChannels?.length ? event.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code));
   const eventSeats = getEventSeatsWithSalesState(state, event);
   const summary = getEventSeatSummary({ eventSeats, tiers: event.tiers });
+  const layoutV2 = getSeatMapLayout(state, event.layoutId)?.layoutV2;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
@@ -1356,7 +1359,7 @@ function EventDetailsDrawer({ event, state, onClose }: { event: EventRecord; sta
         <div className="space-y-5 p-6">
           {summary.hasSeatMap && (
             <section className="space-y-3 rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
-              <SeatMapPreview eventSeats={eventSeats} tiers={event.tiers} title="Схема зала мероприятия" />
+              <SeatMapPreview eventSeats={eventSeats} tiers={event.tiers} title="Схема зала мероприятия" layoutV2={layoutV2} />
               <div className="text-[12px]" style={{ color: T.textSecondary }}>Выручка: {summary.revenue} BYN</div>
               <button onClick={() => setSchemeOpen(true)} className="h-9 rounded-lg px-3 text-sm font-semibold" style={{ background: T.goldBg, color: T.gold }}>
                 Открыть схему
@@ -1396,6 +1399,7 @@ function EventDetailsDrawer({ event, state, onClose }: { event: EventRecord; sta
         subtitle={event.title}
         mode="viewer"
         eventSeats={eventSeats}
+        layoutV2={layoutV2}
         tiers={event.tiers}
         onClose={() => setSchemeOpen(false)}
       />
