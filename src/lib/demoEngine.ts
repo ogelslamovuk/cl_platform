@@ -561,10 +561,10 @@ function ensureSoldOutEvent(state: AppState): void {
 function ensureApprovedUnpublishedEvent(state: AppState): void {
   const now = new Date().toISOString();
   const organizerId = "demo_org_minskconcert";
-  const eventTitle = "Вечер симфонической музыки во Дворце Республики";
+  const eventTitle = "Вечер симфонической музыки · Grand Theatre";
   const dateTime = toDateTime(15, "19:30");
   const tiers = [{ ...APPROVED_UNPUBLISHED_TIER }];
-  const layout = getSeatMapLayout(state, "layout_palace_main");
+  const layout = getSeatMapLayout(state, "layout_grand_theatre_v2");
   const eventSeats = layout ? buildEventSeatsFromLayout(layout, tiers).map((seat) => ({ ...seat, status: "available" as const })) : [];
   const tierCounts = eventSeats.length > 0
     ? tiers.map((tier) => ({
@@ -578,7 +578,7 @@ function ensureApprovedUnpublishedEvent(state: AppState): void {
     appId: APPROVED_UNPUBLISHED_APP_ID,
     organizerId,
     title: eventTitle,
-    venue: "Дворец Республики",
+    venue: "Grand Theatre · SeatMap V2 Demo",
     dateTime,
     capacity,
     tiers: tierCounts,
@@ -602,7 +602,7 @@ function ensureApprovedUnpublishedEvent(state: AppState): void {
     licenseId: "LIC-DEMO-APPROVED",
     appId: APPROVED_UNPUBLISHED_APP_ID,
     title: eventTitle,
-    venue: "Дворец Республики",
+    venue: "Grand Theatre · SeatMap V2 Demo",
     dateTime,
     capacity,
     tiers: tierCounts,
@@ -613,9 +613,9 @@ function ensureApprovedUnpublishedEvent(state: AppState): void {
     salesChannels: ["OWN", "ByCard", "TicketPro"],
     status: "approved" as const,
     remaining: eventSeats.filter((seat) => seat.status === "available").length,
-    venueId: "venue_palace_republic",
-    hallId: "hall_palace_main",
-    layoutId: "layout_palace_main",
+    venueId: "venue_grand_theatre_v2",
+    hallId: "hall_grand_theatre_v2",
+    layoutId: "layout_grand_theatre_v2",
     eventSeats,
     createdAt: now,
     updatedAt: now,
@@ -799,16 +799,21 @@ function ensureSeedPublishedEvents(state: AppState): void {
 
 function ensureSeatMapDemoEvent(state: AppState): void {
   const existing = state.events.find((event) => event.eventId === "EVT-SEAT-MAP-DEMO");
-  const layout = getSeatMapLayout(state, "layout_palace_main");
+  const layout = getSeatMapLayout(state, "layout_grand_theatre_v2");
   if (!layout) return;
   const tiers: PriceTier[] = [
-    { name: "Эконом", price: 5, quantity: 0, color: "#2563EB" },
-    { name: "Стандарт", price: 50, quantity: 0, color: "#16A34A" },
-    { name: "VIP", price: 100, quantity: 0, color: "#D97706" },
+    { name: "VIP", price: 180, quantity: 0, color: "#F59E0B" },
+    { name: "Партер", price: 110, quantity: 0, color: "#2563EB" },
+    { name: "Балкон", price: 65, quantity: 0, color: "#7C3AED" },
+    { name: "Ложа", price: 240, quantity: 0, color: "#EA580C" },
   ];
   const seats = buildEventSeatsFromLayout(layout, tiers).map((seat, index) => ({
     ...seat,
-    status: index === 2 || index === 13 ? "sold" as const : index === 6 || index === 21 ? "blocked" as const : "available" as const,
+    status: [7, 19, 86, 149, 203].includes(index)
+      ? "sold" as const
+      : [142, 233, 271].includes(index)
+        ? "blocked" as const
+        : "available" as const,
   }));
   const tierCounts = tiers.map((tier) => ({
     ...tier,
@@ -821,26 +826,32 @@ function ensureSeatMapDemoEvent(state: AppState): void {
     licenseId: "LIC-SEAT-MAP-DEMO",
     appId: "EVAPP-SEAT-MAP-DEMO",
     complianceApplicationId: "EVAPP-SEAT-MAP-DEMO",
-    title: "Гала-концерт «Беларусь культурная»",
-    venue: "Дворец Республики",
+    title: "Гала-концерт в Grand Theatre",
+    venue: "Grand Theatre · SeatMap V2 Demo",
     dateTime: toDateTime(16, "19:00"),
     capacity: 0,
     tiers: tierCounts,
     city: "Минск",
     category: "Концерты",
-    description: "Демо-событие со схемой зала, тарифами, проданными и заблокированными местами.",
+    description: "Демо-событие SeatMap V2: партер, диагональные сектора, балкон, ложи и realtime-продажи.",
     poster: DEMO_POSTERS.belarusUSertsy,
     salesChannels: ALL_ACTIVE_RESELLER_CHANNELS,
     status: "published" as const,
     remaining: 0,
-    venueId: "venue_palace_republic",
-    hallId: "hall_palace_main",
-    layoutId: "layout_palace_main",
+    venueId: "venue_grand_theatre_v2",
+    hallId: "hall_grand_theatre_v2",
+    layoutId: "layout_grand_theatre_v2",
     eventSeats: seats,
     createdAt: now,
     updatedAt: now,
   };
   Object.assign(next, {
+    title: "Гала-концерт в Grand Theatre",
+    venue: "Grand Theatre · SeatMap V2 Demo",
+    description: "Демо-событие SeatMap V2: партер, диагональные сектора, балкон, ложи и realtime-продажи.",
+    venueId: "venue_grand_theatre_v2",
+    hallId: "hall_grand_theatre_v2",
+    layoutId: "layout_grand_theatre_v2",
     capacity: seats.filter((seat) => seat.status !== "blocked").length,
     tiers: tierCounts,
     remaining: seats.filter((seat) => seat.status === "available").length,
@@ -848,8 +859,15 @@ function ensureSeatMapDemoEvent(state: AppState): void {
     updatedAt: now,
   });
   if (!existing) state.events.push(next);
+  const existingSeatTickets = state.tickets.filter((ticket) => ticket.eventId === next.eventId);
+  if (existingSeatTickets.length > 0 && !existingSeatTickets.some((ticket) => seats.some((seat) => seat.seatId === ticket.seatId))) {
+    state.tickets = state.tickets.filter((ticket) => ticket.eventId !== next.eventId);
+    state.demoPurchases = state.demoPurchases.filter((purchase) => purchase.eventId !== next.eventId);
+    state.ops = state.ops.filter((operation) => operation.eventId !== next.eventId);
+  }
   if (!state.tickets.some((ticket) => ticket.eventId === next.eventId)) issueMarks(state, next.eventId);
-  if (!state.eventComplianceApplications.some((app) => app.eventComplianceApplicationId === "EVAPP-SEAT-MAP-DEMO")) {
+  const existingCompliance = state.eventComplianceApplications.find((app) => app.eventComplianceApplicationId === "EVAPP-SEAT-MAP-DEMO");
+  if (!existingCompliance) {
     state.eventComplianceApplications.push({
       eventComplianceApplicationId: "EVAPP-SEAT-MAP-DEMO",
       organizerId: "demo_org_minskconcert",
@@ -871,10 +889,10 @@ function ensureSeatMapDemoEvent(state: AppState): void {
         salesChannels: next.salesChannels,
         dateSlots: [next.dateTime],
         venueName: next.venue,
-        venueAddress: "Октябрьская площадь, 1",
-        venueId: "venue_palace_republic",
-        hallId: "hall_palace_main",
-        layoutId: "layout_palace_main",
+        venueAddress: "пр-т Независимости, 25",
+        venueId: "venue_grand_theatre_v2",
+        hallId: "hall_grand_theatre_v2",
+        layoutId: "layout_grand_theatre_v2",
         eventSeats: seats,
         performers: [],
         onlyBelarusianPerformers: true,
@@ -905,6 +923,17 @@ function ensureSeatMapDemoEvent(state: AppState): void {
       createdAt: now,
       updatedAt: now,
     });
+  } else {
+    existingCompliance.data.venueName = next.venue;
+    existingCompliance.data.venueAddress = "пр-т Независимости, 25";
+    existingCompliance.data.venueId = "venue_grand_theatre_v2";
+    existingCompliance.data.hallId = "hall_grand_theatre_v2";
+    existingCompliance.data.layoutId = "layout_grand_theatre_v2";
+    existingCompliance.data.eventSeats = seats;
+    existingCompliance.data.ticketTiers = tierCounts;
+    existingCompliance.data.projectedCapacity = next.capacity;
+    existingCompliance.data.plannedTicketsForSale = next.capacity;
+    existingCompliance.updatedAt = now;
   }
 }
 

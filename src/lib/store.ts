@@ -1,4 +1,12 @@
 import { normalizePlatformCommissionPercent } from "@/lib/finance";
+import {
+  COMPLEX_THEATRE_LAYOUT_ID,
+  adaptLegacySeatsToLayoutV2,
+  cloneSeatMapLayoutV2,
+  createGrandTheatreLayoutV2,
+  flattenSeatMapLayoutV2,
+  type SeatMapLayoutV2,
+} from "@/lib/seatMapV2";
 
 // TicketHub MVP State Management — localStorage based
 
@@ -50,6 +58,7 @@ export interface SeatMapLayout {
   hallId: string;
   name: string;
   seats: SeatMapSeat[];
+  layoutV2?: SeatMapLayoutV2;
   createdAt: string;
   updatedAt: string;
 }
@@ -503,10 +512,48 @@ function defaultLayout(layoutId: string, venueId: string, hallId: string, name: 
   };
 }
 
+function grandTheatreLayout(): SeatMapLayout {
+  const now = "2026-05-26T00:00:00.000Z";
+  const layoutV2 = createGrandTheatreLayoutV2();
+  return {
+    layoutId: layoutV2.layoutId,
+    venueId: "venue_grand_theatre_v2",
+    hallId: "hall_grand_theatre_v2",
+    name: "Большая сцена · SeatMap V2",
+    seats: flattenSeatMapLayoutV2(layoutV2).map((seat) => ({
+      seatId: seat.seatId,
+      label: seat.label,
+      row: seat.row,
+      number: seat.number,
+      x: seat.x,
+      y: seat.y,
+      w: 1,
+      h: 1,
+    })),
+    layoutV2,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function cloneSeatMapLayout(layout: SeatMapLayout): SeatMapLayout {
+  return {
+    ...layout,
+    seats: layout.seats.map((seat) => ({ ...seat })),
+    layoutV2: layout.layoutV2 ? cloneSeatMapLayoutV2(layout.layoutV2) : undefined,
+  };
+}
+
+export function getSeatMapLayoutV2(layout?: SeatMapLayout | null): SeatMapLayoutV2 | null {
+  if (!layout) return null;
+  return layout.layoutV2 || adaptLegacySeatsToLayoutV2(layout.layoutId, layout.name, layout.seats);
+}
+
 const DEFAULT_SEAT_MAP_LAYOUTS: SeatMapLayout[] = [
   defaultLayout("layout_palace_main", "venue_palace_republic", "hall_palace_main", "Основной зал 5x8", 5, 8),
   defaultLayout("layout_bolshoi_demo", "venue_bolshoi_theatre", "hall_bolshoi_demo", "Демо-схема 4x6", 4, 6),
   defaultLayout("layout_grodno_culture", "venue_grodno_culture", "hall_grodno_main", "Зал 4x5", 4, 5),
+  grandTheatreLayout(),
 ];
 
 const DEFAULT_VENUE_REGISTRY: VenueRegistryRecord[] = [
@@ -547,6 +594,18 @@ const DEFAULT_VENUE_REGISTRY: VenueRegistryRecord[] = [
     halls: [{ hallId: "hall_grodno_main", venueId: "venue_grodno_culture", name: "Малый зал", capacity: 20, hasSeatMap: true, layoutId: "layout_grodno_culture" }],
   },
   {
+    venueId: "venue_grand_theatre_v2",
+    name: "Grand Theatre · SeatMap V2 Demo",
+    city: "Минск",
+    region: "Минск",
+    type: "театр",
+    address: "пр-т Независимости, 25",
+    description: "Демонстрационный театр с партером, балконом, диагональными секторами и ложами.",
+    capacity: 292,
+    status: "approved",
+    halls: [{ hallId: "hall_grand_theatre_v2", venueId: "venue_grand_theatre_v2", name: "Большая сцена V2", capacity: 292, hasSeatMap: true, layoutId: COMPLEX_THEATRE_LAYOUT_ID }],
+  },
+  {
     venueId: "venue_podnikolie_park",
     name: "Парк Подниколье",
     city: "Могилёв",
@@ -580,7 +639,7 @@ export function defaultState(): AppState {
     eventComplianceApplications: [],
     organizerRegistry: [],
     venueRegistry: DEFAULT_VENUE_REGISTRY.map((venue) => ({ ...venue, halls: venue.halls.map((hall) => ({ ...hall })) })),
-    seatMapLayouts: DEFAULT_SEAT_MAP_LAYOUTS.map((layout) => ({ ...layout, seats: layout.seats.map((seat) => ({ ...seat })) })),
+    seatMapLayouts: DEFAULT_SEAT_MAP_LAYOUTS.map(cloneSeatMapLayout),
     events: [],
     tickets: [],
     resellers: DEFAULT_RESELLERS.map((reseller) => ({ ...reseller, updatedAt: createdAt })),
@@ -901,8 +960,11 @@ export function ensureSeatMapState(state: AppState): void {
   if (!Array.isArray(state.venueRegistry)) state.venueRegistry = [];
   if (!Array.isArray(state.seatMapLayouts)) state.seatMapLayouts = [];
   for (const layout of DEFAULT_SEAT_MAP_LAYOUTS) {
-    if (!state.seatMapLayouts.some((item) => item.layoutId === layout.layoutId)) {
-      state.seatMapLayouts.push({ ...layout, seats: layout.seats.map((seat) => ({ ...seat })) });
+    const existingLayout = state.seatMapLayouts.find((item) => item.layoutId === layout.layoutId);
+    if (!existingLayout) {
+      state.seatMapLayouts.push(cloneSeatMapLayout(layout));
+    } else if (layout.layoutV2 && !existingLayout.layoutV2) {
+      existingLayout.layoutV2 = cloneSeatMapLayoutV2(layout.layoutV2);
     }
   }
   for (const venue of DEFAULT_VENUE_REGISTRY) {
@@ -936,14 +998,17 @@ export function getVenueRegistryRecord(state: AppState, venueId?: string): Venue
 
 export function buildEventSeatsFromLayout(layout: SeatMapLayout, tiers: PriceTier[] = []): EventSeat[] {
   const normalized = normalizeTierRows(tiers, 0);
+  const v2SeatById = new Map((layout.layoutV2 ? flattenSeatMapLayoutV2(layout.layoutV2) : []).map((seat) => [seat.seatId, seat]));
   return layout.seats.map((seat, index) => {
-    const tier = normalized[index % Math.max(1, normalized.length)] || normalized[0];
+    const v2Seat = v2SeatById.get(seat.seatId);
+    const presetTier = normalized.find((item) => item.name === v2Seat?.tariffName);
+    const tier = presetTier || normalized[index % Math.max(1, normalized.length)] || normalized[0];
     return {
       ...copySeat(seat),
       tariffId: tier?.name,
       tariffName: tier?.name,
       price: tier?.price,
-      color: tier?.color || SEAT_TARIFF_COLORS[index % SEAT_TARIFF_COLORS.length],
+      color: tier?.color || (presetTier ? v2Seat?.color : undefined) || SEAT_TARIFF_COLORS[normalized.indexOf(tier) % SEAT_TARIFF_COLORS.length],
       status: "available",
     };
   });

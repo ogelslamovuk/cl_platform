@@ -1,5 +1,7 @@
-import React, { useMemo } from "react";
+import React from "react";
 import type { EventSeat, PriceTier, SeatStatus } from "@/lib/store";
+import type { SeatMapLayoutV2 } from "@/lib/seatMapV2";
+import SeatMapViewerCanvas from "@/components/seatmap/SeatMapViewerCanvas";
 
 type Variant = "light" | "dark";
 
@@ -12,6 +14,7 @@ type Props = {
   selectable?: boolean;
   selectedSeatId?: string | null;
   onSelectSeat?: (seat: EventSeat) => void;
+  layoutV2?: SeatMapLayoutV2;
 };
 
 const statusLabel: Record<SeatStatus, string> = {
@@ -62,9 +65,10 @@ export default function SeatMapPreview({
   selectable = false,
   selectedSeatId = null,
   onSelectSeat,
+  layoutV2,
 }: Props) {
-  const seats = useMemo(() => eventSeats.filter(Boolean), [eventSeats]);
-  const counts = useMemo(() => getCounts(seats), [seats]);
+  const seats = eventSeats.filter(Boolean);
+  const counts = getCounts(seats);
   const maxX = Math.max(1, ...seats.map((seat) => seat.x + (seat.w || 1)));
   const maxY = Math.max(1, ...seats.map((seat) => seat.y + (seat.h || 1)));
   const isDark = variant === "dark";
@@ -95,51 +99,68 @@ export default function SeatMapPreview({
         </div>
       </div>
 
-      <div className="mt-3 overflow-x-auto rounded-lg border px-3 pb-4 pt-3" style={panelStyle}>
-        <div className="mx-auto mb-4 h-6 max-w-[72%] rounded-b-[36px] border border-slate-300 bg-slate-100 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 shadow-inner">
-          <span className="relative top-1.5">Сцена</span>
-        </div>
-        <div
-          className="grid justify-center gap-x-1.5 gap-y-2"
-          style={{
-            gridTemplateColumns: `repeat(${maxX}, 28px)`,
-            gridTemplateRows: `repeat(${maxY}, 30px)`,
-            minWidth: `${maxX * 28 + Math.max(0, maxX - 1) * 6}px`,
+      {layoutV2 ? (
+        <SeatMapViewerCanvas
+          layout={layoutV2}
+          eventSeats={seats}
+          selectedSeatIds={selectedSeatId ? [selectedSeatId] : []}
+          onSeatClick={(seatId) => {
+            const seat = seats.find((item) => item.seatId === seatId);
+            if (seat && seat.status === "available") onSelectSeat?.(seat);
           }}
-        >
-          {seats.map((seat) => {
-            const tooltip = seatTooltip(seat);
-            const selected = selectedSeatId === seat.seatId;
-            const canSelect = selectable && seat.status === "available";
-            return (
-              <button
-                key={seat.seatId}
-                type="button"
-                title={tooltip}
-                aria-label={`${tooltip} · ${statusLabel[seat.status || "available"]}`}
-                aria-pressed={selected || undefined}
-                onClick={() => canSelect && onSelectSeat?.(seat)}
-                data-seat-map-preview-seat={seat.seatId}
-                data-seat-status={seat.status || "available"}
-                data-seat-selected={selected || undefined}
-                className={`group/seat relative flex h-7 w-7 items-center justify-center rounded-b-md rounded-t-[14px] border text-[8px] font-semibold shadow-sm outline-none transition hover:-translate-y-0.5 hover:border-blue-400 hover:ring-2 hover:ring-blue-100 focus-visible:ring-2 ${canSelect ? "cursor-pointer" : "cursor-default"}`}
-                style={{
-                  gridColumn: `${seat.x + 1} / span ${seat.w || 1}`,
-                  gridRow: `${seat.y + 1} / span ${seat.h || 1}`,
-                  background: seatFill(seat, selected, isDark),
-                  borderColor: seatBorder(seat, selected, isDark),
-                  color: seatText(seat, selected),
-                }}
-              >
-                <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-max max-w-[220px] -translate-x-1/2 rounded-lg bg-slate-950 px-2 py-1 text-[11px] font-medium leading-4 text-white shadow-lg group-hover/seat:block group-focus-visible/seat:block">
-                  {tooltip}
-                </span>
-                {seat.label}
-              </button>
-            );
-          })}
+          interactive={selectable}
+          variant={variant}
+          height={variant === "dark" ? 390 : 500}
+          compact
+          className="mt-3"
+        />
+      ) : (
+        <div className="mt-3 overflow-x-auto rounded-lg border px-3 pb-4 pt-3" style={panelStyle}>
+          <div className="mx-auto mb-4 h-6 max-w-[72%] rounded-b-[36px] border border-slate-300 bg-slate-100 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 shadow-inner">
+            <span className="relative top-1.5">Сцена</span>
+          </div>
+          <div
+            className="grid justify-center gap-x-1.5 gap-y-2"
+            style={{
+              gridTemplateColumns: `repeat(${maxX}, 28px)`,
+              gridTemplateRows: `repeat(${maxY}, 30px)`,
+              minWidth: `${maxX * 28 + Math.max(0, maxX - 1) * 6}px`,
+            }}
+          >
+            {seats.map((seat) => {
+              const tooltip = seatTooltip(seat);
+              const selected = selectedSeatId === seat.seatId;
+              const canSelect = selectable && seat.status === "available";
+              return (
+                <button
+                  key={seat.seatId}
+                  type="button"
+                  title={tooltip}
+                  aria-label={`${tooltip} · ${statusLabel[seat.status || "available"]}`}
+                  aria-pressed={selected || undefined}
+                  onClick={() => canSelect && onSelectSeat?.(seat)}
+                  data-seat-map-preview-seat={seat.seatId}
+                  data-seat-status={seat.status || "available"}
+                  data-seat-selected={selected || undefined}
+                  className={`group/seat relative flex h-7 w-7 items-center justify-center rounded-b-md rounded-t-[14px] border text-[8px] font-semibold shadow-sm outline-none transition hover:-translate-y-0.5 hover:border-blue-400 hover:ring-2 hover:ring-blue-100 focus-visible:ring-2 ${canSelect ? "cursor-pointer" : "cursor-default"}`}
+                  style={{
+                    gridColumn: `${seat.x + 1} / span ${seat.w || 1}`,
+                    gridRow: `${seat.y + 1} / span ${seat.h || 1}`,
+                    background: seatFill(seat, selected, isDark),
+                    borderColor: seatBorder(seat, selected, isDark),
+                    color: seatText(seat, selected),
+                  }}
+                >
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-max max-w-[220px] -translate-x-1/2 rounded-lg bg-slate-950 px-2 py-1 text-[11px] font-medium leading-4 text-white shadow-lg group-hover/seat:block group-focus-visible/seat:block">
+                    {tooltip}
+                  </span>
+                  {seat.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {tiers.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2 text-[11px]" style={{ color: mutedColor }}>

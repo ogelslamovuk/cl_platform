@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { Minus, Plus, Save, Trash2, X } from "lucide-react";
 import type { EventSeat, PriceTier, SeatMapSeat, SeatStatus } from "@/lib/store";
 import { SEAT_TARIFF_COLORS, createRectangularSeats } from "@/lib/store";
+import type { SeatMapLayoutV2 } from "@/lib/seatMapV2";
+import SeatMapViewerCanvas from "@/components/seatmap/SeatMapViewerCanvas";
 
 type Mode = "layout" | "assign" | "viewer" | "buyer";
 
@@ -13,6 +15,7 @@ type Props = {
   mode: Mode;
   baseSeats?: SeatMapSeat[];
   eventSeats?: EventSeat[];
+  layoutV2?: SeatMapLayoutV2;
   tiers?: PriceTier[];
   onClose: () => void;
   onSaveLayout?: (seats: SeatMapSeat[]) => void;
@@ -75,6 +78,7 @@ export default function SeatMapModal({
   mode,
   baseSeats = EMPTY_BASE_SEATS,
   eventSeats = EMPTY_EVENT_SEATS,
+  layoutV2,
   tiers = EMPTY_TIERS,
   onClose,
   onSaveLayout,
@@ -104,6 +108,7 @@ export default function SeatMapModal({
     () => workingSeats.find((seat) => seat.seatId === selectedIds[0]) || null,
     [selectedIds, workingSeats],
   );
+  const canvasEventSeats = mode === "viewer" && eventSeats.length === 0 && tiers.length === 0 ? [] : workingSeats;
 
   if (!open || typeof document === "undefined") return null;
 
@@ -248,7 +253,19 @@ export default function SeatMapModal({
             </div>
           </aside>
 
-          <main className={buyerMode ? "min-h-0 min-w-0 overflow-hidden bg-slate-50 p-3 sm:p-4" : "min-h-0 min-w-0 overflow-auto bg-slate-50 p-4"}>
+          <main className={layoutV2 ? "min-h-0 min-w-0 overflow-hidden bg-slate-50 p-3 sm:p-4" : buyerMode ? "min-h-0 min-w-0 overflow-hidden bg-slate-50 p-3 sm:p-4" : "min-h-0 min-w-0 overflow-auto bg-slate-50 p-4"}>
+            {layoutV2 ? (
+              <SeatMapViewerCanvas
+                layout={layoutV2}
+                eventSeats={canvasEventSeats}
+                selectedSeatIds={selectedIds}
+                onSeatClick={toggleSeat}
+                interactive={mode !== "viewer"}
+                allowUnavailableSelection={mode === "assign"}
+                className="h-full min-h-0"
+              />
+            ) : (
+              <>
             {!buyerMode && (
               <div className="mb-3 flex items-center justify-end gap-2">
                 <button onClick={() => setZoom((value) => Math.max(0.7, value - 0.1))} className="flex h-9 w-9 items-center justify-center rounded-lg border bg-white"><Minus size={16} /></button>
@@ -308,6 +325,8 @@ export default function SeatMapModal({
                 })}
               </div>
             </div>
+              </>
+            )}
           </main>
         </div>
       </div>

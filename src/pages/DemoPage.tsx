@@ -21,6 +21,8 @@ export default function DemoPage() {
     if (enrichedSeatMapState.current) return;
     if (!state.events.length && !state.tickets.length && !state.applications.length) return;
     if (state.events.some((event) =>
+      event.eventId === "EVT-SEAT-MAP-DEMO" &&
+      event.layoutId === "layout_grand_theatre_v2" &&
       event.status === "published" &&
       event.eventSeats?.length &&
       state.tickets.some((ticket) => ticket.eventId === event.eventId)

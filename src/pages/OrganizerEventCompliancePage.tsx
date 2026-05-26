@@ -706,6 +706,7 @@ export default function OrganizerEventCompliancePage() {
         mode="assign"
         baseSeats={selectedLayout?.seats || []}
         eventSeats={(form.eventSeats || []) as EventSeat[]}
+        layoutV2={selectedLayout?.layoutV2}
         tiers={normalizedTiersWithColors}
         onClose={() => setSeatMapOpen(false)}
         onSaveEventSeats={(seats) => {

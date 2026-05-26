@@ -369,8 +369,9 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
         open={Boolean(schemeVenue && activeLayout)}
         title={schemeVenue?.name || "Схема площадки"}
         subtitle={activeHall?.name}
-        mode="layout"
+        mode={activeLayout?.layoutV2 ? "viewer" : "layout"}
         baseSeats={activeLayout?.seats || []}
+        layoutV2={activeLayout?.layoutV2}
         onClose={() => setSchemeVenue(null)}
         onSaveLayout={(seats) => {
           if (activeLayout && saveSeatMapLayout(state, activeLayout.layoutId, seats)) {
