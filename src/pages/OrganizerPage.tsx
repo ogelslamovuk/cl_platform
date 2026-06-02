@@ -6,8 +6,8 @@ import HelpTooltip from "@/components/ui/help-tooltip";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import SeatMapPreview from "@/components/seatmap/SeatMapPreview";
 import { useStorageSync } from "@/hooks/useStorageSync";
-import type { AppState, EventComplianceApplicationRecord, EventRecord, OrganizerDocument, OrganizerSaleRecord } from "@/lib/store";
-import { calculateComplianceFee, getEventSeatsWithSalesState, getEventSeatSummary, getSalesChannelLabel, getSeatMapLayout, logoutOrganizer } from "@/lib/store";
+import type { AppState, EventComplianceApplicationRecord, EventRecord, OrganizerDocument, OrganizerFinanceOperation, OrganizerFinanceReceipt, OrganizerSaleRecord } from "@/lib/store";
+import { calculateComplianceFee, calculateComplianceFeeAmount, DEMO_TOP_UP_AMOUNT, getCompliancePaymentStatus, getEventSeatsWithSalesState, getEventSeatSummary, getOrganizerFinancialAccount, getSalesChannelLabel, getSeatMapLayout, logoutOrganizer, topUpOrganizerBalance } from "@/lib/store";
 import { formatDisplayId, getEventStatusLabel, getOperationTypeLabel } from "@/lib/display";
 import {
   calculateOrganizerFinance,
@@ -32,14 +32,16 @@ import {
   LayoutDashboard,
   Megaphone,
   Plus,
+  ReceiptText,
   Search,
   ShieldCheck,
   TrendingUp,
   User,
+  Wallet,
   X,
 } from "lucide-react";
 
-type Section = "dashboard" | "applications" | "events" | "sales" | "reports" | "marketing" | "documents" | "support";
+type Section = "dashboard" | "financial" | "applications" | "events" | "sales" | "reports" | "marketing" | "documents" | "support";
 type AppFilter = "all" | "draft" | "submitted" | "approved" | "rejected" | "needs_rework";
 type SortDirection = "asc" | "desc";
 
@@ -157,6 +159,11 @@ export default function OrganizerPage() {
       ? calculateOrganizerFinance(state, organizer.organizerId)
       : { currentRevenue: 0, soldTickets: 0, amountDue: 0, openEvents: 0, commissionPercent: 5 }
   ), [organizer, state]);
+  const organizerFinancialAccount = useMemo(() => (
+    organizer
+      ? getOrganizerFinancialAccount(state, organizer.organizerId)
+      : { balance: 0, available: 0, reserved: 0, operations: [], receipts: [] }
+  ), [organizer, state]);
   const organizerSettlementReport = useMemo(() => (
     organizer
       ? calculateOrganizerSettlementReport(state, organizer.organizerId)
@@ -236,6 +243,13 @@ export default function OrganizerPage() {
     logoutOrganizer(state);
     update({ ...state });
     navigate("/organizer/login", { replace: true });
+  };
+
+  const handleTopUpBalance = () => {
+    if (!organizer) return;
+    topUpOrganizerBalance(state, organizer.organizerId);
+    update({ ...state });
+    toast.success(`Счёт пополнен на ${formatMoney(DEMO_TOP_UP_AMOUNT)}.`);
   };
 
   if (!organizer) {
@@ -389,7 +403,7 @@ export default function OrganizerPage() {
       <div className="flex-1 flex flex-col min-h-screen">
         <header className="sticky top-0 z-40 border-b flex items-center justify-between px-6 h-14" style={{ background: T.sidebarBg, borderColor: T.border }}>
           <h1 className="text-lg font-semibold" style={{ color: T.textPrimary }}>
-            {sidebarItems.find((s) => s.id === activeSection)?.label || "Дашборд"}
+            {activeSection === "financial" ? "Финансовый счёт" : sidebarItems.find((s) => s.id === activeSection)?.label || "Дашборд"}
           </h1>
           <div className="flex items-center gap-3">
             <button
@@ -457,13 +471,15 @@ export default function OrganizerPage() {
                     {[
                       { label: "Текущая выручка", value: formatMoney(organizerFinance.currentRevenue), icon: TrendingUp, tooltip: "Выручка по открытым мероприятиям: учитываются только проданные и не возвращённые билеты." },
                       { label: "Продано билетов", value: String(organizerFinance.soldTickets), icon: BarChart3, tooltip: "Количество проданных билетов по открытым мероприятиям без возвращённых билетов." },
-                      { label: "К уплате платформе", value: formatMoney(organizerFinance.amountDue), icon: ShieldCheck, tooltip: `Начисление по ставке ${organizerFinance.commissionPercent}% от текущей выручки.` },
+                      { label: "Баланс", value: formatMoney(organizerFinancialAccount.balance), icon: Wallet, tooltip: "Текущий баланс финансового счёта организатора. Нажмите карточку, чтобы открыть операции и квитанции.", onClick: () => setActiveSection("financial") },
                       { label: "Открытые мероприятия", value: String(organizerFinance.openEvents), icon: Calendar, tooltip: "Опубликованные мероприятия, дата и время которых ещё не прошли." },
                     ].map((k) => (
                     <div key={k.label} className="relative">
-                    <div
+                    <button
+                      type="button"
+                      onClick={k.onClick}
                       className="rounded-[18px] border p-5 text-left transition-all duration-200 hover:-translate-y-0.5 w-full"
-                      style={{ background: T.cardBg, backgroundImage: T.cardGradient, borderColor: T.border, boxShadow: T.cardShadow }}
+                      style={{ background: T.cardBg, backgroundImage: T.cardGradient, borderColor: T.border, boxShadow: T.cardShadow, cursor: k.onClick ? "pointer" : "default" }}
                     >
                       <div className="flex items-center justify-between mb-3">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: T.goldBg }}>
@@ -472,7 +488,7 @@ export default function OrganizerPage() {
                       </div>
                       <div className="text-[28px] font-bold" style={{ color: T.textPrimary }}>{k.value}</div>
                       <div className="text-[13px] mt-1" style={{ color: T.textSecondary }}>{k.label}</div>
-                    </div>
+                    </button>
                     <CardHelp text={k.tooltip} />
                     </div>
                   ))}
@@ -541,6 +557,15 @@ export default function OrganizerPage() {
                   </div>
                 </div>
               </>
+            )}
+
+            {activeSection === "financial" && isOrganizerApproved && (
+              <FinancialAccountSection
+                account={organizerFinancialAccount}
+                applications={myComplianceApplications}
+                onBack={() => setActiveSection("dashboard")}
+                onTopUp={handleTopUpBalance}
+              />
             )}
 
             {activeSection === "applications" && isOrganizerApproved && (
@@ -932,6 +957,172 @@ function EventsTable({ rows, state, compact = false }: { rows: EventRecord[]; st
   );
 }
 
+function FinancialAccountSection({
+  account,
+  applications,
+  onBack,
+  onTopUp,
+}: {
+  account: { balance: number; available: number; reserved: number; operations: OrganizerFinanceOperation[]; receipts: OrganizerFinanceReceipt[] };
+  applications: EventComplianceApplicationRecord[];
+  onBack: () => void;
+  onTopUp: () => void;
+}) {
+  const applicationById = new Map(applications.map((application) => [application.eventComplianceApplicationId, application]));
+  const applicationPaymentRows = applications
+    .filter((application) => application.status !== "draft")
+    .map((application) => ({
+      application,
+      feeAmount: calculateComplianceFeeAmount(application.data),
+      status: getCompliancePaymentStatus(application),
+    }));
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-[18px] border p-6 relative" style={{ background: T.cardBg, borderColor: T.border, boxShadow: T.cardShadow }}>
+        <CardHelp text="Финансовый счёт используется в демо-режиме для пополнения баланса и оплаты обязательных пошлин по заявкам." />
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <button onClick={onBack} className="mb-4 h-9 rounded-lg border px-3 text-sm" style={{ borderColor: T.btnSecondaryBorder, color: T.textSecondary, background: "transparent" }}>
+              Вернуться в дашборд
+            </button>
+            <h2 className="text-xl font-semibold" style={{ color: T.textPrimary }}>Финансовый счёт</h2>
+            <p className="mt-1 text-sm" style={{ color: T.textSecondary }}>Баланс, операции по заявкам и демонстрационные квитанции.</p>
+          </div>
+          <span className="inline-flex items-center gap-1">
+            <button onClick={onTopUp} className="h-10 rounded-xl px-4 text-sm font-semibold" style={{ background: T.gold, color: "#111" }}>
+              Пополнить счёт
+            </button>
+            <HelpTooltip text={`Добавляет на финансовый счёт демонстрационную сумму ${formatMoney(DEMO_TOP_UP_AMOUNT)} без подключения банка.`} />
+          </span>
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <MetricCard label="Текущий баланс" value={formatMoney(account.balance)} help="Общая сумма на финансовом счёте организатора." />
+          <MetricCard label="Доступно к использованию" value={formatMoney(account.available)} help="Сумма, доступная для оплаты обязательных пошлин по заявкам." />
+          <MetricCard label="Зарезервировано" value={formatMoney(account.reserved)} help="В текущем демонстрационном сценарии средства не резервируются отдельно." />
+        </div>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+        <section className="rounded-[18px] border p-6 relative" style={{ background: T.cardBg, borderColor: T.border, boxShadow: T.cardShadow }}>
+          <CardHelp text="История показывает пополнения, оплаты пошлин и формирование квитанций." />
+          <h3 className="text-lg font-semibold mb-4" style={{ color: T.textPrimary }}>История операций</h3>
+          {account.operations.length === 0 ? (
+            <SimpleEmpty title="Операций пока нет" desc="После пополнения или оплаты здесь появится запись." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr style={{ background: T.tableHeaderBg }}>
+                    <th className="py-2.5 px-3 text-left font-semibold">Дата</th>
+                    <th className="py-2.5 px-3 text-left font-semibold">Операция</th>
+                    <th className="py-2.5 px-3 text-left font-semibold">Заявка</th>
+                    <th className="py-2.5 px-3 text-right font-semibold">Сумма</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {account.operations.map((operation) => (
+                    <tr key={operation.financeOperationId} className="border-b" style={{ borderColor: T.border }}>
+                      <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{fmtDateTime(operation.createdAt)}</td>
+                      <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>
+                        <div className="font-medium">{operation.kind}</div>
+                        <div className="text-xs" style={{ color: T.textMuted }}>{operation.title}</div>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-xs" style={{ color: T.textSecondary }}>
+                        {operation.eventComplianceApplicationId ? formatDisplayId(operation.eventComplianceApplicationId) : "—"}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-semibold" style={{ color: operation.amount < 0 ? "#F59E0B" : "#22C55E" }}>
+                        {formatMoney(operation.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-[18px] border p-6 relative" style={{ background: T.cardBg, borderColor: T.border, boxShadow: T.cardShadow }}>
+          <CardHelp text="Квитанции создаются для демонстрации подтверждения платежа или подготовленного платёжного документа." />
+          <h3 className="text-lg font-semibold mb-4" style={{ color: T.textPrimary }}>Квитанции</h3>
+          {account.receipts.length === 0 ? (
+            <SimpleEmpty title="Квитанций пока нет" desc="Сформируйте квитанцию или оплатите пошлину по заявке." />
+          ) : (
+            <div className="space-y-3">
+              {account.receipts.map((receipt) => (
+                <div key={receipt.receiptId} className="rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-lg p-2" style={{ background: T.goldBg, color: T.gold }}><ReceiptText size={16} /></div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold" style={{ color: T.textPrimary }}>{receipt.number}</div>
+                      <div className="mt-1 text-xs" style={{ color: T.textSecondary }}>{receipt.title}</div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs" style={{ color: T.textMuted }}>
+                        <span>{formatMoney(receipt.amount)}</span>
+                        <span>{receipt.status}</span>
+                        <span>{fmtDateTime(receipt.createdAt)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      <section className="rounded-[18px] border p-6 relative" style={{ background: T.cardBg, borderColor: T.border, boxShadow: T.cardShadow }}>
+        <CardHelp text="Операции по заявкам связывают начисленную пошлину, статус оплаты и квитанцию." />
+        <h3 className="text-lg font-semibold mb-4" style={{ color: T.textPrimary }}>Операции по заявкам</h3>
+        {applicationPaymentRows.length === 0 ? (
+          <SimpleEmpty title="Нет поданных заявок" desc="После подачи заявки здесь появятся начисления и статусы оплаты." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr style={{ background: T.tableHeaderBg }}>
+                  <th className="py-2.5 px-3 text-left font-semibold">ID заявки</th>
+                  <th className="py-2.5 px-3 text-left font-semibold">Название</th>
+                  <th className="py-2.5 px-3 text-left font-semibold">Статус оплаты</th>
+                  <th className="py-2.5 px-3 text-right font-semibold">Сумма</th>
+                  <th className="py-2.5 px-3 text-left font-semibold">Квитанция</th>
+                </tr>
+              </thead>
+              <tbody>
+                {applicationPaymentRows.map(({ application, feeAmount, status }) => {
+                  const receipt = account.receipts.find((item) => item.eventComplianceApplicationId === application.eventComplianceApplicationId && item.status === "оплачена");
+                  return (
+                    <tr key={application.eventComplianceApplicationId} className="border-b" style={{ borderColor: T.border }}>
+                      <td className="py-2.5 px-3 font-mono text-xs" style={{ color: T.textSecondary }}>{formatDisplayId(application.eventComplianceApplicationId)}</td>
+                      <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>{applicationById.get(application.eventComplianceApplicationId)?.data.title || "—"}</td>
+                      <td className="py-2.5 px-3">
+                        <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={status === "Оплачено" ? statusStyle.approved : status === "Недостаточно средств" ? statusStyle.needs_rework : statusStyle.submitted}>
+                          {status}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right" style={{ color: T.textSecondary }}>{formatMoney(feeAmount)}</td>
+                      <td className="py-2.5 px-3" style={{ color: T.textSecondary }}>{receipt?.number || "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function MetricCard({ label, value, help }: { label: string; value: string; help: string }) {
+  return (
+    <div className="relative rounded-xl border p-4" style={{ borderColor: T.border, background: T.sidebarBg }}>
+      <div className="absolute right-3 top-3"><HelpTooltip text={help} /></div>
+      <div className="text-[12px]" style={{ color: T.textSecondary }}>{label}</div>
+      <div className="mt-2 text-2xl font-bold" style={{ color: T.textPrimary }}>{value}</div>
+    </div>
+  );
+}
+
 function SalesSection({ rows }: { rows: OrganizerSaleRecord[] }) {
   return (
     <div className="rounded-[18px] border p-6 relative" style={{ background: T.cardBg, borderColor: T.border, boxShadow: T.cardShadow }}>
@@ -987,7 +1178,7 @@ function ReportsSection({ report }: { report: OrganizerSettlementReport }) {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard title="Выручка" value={formatMoney(report.totalRevenue)} cardTitle="Сумма активных продаж по открытым и закрытым мероприятиям." />
         <KpiCard title="Продано билетов" value={String(report.totalSoldTickets)} cardTitle="Количество проданных и погашенных билетов без возвращённых билетов." />
-        <KpiCard title="К уплате платформе" value={formatMoney(report.totalAmountDue)} cardTitle="Начисление по настроенному проценту платформы / Минкульта." />
+        <KpiCard title="Начисления платформы" value={formatMoney(report.totalAmountDue)} cardTitle="Начисление по настроенному проценту платформы / Минкульта." />
         <KpiCard title="Оплачено" value={formatMoney(report.paidAmount)} cardTitle="Платежный контур в этом прототипе не моделируется." />
         <KpiCard title="Остаток к оплате" value={formatMoney(report.remainingDue)} cardTitle="Сумма к уплате за вычетом уже отражённых оплат." />
       </div>
@@ -1055,7 +1246,7 @@ function SettlementEventsTable({
                 <th className="py-2.5 px-3 text-left font-semibold">Продано билетов</th>
                 <th className="py-2.5 px-3 text-left font-semibold">Выручка</th>
                 <th className="py-2.5 px-3 text-left font-semibold">Комиссия платформы</th>
-                <th className="py-2.5 px-3 text-left font-semibold">К уплате платформе</th>
+                <th className="py-2.5 px-3 text-left font-semibold">Начисления платформы</th>
               </tr>
             </thead>
             <tbody>
@@ -1262,6 +1453,9 @@ function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianc
   const fee = app.data.approvalMode === "certificate_required"
     ? `${calculateComplianceFee(app.data.projectedCapacity, app.data.plannedTicketsForSale, app.data.ticketTiers)} БВ`
     : "—";
+  const feeAmount = calculateComplianceFeeAmount(app.data);
+  const paymentStatus = getCompliancePaymentStatus(app);
+  const paidReceipt = state.finance.organizerReceipts.find((receipt) => receipt.eventComplianceApplicationId === app.eventComplianceApplicationId && receipt.status === "оплачена");
   const salesChannels = (app.data.salesChannels?.length ? app.data.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code));
   const linkedEvent = app.linkedEventId ? state.events.find((event) => event.eventId === app.linkedEventId) || null : null;
   const schemeSeats = linkedEvent?.eventSeats?.length ? linkedEvent.eventSeats : app.data.eventSeats || [];
@@ -1299,6 +1493,9 @@ function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianc
             <Item k="Каналы продаж" v={salesChannels.join(", ")} />
             <Item k="Режим согласования" v={approvalModeLabel[app.data.approvalMode] || app.data.approvalMode} />
             <Item k="Госпошлина" v={fee} />
+            <Item k="Сумма к оплате" v={formatMoney(feeAmount)} />
+            <Item k="Статус оплаты" v={paymentStatus} />
+            <Item k="Квитанция" v={paidReceipt?.number || "—"} />
             <Item k="Комментарий администратора" v={app.adminComment || "—"} />
             {app.certificateNumber && <Item k="Номер удостоверения" v={app.certificateNumber} />}
             {app.certificateDate && <Item k="Дата удостоверения" v={app.certificateDate} />}

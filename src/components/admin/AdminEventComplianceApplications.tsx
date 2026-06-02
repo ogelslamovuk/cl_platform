@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import type { AppState } from "@/lib/store";
-import { calculateComplianceFee, getSalesChannelLabel, setEventComplianceReview } from "@/lib/store";
+import { calculateComplianceFee, calculateComplianceFeeAmount, getCompliancePaymentStatus, getSalesChannelLabel, setEventComplianceReview } from "@/lib/store";
 import { A } from "./adminStyles";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import { toast } from "sonner";
@@ -51,7 +51,6 @@ function getApplicationFeatures(row: AppState["eventComplianceApplications"][num
 
 export default function AdminEventComplianceApplications({ state, onUpdate }: Props) {
   const [comment, setComment] = useState<Record<string, string>>({});
-  const [confirmFee, setConfirmFee] = useState<Record<string, boolean>>({});
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("submitted");
 
   const allRows = useMemo(() => state.eventComplianceApplications.filter((row) => row.status !== "draft").slice().reverse(), [state.eventComplianceApplications]);
@@ -69,7 +68,6 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
     const ok = setEventComplianceReview(state, id, {
       decision,
       comment: text,
-      confirmFeePayment: !!confirmFee[id],
     });
     if (!ok) {
       toast.error("Недопустимый переход статуса.");
@@ -113,19 +111,23 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
           const fee = r.data.approvalMode === "certificate_required"
             ? `${calculateComplianceFee(r.data.projectedCapacity, r.data.plannedTicketsForSale, r.data.ticketTiers)} БВ`
             : "—";
+          const feeAmount = calculateComplianceFeeAmount(r.data);
+          const paymentStatus = getCompliancePaymentStatus(r);
+          const isPaymentWaiting = paymentStatus === "Ожидает оплаты";
+          const canApprove = r.status === "submitted" && paymentStatus === "Оплачено";
+          const paidReceipt = state.finance.organizerReceipts.find((receipt) => receipt.eventComplianceApplicationId === r.eventComplianceApplicationId && receipt.status === "оплачена");
           const features = getApplicationFeatures(r);
           const salesChannels = (r.data.salesChannels?.length ? r.data.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code));
           const eventTypePath = r.data.eventTypePath?.length ? r.data.eventTypePath.join(" / ") : r.data.eventType || "—";
           const performers = r.data.performers || [];
           const checks = r.data.interagencyChecks || [];
           const contractStatus = r.data.venueContractStatus || "требуется";
-          const paymentStatus = r.data.feeExempt ? "освобождение" : r.data.feePaid ? "оплачена" : "требуется";
 
           return (
             <article
               key={r.eventComplianceApplicationId}
               className="relative rounded-xl border p-4"
-              style={{ background: A.cardBg, borderColor: A.border, boxShadow: A.cardShadow }}
+              style={{ background: isPaymentWaiting ? "rgba(251,191,36,0.10)" : A.cardBg, borderColor: isPaymentWaiting ? "rgba(251,191,36,0.45)" : A.border, boxShadow: A.cardShadow }}
             >
               <CardHelp text="Список заявок на проведение конкретных мероприятий. При одобрении удостоверение присваивается автоматически, если оно требуется." />
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)]">
@@ -160,7 +162,7 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                     </div>
                     <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
                       <div className="text-xs" style={{ color: A.textMuted }}>Пошлина</div>
-                      <div style={{ color: A.textPrimary }}>{fee}</div>
+                      <div style={{ color: A.textPrimary }}>{fee} · {feeAmount.toFixed(2)} BYN</div>
                     </div>
                     <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
                       <div className="text-xs" style={{ color: A.textMuted }}>Категория мероприятия</div>
@@ -172,7 +174,11 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                     </div>
                     <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
                       <div className="text-xs" style={{ color: A.textMuted }}>Оплата</div>
-                      <div style={{ color: A.textPrimary }}>{paymentStatus}</div>
+                      <div style={{ color: paymentStatus === "Оплачено" ? A.statusOk : paymentStatus === "Недостаточно средств" ? A.statusWarn : A.statusInfo }}>{paymentStatus}</div>
+                    </div>
+                    <div className="rounded-lg border px-3 py-2 text-sm md:col-span-2" style={{ borderColor: A.border, background: A.surfaceBg }}>
+                      <div className="text-xs" style={{ color: A.textMuted }}>Факт оплаты</div>
+                      <div style={{ color: A.textPrimary }}>{paymentStatus === "Оплачено" ? `Оплачено${paidReceipt ? `, квитанция ${paidReceipt.number}` : ""}` : "Ожидает оплаты обязательных пошлин"}</div>
                     </div>
                   </div>
 
@@ -206,15 +212,18 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                     </div>
                   </div>
 
-                  <label className="flex items-center gap-2 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={!!confirmFee[r.eventComplianceApplicationId]}
-                      onChange={(e) => setConfirmFee((p) => ({ ...p, [r.eventComplianceApplicationId]: e.target.checked }))}
-                    />
-                    Подтвердить оплату
-                    <HelpTooltip text="Отметьте, если оплата пошлины проверена перед одобрением заявки." />
-                  </label>
+                  <div className="rounded border p-2 text-xs" style={{ borderColor: paymentStatus === "Оплачено" ? "rgba(52,211,153,0.35)" : "rgba(251,191,36,0.45)", background: A.cardBg, color: A.textPrimary }}>
+                    <div className="inline-flex items-center gap-1">
+                      Статус оплаты: <b>{paymentStatus}</b>
+                      <HelpTooltip text="Центр Управления видит статус оплаты, но не управляет балансом организатора." />
+                    </div>
+                    {paymentStatus !== "Оплачено" && (
+                      <div className="mt-2" style={{ color: A.statusWarn }}>Одобрение доступно после оплаты обязательных пошлин.</div>
+                    )}
+                    {paidReceipt && (
+                      <div className="mt-2" style={{ color: A.textSecondary }}>Квитанция: {paidReceipt.number}, {paidReceipt.amount.toFixed(2)} BYN</div>
+                    )}
+                  </div>
 
                   <div className="relative">
                     <textarea
@@ -242,8 +251,8 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
 
                   <div className="flex gap-2 flex-wrap">
                     <span className="inline-flex items-center gap-1">
-                      <button disabled={r.status !== "submitted"} className="px-2 py-1 rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: A.statusOkBg, color: A.statusOk }} onClick={() => applyDecision(r.eventComplianceApplicationId, "approved")}>Одобрить заявку</button>
-                      <HelpTooltip text="Одобрить мероприятие и автоматически присвоить удостоверение." />
+                      <button disabled={!canApprove} className="px-2 py-1 rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: A.statusOkBg, color: A.statusOk }} onClick={() => applyDecision(r.eventComplianceApplicationId, "approved")}>Одобрить заявку</button>
+                      <HelpTooltip text={canApprove ? "Одобрить мероприятие и автоматически присвоить удостоверение." : "Одобрение доступно после оплаты обязательных пошлин."} />
                     </span>
                     <span className="inline-flex items-center gap-1">
                       <button disabled={r.status !== "submitted"} className="px-2 py-1 rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: A.statusWarnBg, color: A.statusWarn }} onClick={() => applyDecision(r.eventComplianceApplicationId, "needs_rework")}>Вернуть на доработку</button>
