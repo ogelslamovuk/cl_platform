@@ -54,7 +54,7 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
   const [confirmFee, setConfirmFee] = useState<Record<string, boolean>>({});
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("submitted");
 
-  const allRows = useMemo(() => state.eventComplianceApplications.slice().reverse(), [state.eventComplianceApplications]);
+  const allRows = useMemo(() => state.eventComplianceApplications.filter((row) => row.status !== "draft").slice().reverse(), [state.eventComplianceApplications]);
   const rows = useMemo(
     () => statusFilter === "all" ? allRows : allRows.filter((row) => row.status === statusFilter),
     [allRows, statusFilter]
@@ -115,6 +115,11 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
             : "—";
           const features = getApplicationFeatures(r);
           const salesChannels = (r.data.salesChannels?.length ? r.data.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code));
+          const eventTypePath = r.data.eventTypePath?.length ? r.data.eventTypePath.join(" / ") : r.data.eventType || "—";
+          const performers = r.data.performers || [];
+          const checks = r.data.interagencyChecks || [];
+          const contractStatus = r.data.venueContractStatus || "требуется";
+          const paymentStatus = r.data.feeExempt ? "освобождение" : r.data.feePaid ? "оплачена" : "требуется";
 
           return (
             <article
@@ -157,6 +162,18 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                       <div className="text-xs" style={{ color: A.textMuted }}>Пошлина</div>
                       <div style={{ color: A.textPrimary }}>{fee}</div>
                     </div>
+                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
+                      <div className="text-xs" style={{ color: A.textMuted }}>Категория мероприятия</div>
+                      <div style={{ color: A.textPrimary }}>{eventTypePath}</div>
+                    </div>
+                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
+                      <div className="text-xs" style={{ color: A.textMuted }}>Договор с площадкой</div>
+                      <div style={{ color: A.textPrimary }}>{contractStatus}</div>
+                    </div>
+                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
+                      <div className="text-xs" style={{ color: A.textMuted }}>Оплата</div>
+                      <div style={{ color: A.textPrimary }}>{paymentStatus}</div>
+                    </div>
                   </div>
 
                   <div className="grid gap-2 md:grid-cols-2">
@@ -167,6 +184,14 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                     <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
                       <div className="mb-1" style={{ color: A.textMuted }}>Каналы продаж</div>
                       {salesChannels.join(", ")}
+                    </div>
+                    <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
+                      <div className="mb-1" style={{ color: A.textMuted }}>Участники и документы</div>
+                      {performers.length ? performers.map((performer) => `${performer.name || "—"} · ${performer.country || "—"} · ${performer.documentStatus || "макет документа"}`).join("; ") : "—"}
+                    </div>
+                    <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
+                      <div className="mb-1" style={{ color: A.textMuted }}>Межведомственные проверки</div>
+                      {checks.length ? checks.map((check) => `${check.agency}: ${check.status}`).join("; ") : "—"}
                     </div>
                   </div>
                 </div>
