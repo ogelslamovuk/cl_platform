@@ -286,11 +286,22 @@ export interface EventPerformer {
   country: string;
   representative: string;
   comment: string;
+  documentStatus?: string;
+  documentNote?: string;
+}
+
+export interface EventInteragencyCheck {
+  checkId: string;
+  agency: string;
+  subject: string;
+  status: "Не отправлено" | "Отправлено" | "В обработке" | "Проверено" | "Требует уточнения";
+  updatedAt: string;
 }
 
 export interface EventComplianceData {
   title: string;
   eventType: string;
+  eventTypePath?: string[];
   shortDescription: string;
   program: string;
   posterPath: string;
@@ -314,6 +325,9 @@ export interface EventComplianceData {
   approvalMode: "certificate_required" | "notice_only" | "certificate_not_required";
   approvalBasis: string;
   eventDocuments: MockAttachment[];
+  venueContractStatus?: "приложен" | "требуется" | "образец";
+  interagencyChecks?: EventInteragencyCheck[];
+  wizardLastStep?: number;
   salesStartDate: string;
   feeExempt: boolean;
   feeExemptReason: string;
@@ -1441,6 +1455,7 @@ export function defaultEventComplianceData(): EventComplianceData {
   return {
     title: "",
     eventType: "",
+    eventTypePath: [],
     shortDescription: "",
     program: "",
     posterPath: "",
@@ -1464,6 +1479,9 @@ export function defaultEventComplianceData(): EventComplianceData {
     approvalMode: "certificate_required",
     approvalBasis: "",
     eventDocuments: [],
+    venueContractStatus: "требуется",
+    interagencyChecks: [],
+    wizardLastStep: 0,
     salesStartDate: "",
     feeExempt: false,
     feeExemptReason: "",
@@ -1608,7 +1626,7 @@ export function createEventComplianceApplication(
   submit: boolean
 ): EventComplianceApplicationRecord {
   const normalizedTiers = normalizeComplianceTicketTiers(data);
-  const canSubmit = !submit || validateTicketTiers(normalizedTiers, data);
+  const canSubmit = submit && validateTicketTiers(normalizedTiers, data);
   const nextData: EventComplianceData = {
     ...data,
     eventSeats: normalizeEventSeats(data.eventSeats),
