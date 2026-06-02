@@ -6,14 +6,21 @@ import HelpTooltip from "@/components/ui/help-tooltip";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import {
   calculateComplianceFee,
+  calculateComplianceFeeAmount,
   buildDefaultSalesChannels,
   buildEventSeatsFromLayout,
   createEventComplianceApplication,
   defaultEventComplianceData,
+  DEMO_TOP_UP_AMOUNT,
+  generateComplianceFeeReceipt,
+  getCompliancePaymentStatus,
+  getOrganizerFinancialAccount,
   getSeatMapLayout,
   getVenueRegistryRecord,
   getSalesChannelLabel,
+  payComplianceFeeFromBalance,
   SEAT_TARIFF_COLORS,
+  topUpOrganizerBalance,
   updateEventComplianceApplication,
 } from "@/lib/store";
 import type { EventInteragencyCheck, EventPerformer, EventSeat, PriceTier } from "@/lib/store";
@@ -84,6 +91,10 @@ function normalizeDateTimeLocal(value: string | null | undefined): string {
   const hh = String(parsed.getHours()).padStart(2, "0");
   const mi = String(parsed.getMinutes()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+function formatMoney(value: number): string {
+  return `${value.toFixed(2)} BYN`;
 }
 
 function mockAttachment(kind: string, name: string, sample = false) {
@@ -196,6 +207,18 @@ export default function OrganizerEventCompliancePage() {
 
   const totalPlannedTickets = form.ticketTiers.reduce((acc, tier) => acc + (Number.isFinite(tier.quantity) ? Math.max(0, Math.floor(tier.quantity)) : 0), 0);
   const fee = calculateComplianceFee(form.projectedCapacity, totalPlannedTickets, form.ticketTiers);
+  const feeAmount = calculateComplianceFeeAmount({ ...form, plannedTicketsForSale: totalPlannedTickets, ticketTiers: form.ticketTiers });
+  const organizerFinancialAccount = getOrganizerFinancialAccount(state, organizer.organizerId);
+  const editingPaymentApplication = editingId ? state.eventComplianceApplications.find((app) => app.eventComplianceApplicationId === editingId) || null : null;
+  const paymentStatus = editingPaymentApplication ? getCompliancePaymentStatus(editingPaymentApplication) : form.feePaid || form.feeExempt || form.approvalMode !== "certificate_required" ? "Оплачено" : form.paymentComment === "Недостаточно средств" ? "Недостаточно средств" : "Ожидает оплаты";
+  const paymentOperations = state.finance.organizerOperations
+    .filter((operation) => operation.organizerId === organizer.organizerId && (!editingId || operation.eventComplianceApplicationId === editingId))
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const paymentReceipts = state.finance.organizerReceipts
+    .filter((receipt) => receipt.organizerId === organizer.organizerId && (!editingId || receipt.eventComplianceApplicationId === editingId))
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const normalizedTiersWithColors = (form.ticketTiers || []).map((tier, index): PriceTier => ({
     ...tier,
     color: tier.color || SEAT_TARIFF_COLORS[index % SEAT_TARIFF_COLORS.length],
@@ -216,7 +239,6 @@ export default function OrganizerEventCompliancePage() {
     !form.venueContractStatus || form.venueContractStatus === "требуется" ? "договор с площадкой" : "",
     !validateTicketTiers(false) && "билеты и тарифы",
     !(form.salesChannels || []).length && "каналы продаж",
-    form.approvalMode === "certificate_required" && !form.feePaid && !form.feeExempt && "пошлина или основание освобождения",
   ].filter(Boolean) as string[];
   const canSubmit = requiredMissing.length === 0;
   const stepStatuses: StepStatus[] = [
@@ -313,6 +335,53 @@ export default function OrganizerEventCompliancePage() {
   function addMockAttachment(kind: string, target: "eventDocuments" | "paymentAttachments" | "notificationsAttachment", name: string, sample = false) {
     const file = mockAttachment(kind, name, sample);
     setForm((prev) => ({ ...prev, [target]: [...prev[target], file] }));
+  }
+
+  function ensureEditableApplicationForPayment(): string | null {
+    if (editingId) return editingId;
+    const payload = normalizeFormPayload();
+    const record = createEventComplianceApplication(state, organizer.organizerId, payload, false);
+    setEditingId(record.eventComplianceApplicationId);
+    setForm(record.data);
+    return record.eventComplianceApplicationId;
+  }
+
+  function handleTopUpBalance() {
+    topUpOrganizerBalance(state, organizer.organizerId);
+    update({ ...state });
+    toast.success(`Счёт пополнен на ${formatMoney(DEMO_TOP_UP_AMOUNT)}.`);
+  }
+
+  function handleGenerateFeeReceipt() {
+    const applicationId = ensureEditableApplicationForPayment();
+    if (!applicationId) {
+      toast.error("Сначала сохраните заявку.");
+      return;
+    }
+    const receipt = generateComplianceFeeReceipt(state, organizer.organizerId, applicationId);
+    update({ ...state });
+    if (!receipt) {
+      toast.error("Не удалось сформировать квитанцию.");
+      return;
+    }
+    toast.success(`Квитанция ${receipt.number} сформирована.`);
+  }
+
+  function handlePayFromBalance() {
+    const applicationId = ensureEditableApplicationForPayment();
+    if (!applicationId) {
+      toast.error("Сначала сохраните заявку.");
+      return;
+    }
+    const result = payComplianceFeeFromBalance(state, organizer.organizerId, applicationId);
+    const updatedApplication = state.eventComplianceApplications.find((app) => app.eventComplianceApplicationId === applicationId);
+    if (updatedApplication) setForm(updatedApplication.data);
+    update({ ...state });
+    if (result.ok) {
+      toast.success(result.message);
+      return;
+    }
+    toast.error(result.message);
   }
 
   function addPerformer() {
@@ -439,8 +508,8 @@ export default function OrganizerEventCompliancePage() {
       salesStartDate: salesStart.toISOString().slice(0, 10),
       feeExempt: false,
       feeExemptReason: "",
-      feePaid: true,
-      paymentAttachments: [mockAttachment("payment-order", "Платёжное поручение по госпошлине", true)],
+      feePaid: false,
+      paymentAttachments: [],
       adRestrictionConfirmed: true,
       changesDeclared: false,
       executiveCommitteeNotified: true,
@@ -828,7 +897,23 @@ export default function OrganizerEventCompliancePage() {
           {activeStep === 7 && (
             <div className="space-y-4">
               <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
-                <div className="inline-flex items-center gap-1">Расчёт пошлины: <b>{fee} БВ</b><HelpTooltip text={COMPLIANCE_FEE_TOOLTIP} /></div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
+                    <div className="inline-flex items-center gap-1 text-xs opacity-75">Начислено <HelpTooltip text={COMPLIANCE_FEE_TOOLTIP} /></div>
+                    <div className="mt-2 text-xl font-semibold">{fee} БВ</div>
+                    <div className="mt-1 text-xs opacity-70">{formatMoney(feeAmount)}</div>
+                  </div>
+                  <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
+                    <div className="inline-flex items-center gap-1 text-xs opacity-75">Текущий баланс <HelpTooltip text="Баланс финансового счёта организатора, доступный для оплаты обязательных пошлин." /></div>
+                    <div className="mt-2 text-xl font-semibold">{formatMoney(organizerFinancialAccount.balance)}</div>
+                    <div className="mt-1 text-xs opacity-70">Доступно: {formatMoney(organizerFinancialAccount.available)}</div>
+                  </div>
+                  <div className="rounded-xl border p-3" style={{ borderColor: paymentStatus === "Оплачено" ? "rgba(52,211,153,0.35)" : paymentStatus === "Недостаточно средств" ? "rgba(251,191,36,0.45)" : "rgba(96,165,250,0.35)", background: "#0F1620" }}>
+                    <div className="inline-flex items-center gap-1 text-xs opacity-75">Статус оплаты <HelpTooltip text="Статус показывает, можно ли одобрить заявку в Центре Управления после подачи." /></div>
+                    <div className="mt-2 text-xl font-semibold">{paymentStatus}</div>
+                    <div className="mt-1 text-xs opacity-70">{paymentStatus === "Оплачено" ? "Одобрение будет доступно после подачи." : "Подать заявку можно, одобрение откроется после оплаты."}</div>
+                  </div>
+                </div>
                 <FieldHelp text="Укажите дату начала реализации билетов.">
                   <input className="h-10 w-full rounded px-3 pr-9 bg-[#0F1620] border" type="date" value={form.salesStartDate} onChange={(e) => updateForm({ salesStartDate: e.target.value })} />
                 </FieldHelp>
@@ -836,12 +921,47 @@ export default function OrganizerEventCompliancePage() {
                 <FieldHelp text="Укажите основание освобождения от госпошлины.">
                   <input className="h-10 w-full rounded px-3 pr-9 bg-[#0F1620] border" placeholder="Основание освобождения" value={form.feeExemptReason} onChange={(e) => updateForm({ feeExemptReason: e.target.value })} />
                 </FieldHelp>
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.feePaid} onChange={(e) => updateForm({ feePaid: e.target.checked })} /> Пошлина оплачена <HelpTooltip text="Отметьте, если пошлина уже оплачена." /></label>
-                <span className="inline-flex items-center gap-1"><button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => addMockAttachment("payment-order", "paymentAttachments", "Платёжное поручение по госпошлине", true)}>Добавить платёжный документ</button><HelpTooltip text="Прикрепить демонстрационный платёжный документ." /></span>
+                {paymentStatus === "Недостаточно средств" && (
+                  <div className="rounded-xl border px-3 py-2 text-sm" style={{ borderColor: "rgba(251,191,36,0.45)", background: "rgba(251,191,36,0.10)", color: "#FBBF24" }}>
+                    Недостаточно средств. Пополните счёт и повторите оплату.
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-3">
+                  <span className="inline-flex items-center gap-1">
+                    <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={handleTopUpBalance}>Пополнить счёт</button>
+                    <HelpTooltip text={`Добавить на финансовый счёт демонстрационную сумму ${formatMoney(DEMO_TOP_UP_AMOUNT)} без внешнего платёжного шлюза.`} />
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={handleGenerateFeeReceipt}>Сформировать квитанцию</button>
+                    <HelpTooltip text="Создать демонстрационную квитанцию по текущей заявке." />
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <button className="px-3 py-2 rounded font-semibold disabled:opacity-50" style={{ background: "#F2C94C", color: "#111" }} onClick={handlePayFromBalance} disabled={paymentStatus === "Оплачено"}>Оплатить с баланса</button>
+                    <HelpTooltip text="Списать демонстрационную сумму пошлины с финансового счёта организатора." />
+                  </span>
+                </div>
               </div>
-              <div className="space-y-2 text-sm">
-                {form.paymentAttachments.map((file) => <div key={file.attachmentId} className="rounded border px-3 py-2" style={{ borderColor: "rgba(255,255,255,0.12)" }}>{file.name}</div>)}
-                {!form.paymentAttachments.length && <div className="opacity-70">Платёжные документы пока не приложены.</div>}
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
+                  <div className="mb-2 inline-flex items-center gap-1 text-sm font-semibold">След операции <HelpTooltip text="Показывает операции финансового счёта, связанные с текущей заявкой." /></div>
+                  <div className="space-y-2 text-sm">
+                    {paymentOperations.map((operation) => (
+                      <div key={operation.financeOperationId} className="rounded border px-3 py-2" style={{ borderColor: "rgba(255,255,255,0.12)" }}>
+                        <div className="font-medium">{operation.kind}</div>
+                        <div className="text-xs opacity-70">{operation.title} · {formatMoney(operation.amount)}</div>
+                      </div>
+                    ))}
+                    {!paymentOperations.length && <div className="opacity-70">Операций по заявке пока нет.</div>}
+                  </div>
+                </div>
+                <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
+                  <div className="mb-2 inline-flex items-center gap-1 text-sm font-semibold">Квитанции <HelpTooltip text="Демонстрационные квитанции по пошлине появляются после формирования или оплаты." /></div>
+                  <div className="space-y-2 text-sm">
+                    {paymentReceipts.map((receipt) => <div key={receipt.receiptId} className="rounded border px-3 py-2" style={{ borderColor: "rgba(255,255,255,0.12)" }}>{receipt.number} · {receipt.status} · {formatMoney(receipt.amount)}</div>)}
+                    {form.paymentAttachments.map((file) => <div key={file.attachmentId} className="rounded border px-3 py-2" style={{ borderColor: "rgba(255,255,255,0.12)" }}>{file.name}</div>)}
+                    {!paymentReceipts.length && !form.paymentAttachments.length && <div className="opacity-70">Квитанции пока не сформированы.</div>}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -862,7 +982,7 @@ export default function OrganizerEventCompliancePage() {
               <SummaryRow label="Договор с площадкой" value={form.venueContractStatus || "требуется"} />
               <SummaryRow label="Показы" value={form.dateSlots.filter(Boolean).map((slot) => slot.replace("T", " ")).join(", ") || "—"} />
               <SummaryRow label="Проверки" value={ensureChecks(form.interagencyChecks).map((row) => `${row.agency}: ${row.status}`).join("; ")} />
-              <SummaryRow label="Пошлина" value={form.feeExempt ? "освобождение" : form.feePaid ? "оплачена" : "требуется"} />
+              <SummaryRow label="Пошлина" value={`${paymentStatus} · ${formatMoney(feeAmount)}`} />
               <div className="rounded-xl border p-3" style={{ borderColor: canSubmit ? "rgba(52,211,153,0.35)" : "rgba(251,191,36,0.35)", background: canSubmit ? "rgba(52,211,153,0.10)" : "rgba(251,191,36,0.10)" }}>
                 {canSubmit ? "Обязательный минимум заполнен. Заявку можно подать на рассмотрение." : `Не заполнено: ${requiredMissing.join(", ")}.`}
               </div>

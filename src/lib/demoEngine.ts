@@ -15,6 +15,7 @@ import {
   createDemoPurchaseTicket,
   ensureSeatMapState,
   ensureDefaultResellers,
+  ensureOrganizerFinanceState,
   getSeatMapLayout,
   loadState,
   issueMarks,
@@ -633,6 +634,7 @@ function seedDemoCatalog(state: AppState): AppState {
   ensureSeatMapState(state);
   cleanupLegacyDemoData(state);
   state.organizers = DEMO_ORGANIZERS.map((organizer) => ({ ...organizer }));
+  ensureOrganizerFinanceState(state);
   state.organizerRegistry = REGISTERED_DEMO_ORGANIZERS.map((organizer, index) => ({
     organizerRegistryId: "DEMO-ORGREG-" + String(index + 1).padStart(3, "0"),
     organizerId: organizer.organizerId,
@@ -712,6 +714,7 @@ function enrichDemoData(state: AppState): void {
   ensureDefaultResellers(state);
   cleanupLegacyDemoData(state);
   ensureDemoOrganizers(state);
+  ensureOrganizerFinanceState(state);
   ensureOrganizerRegistry(state);
   ensureDemoOrganizerDocuments(state);
   ensureSeatMapState(state);
@@ -736,6 +739,7 @@ function ensureDemoOrganizers(state: AppState): void {
     }
     Object.assign(existing, demo);
   }
+  ensureOrganizerFinanceState(state);
 }
 
 function ensureOrganizerRegistry(state: AppState): void {

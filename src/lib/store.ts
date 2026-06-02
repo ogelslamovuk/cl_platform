@@ -219,6 +219,38 @@ export interface OrganizerAccount {
   feesStatus: "оплачены";
 }
 
+export type CompliancePaymentStatus = "Ожидает оплаты" | "Недостаточно средств" | "Оплачено";
+
+export interface OrganizerFinanceOperation {
+  financeOperationId: string;
+  organizerId: string;
+  eventComplianceApplicationId?: string;
+  kind: "Пополнение счёта" | "Оплата пошлины" | "Формирование квитанции";
+  title: string;
+  amount: number;
+  createdAt: string;
+  status: "успешно" | "сформировано";
+  receiptId?: string;
+}
+
+export interface OrganizerFinanceReceipt {
+  receiptId: string;
+  organizerId: string;
+  eventComplianceApplicationId?: string;
+  number: string;
+  title: string;
+  amount: number;
+  createdAt: string;
+  status: "сформирована" | "оплачена";
+}
+
+export interface FinanceState {
+  platformCommissionPercent: number;
+  organizerBalances: Record<string, number>;
+  organizerOperations: OrganizerFinanceOperation[];
+  organizerReceipts: OrganizerFinanceReceipt[];
+}
+
 export interface MockAttachment {
   attachmentId: string;
   name: string;
@@ -372,7 +404,7 @@ export interface OrganizerDocument {
 export interface AppState {
   meta: { version: string; updatedAt: string };
   counters: { app: number; lic: number; evt: number; tck: number; op: number };
-  finance: { platformCommissionPercent: number };
+  finance: FinanceState;
   applications: Application[];
   organizerApplications: OrganizerApplicationRecord[];
   eventComplianceApplications: EventComplianceApplicationRecord[];
@@ -393,6 +425,8 @@ export interface AppState {
 
 const STORAGE_KEY = "ticket_hub_state_v1";
 const LEGACY_DEFAULT_ORGANIZER_ID = "org_demo_1";
+export const DEMO_BASE_UNIT_AMOUNT = 42;
+export const DEMO_TOP_UP_AMOUNT = 2000;
 let suppressPersistence = false;
 
 const DEFAULT_RESELLERS: Omit<Reseller, "updatedAt">[] = [
@@ -648,7 +682,12 @@ export function defaultState(): AppState {
   const state: AppState = {
     meta: { version: "v4", updatedAt: createdAt },
     counters: { app: 1, lic: 1, evt: 1, tck: 1, op: 1 },
-    finance: { platformCommissionPercent: 5 },
+    finance: {
+      platformCommissionPercent: 5,
+      organizerBalances: {},
+      organizerOperations: [],
+      organizerReceipts: [],
+    },
     applications: [],
     organizerApplications: [],
     eventComplianceApplications: [],
@@ -698,6 +737,22 @@ export function ensureDefaultResellers(state: AppState): void {
     if (typeof existing.signatureValidation !== "boolean") existing.signatureValidation = seed.signatureValidation;
     existing.lastSync ||= seed.lastSync || existing.updatedAt || now;
     existing.updatedAt ||= now;
+  }
+}
+
+export function ensureOrganizerFinanceState(state: AppState): void {
+  state.finance ||= {
+    platformCommissionPercent: 5,
+    organizerBalances: {},
+    organizerOperations: [],
+    organizerReceipts: [],
+  };
+  state.finance.organizerBalances ||= {};
+  state.finance.organizerOperations = Array.isArray(state.finance.organizerOperations) ? state.finance.organizerOperations : [];
+  state.finance.organizerReceipts = Array.isArray(state.finance.organizerReceipts) ? state.finance.organizerReceipts : [];
+  for (const organizer of state.organizers) {
+    const current = Number(state.finance.organizerBalances[organizer.organizerId]);
+    state.finance.organizerBalances[organizer.organizerId] = Number.isFinite(current) ? Number(current.toFixed(2)) : 350;
   }
 }
 
@@ -775,6 +830,9 @@ function migrateState(parsed: Partial<AppState>): AppState {
       ...parsed,
       finance: {
         platformCommissionPercent: normalizePlatformCommissionPercent(parsed.finance?.platformCommissionPercent),
+        organizerBalances: parsed.finance?.organizerBalances && typeof parsed.finance.organizerBalances === "object" ? parsed.finance.organizerBalances : {},
+        organizerOperations: Array.isArray(parsed.finance?.organizerOperations) ? parsed.finance.organizerOperations : [],
+        organizerReceipts: Array.isArray(parsed.finance?.organizerReceipts) ? parsed.finance.organizerReceipts : [],
       },
       applications: Array.isArray(parsed.applications) ? parsed.applications : [],
       organizerApplications: Array.isArray(parsed.organizerApplications) ? parsed.organizerApplications : [],
@@ -808,6 +866,7 @@ function migrateState(parsed: Partial<AppState>): AppState {
       app.capacity = sumTierQuantity(app.tiers) || app.capacity || 0;
     }
     ensureDefaultResellers(state);
+    ensureOrganizerFinanceState(state);
     for (const event of state.events) {
       if (!event.organizerId || !knownOrganizerIds.has(event.organizerId)) {
         const fromApp = state.applications.find((a) => a.appId === event.appId)?.organizerId;
@@ -1512,6 +1571,181 @@ export function calculateComplianceFee(capacity: number | null, plannedTicketsFo
   return 200;
 }
 
+export function calculateComplianceFeeAmount(data: EventComplianceData): number {
+  if (data.feeExempt || data.approvalMode !== "certificate_required") return 0;
+  return Number((calculateComplianceFee(data.projectedCapacity, data.plannedTicketsForSale, data.ticketTiers) * DEMO_BASE_UNIT_AMOUNT).toFixed(2));
+}
+
+export function getCompliancePaymentStatus(app: Pick<EventComplianceApplicationRecord, "data">): CompliancePaymentStatus {
+  if (app.data.feeExempt || app.data.approvalMode !== "certificate_required" || app.data.feePaid) return "Оплачено";
+  if (app.data.paymentComment === "Недостаточно средств") return "Недостаточно средств";
+  return "Ожидает оплаты";
+}
+
+export function getOrganizerFinancialAccount(state: AppState, organizerId: string) {
+  ensureOrganizerFinanceState(state);
+  const balance = Number(state.finance.organizerBalances[organizerId] || 0);
+  const operations = state.finance.organizerOperations
+    .filter((operation) => operation.organizerId === organizerId)
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const receipts = state.finance.organizerReceipts
+    .filter((receipt) => receipt.organizerId === organizerId)
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return {
+    balance: Number(balance.toFixed(2)),
+    available: Number(balance.toFixed(2)),
+    reserved: 0,
+    operations,
+    receipts,
+  };
+}
+
+function createFinanceReceipt(
+  state: AppState,
+  organizerId: string,
+  data: {
+    eventComplianceApplicationId?: string;
+    title: string;
+    amount: number;
+    status: OrganizerFinanceReceipt["status"];
+  }
+): OrganizerFinanceReceipt {
+  const receiptId = quickId("RCPT");
+  const receipt: OrganizerFinanceReceipt = {
+    receiptId,
+    organizerId,
+    eventComplianceApplicationId: data.eventComplianceApplicationId,
+    number: `КВ-${new Date().getFullYear()}-${String(state.finance.organizerReceipts.length + 1).padStart(4, "0")}`,
+    title: data.title,
+    amount: Number(data.amount.toFixed(2)),
+    createdAt: nowIso(),
+    status: data.status,
+  };
+  state.finance.organizerReceipts.push(receipt);
+  return receipt;
+}
+
+function addFinanceOperation(
+  state: AppState,
+  organizerId: string,
+  data: Omit<OrganizerFinanceOperation, "financeOperationId" | "organizerId" | "createdAt">
+): OrganizerFinanceOperation {
+  const operation: OrganizerFinanceOperation = {
+    financeOperationId: quickId("FINOP"),
+    organizerId,
+    createdAt: nowIso(),
+    ...data,
+    amount: Number(data.amount.toFixed(2)),
+  };
+  state.finance.organizerOperations.push(operation);
+  return operation;
+}
+
+export function topUpOrganizerBalance(state: AppState, organizerId: string, amount = DEMO_TOP_UP_AMOUNT): OrganizerFinanceOperation {
+  ensureOrganizerFinanceState(state);
+  const value = Number(amount.toFixed(2));
+  state.finance.organizerBalances[organizerId] = Number(((state.finance.organizerBalances[organizerId] || 0) + value).toFixed(2));
+  const operation = addFinanceOperation(state, organizerId, {
+    kind: "Пополнение счёта",
+    title: "Демонстрационное пополнение финансового счёта",
+    amount: value,
+    status: "успешно",
+  });
+  saveState(state);
+  return operation;
+}
+
+export function generateComplianceFeeReceipt(
+  state: AppState,
+  organizerId: string,
+  eventComplianceApplicationId: string
+): OrganizerFinanceReceipt | null {
+  ensureOrganizerFinanceState(state);
+  const app = state.eventComplianceApplications.find((row) => row.eventComplianceApplicationId === eventComplianceApplicationId);
+  if (!app) return null;
+  const amount = calculateComplianceFeeAmount(app.data);
+  const existing = state.finance.organizerReceipts.find((receipt) =>
+    receipt.organizerId === organizerId &&
+    receipt.eventComplianceApplicationId === eventComplianceApplicationId &&
+    receipt.status === "сформирована"
+  );
+  if (existing) return existing;
+  const receipt = createFinanceReceipt(state, organizerId, {
+    eventComplianceApplicationId,
+    title: `Квитанция по заявке ${eventComplianceApplicationId}`,
+    amount,
+    status: "сформирована",
+  });
+  addFinanceOperation(state, organizerId, {
+    eventComplianceApplicationId,
+    kind: "Формирование квитанции",
+    title: `Сформирована квитанция по заявке ${eventComplianceApplicationId}`,
+    amount,
+    status: "сформировано",
+    receiptId: receipt.receiptId,
+  });
+  saveState(state);
+  return receipt;
+}
+
+export function payComplianceFeeFromBalance(
+  state: AppState,
+  organizerId: string,
+  eventComplianceApplicationId: string
+): { ok: boolean; status: CompliancePaymentStatus; message: string; receipt?: OrganizerFinanceReceipt } {
+  ensureOrganizerFinanceState(state);
+  const app = state.eventComplianceApplications.find((row) => row.eventComplianceApplicationId === eventComplianceApplicationId && row.organizerId === organizerId);
+  if (!app) return { ok: false, status: "Ожидает оплаты", message: "Заявка не найдена." };
+  const amount = calculateComplianceFeeAmount(app.data);
+  if (amount <= 0) {
+    app.data.feePaid = true;
+    app.data.paymentComment = "Обязательные пошлины по заявке не начисляются.";
+    app.updatedAt = nowIso();
+    saveState(state);
+    return { ok: true, status: "Оплачено", message: "Оплата по заявке не требуется." };
+  }
+  const balance = Number(state.finance.organizerBalances[organizerId] || 0);
+  if (balance < amount) {
+    app.data.feePaid = false;
+    app.data.paymentComment = "Недостаточно средств";
+    app.updatedAt = nowIso();
+    saveState(state);
+    return { ok: false, status: "Недостаточно средств", message: "Недостаточно средств. Пополните счёт и повторите оплату." };
+  }
+  state.finance.organizerBalances[organizerId] = Number((balance - amount).toFixed(2));
+  const receipt = createFinanceReceipt(state, organizerId, {
+    eventComplianceApplicationId,
+    title: `Квитанция об оплате обязательной пошлины по заявке ${eventComplianceApplicationId}`,
+    amount,
+    status: "оплачена",
+  });
+  addFinanceOperation(state, organizerId, {
+    eventComplianceApplicationId,
+    kind: "Оплата пошлины",
+    title: `Оплата обязательной пошлины по заявке ${eventComplianceApplicationId}`,
+    amount: -amount,
+    status: "успешно",
+    receiptId: receipt.receiptId,
+  });
+  app.data.feePaid = true;
+  app.data.paymentComment = `Оплачено с баланса. Квитанция ${receipt.number}.`;
+  if (!app.data.paymentAttachments.some((attachment) => attachment.attachmentId === receipt.receiptId)) {
+    app.data.paymentAttachments.push({
+      attachmentId: receipt.receiptId,
+      kind: "balance-fee-receipt",
+      name: receipt.title,
+      uploadedAt: receipt.createdAt,
+      isSample: true,
+    });
+  }
+  app.feePaymentConfirmedByAdmin = true;
+  app.updatedAt = nowIso();
+  saveState(state);
+  return { ok: true, status: "Оплачено", message: "Пошлина оплачена с баланса.", receipt };
+}
+
 export function upsertOrganizerApplication(
   state: AppState,
   organizerId: string,
@@ -1698,6 +1932,7 @@ export function setEventComplianceReview(
   const comment = payload.comment?.trim() || "";
   if ((payload.decision === "rejected" || payload.decision === "needs_rework") && !comment) return false;
   if (payload.decision === "approved") {
+    if (getCompliancePaymentStatus(app) !== "Оплачено") return false;
     const normalizedTiers = normalizeComplianceTicketTiers(app.data);
     if (!validateTicketTiers(normalizedTiers, app.data)) return false;
   }
@@ -1706,7 +1941,7 @@ export function setEventComplianceReview(
   app.adminComment = comment;
   app.reviewedAt = nowIso();
   app.updatedAt = nowIso();
-  app.feePaymentConfirmedByAdmin = Boolean(payload.confirmFeePayment);
+  app.feePaymentConfirmedByAdmin = getCompliancePaymentStatus(app) === "Оплачено" || Boolean(payload.confirmFeePayment);
 
   if (payload.decision === "approved") {
     const now = nowIso();
