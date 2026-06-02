@@ -1,10 +1,11 @@
 # CL_PLATFORM_CONTEXT.md
 
-## Purpose
+Codex must read this file before any implementation task in this repo.
 
-This file gives Codex Desktop the permanent product context for `cl_platform`.
-Codex must read it before implementing any task in this repository.
+## Project meaning
 
-`cl_platform` is a demonstration prototype of a state-level digital platform for regulating and managing cultural and entertainment events.
+`cl_platform` is a demo prototype of a state-level digital platform for regulating cultural and entertainment events in Belarus.
 
-The prototype is being prepared for ministry-level and institutional demonstrations. It must look
+The prototype is prepared for ministry-level demonstrations. It must look coherent, mature and convincing. It is not a production system.
+
+Main product idea: not a form for submitting an event, but a controlled
