@@ -1,82 +1,29 @@
 # CL_PLATFORM_CONTEXT.md
 
-## Project
+`cl_platform` — демонстрационный прототип государственной платформы для управления рынком культурных и массовых мероприятий.
 
-`cl_platform` is a demo prototype of a state-level platform for managing and controlling public cultural/event activity.
+Проект готовится для демонстрации министерствам. Цель — убедительный сквозной demo-flow, а не production backend.
 
-The prototype is prepared for ministry-level demonstration. The goal is to show a convincing end-to-end platform flow, not to build production backend logic.
+Главная цепочка, которую нельзя ломать:
 
-Main product chain:
+```text
+Кандидат в организаторы -> Организатор -> Заявка на мероприятие -> Центр Управления -> Одобренное событие -> Реселлеры / розница / билеты
+```
 
-Candidate organizer -> Organizer -> Event application -> Control Center -> Approved event -> Sellers / retail / ticket flow
+DTCM/Dubai используется только как продуктовый референс: заявка живёт как сущность, её можно сохранить и продолжить, она состоит из этапов, к ней привязаны документы, проверки, платежи и действия.
 
-Do not break this chain.
+Нельзя создавать DTCM/Dubai/NEN-сущности или UI-термины. Нужно адаптировать идеи под текущий `cl_platform`.
 
-## Product goal
+Demo-first правило: делать кликабельно и убедительно, но не production-deep.
 
-The prototype must look like a serious digital platform for:
+Примеры:
 
-- organizer registration;
-- event application submission and review;
-- venue registry usage;
-- ticket/category setup;
-- authorized sales channels;
-- mock interagency checks;
-- fees/payments;
-- approval and event creation;
-- later seller/retail flows.
+- mock межведомственных проверок — да; реальные интеграции — нет;
+- mock документов участников — да; реальные паспортные данные — нет;
+- договор с площадкой как обязательный mock-документ — да; генератор договора — нет;
+- текущий конструктор схемы зала/тарифов — использовать; новый конструктор — не создавать;
+- статус пошлин/платежей — показать; платёжный шлюз — не строить.
 
-## Reference
+Переиспользовать текущие сущности/понятия проекта: OrganizerAccount, OrganizerApplicationRecord, EventComplianceApplicationRecord, EventComplianceData, EventRecord, Ticket, Reseller, OpRecord, VenueRegistryRecord, AppState.
 
-The product is inspired by Dubai DTCM event licensing/e-ticketing platform.
-
-Use DTCM only as a reference for mature product behavior:
-
-- application is a long-living record, not a one-time form;
-- application can be saved and resumed;
-- application has multiple stages;
-- documents, statuses, fees, checks and admin actions are connected;
-- sellers and ticketing are controlled through the platform.
-
-Do not create any Dubai/DTCM/NEN-specific entity or wording in the UI.
-
-## Demo-first rule
-
-Implementation must be believable and clickable, but not production-deep.
-
-Show the process clearly. Do not overbuild hidden mechanics.
-
-Examples:
-
-- show mock interagency check status, but do not build real integrations;
-- show participant documents, but use mock/sample documents;
-- show venue contract requirement, but do not build real document generation;
-- use current seat map / tariff constructor, do not build a new one;
-- show fees/payment status, but do not implement real payment gateway.
-
-## Existing entities must be reused
-
-Before adding new models, inspect and reuse current project structures.
-
-Expected existing concepts include:
-
-- OrganizerAccount;
-- OrganizerApplicationRecord;
-- EventComplianceApplicationRecord;
-- EventComplianceData;
-- EventRecord;
-- Ticket;
-- Reseller;
-- OpRecord;
-- VenueRegistryRecord;
-- AppState.
-
-Do not duplicate these with parallel entities.
-
-## Language and UI
-
-All new visible UI text must be Russian.
-
-No new English labels, buttons, badges, helper text, tooltips or headings.
-
-Keep the current visual style. Do not redesign the product.
+Весь новый видимый UI-текст — только русский. Дизайн и стилистику не менять.

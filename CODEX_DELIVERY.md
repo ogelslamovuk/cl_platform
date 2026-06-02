@@ -1,7 +1,5 @@
 # CODEX_DELIVERY.md
 
-## Delivery requirements
-
 Definition of done is not code-only.
 
 Codex must complete full delivery:
@@ -24,10 +22,9 @@ Codex must complete full delivery:
 16. Verify required demo scenario.
 17. Return final answer with public URL.
 
-## Final answer format
+Final answer format:
 
-Codex final answer must be:
-
+```text
 Готово.
 
 Что сделано:
@@ -42,20 +39,6 @@ Codex final answer must be:
 
 Проверять здесь:
 <public URL>
+```
 
-## If blocked
-
-Codex may stop only on a real external blocker:
-
-- no GitHub auth;
-- no push permission;
-- no merge permission;
-- GitHub Pages unavailable;
-- branch protection requires manual approval;
-- task requires product decision not covered by task files.
-
-If blocked, final answer must include:
-
-- exact blocker;
-- what was completed;
-- one exact next step needed from user.
+Codex may stop only on a real external blocker: no GitHub auth, no push permission, no merge permission, GitHub Pages unavailable, branch protection requires manual approval, or task requires product decision not covered by task files.
