@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Minus, Plus, Save, Trash2, X } from "lucide-react";
+import HelpTooltip from "@/components/ui/help-tooltip";
 import type { EventSeat, PriceTier, SeatMapSeat, SeatStatus } from "@/lib/store";
-import { SEAT_TARIFF_COLORS, createRectangularSeats } from "@/lib/store";
+import { SEAT_TARIFF_COLORS, createRectangularSeats, getSeatTariffConfigurationSummary } from "@/lib/store";
 import type { SeatMapLayoutV2 } from "@/lib/seatMapV2";
 import SeatMapViewerCanvas from "@/components/seatmap/SeatMapViewerCanvas";
 
@@ -34,15 +35,28 @@ const statusLabel: Record<SeatStatus, string> = {
 };
 
 function toEventSeats(baseSeats: SeatMapSeat[], eventSeats: EventSeat[], tiers: PriceTier[]): EventSeat[] {
-  if (eventSeats.length > 0) return eventSeats.map((seat) => ({ ...seat }));
+  if (eventSeats.length > 0) return eventSeats.map((seat) => ({
+    ...seat,
+    baseTariffId: seat.baseTariffId || seat.tariffId,
+    baseTariffName: seat.baseTariffName || seat.tariffName,
+    basePrice: Number.isFinite(Number(seat.basePrice)) ? seat.basePrice : seat.price,
+    baseColor: seat.baseColor || seat.color,
+    isIndividualOverride: Boolean(seat.isIndividualOverride),
+  }));
   return baseSeats.map((seat, index) => {
     const tier = tiers[index % Math.max(1, tiers.length)] || tiers[0];
+    const color = tier?.color || SEAT_TARIFF_COLORS[index % SEAT_TARIFF_COLORS.length];
     return {
       ...seat,
       tariffId: tier?.name,
       tariffName: tier?.name,
       price: tier?.price,
-      color: tier?.color || SEAT_TARIFF_COLORS[index % SEAT_TARIFF_COLORS.length],
+      color,
+      baseTariffId: tier?.name,
+      baseTariffName: tier?.name,
+      basePrice: tier?.price,
+      baseColor: color,
+      isIndividualOverride: false,
       status: "available",
     };
   });
@@ -51,12 +65,13 @@ function toEventSeats(baseSeats: SeatMapSeat[], eventSeats: EventSeat[], tiers: 
 function seatColor(seat: EventSeat, selected: boolean): string {
   if (selected) return "#2563EB";
   if (seat.status === "sold" || seat.status === "blocked") return "#CBD5E1";
-  return "#FFFFFF";
+  return seat.color || "#FFFFFF";
 }
 
 function seatTextColor(seat: EventSeat, selected: boolean): string {
   if (selected) return "#FFFFFF";
   if (seat.status === "sold" || seat.status === "blocked") return "#475569";
+  if (seat.color) return "#FFFFFF";
   return "#0F172A";
 }
 
@@ -108,6 +123,15 @@ export default function SeatMapModal({
     () => workingSeats.find((seat) => seat.seatId === selectedIds[0]) || null,
     [selectedIds, workingSeats],
   );
+  const selectedEventSeats = useMemo(
+    () => workingSeats.filter((seat) => selectedIds.includes(seat.seatId)),
+    [selectedIds, workingSeats],
+  );
+  const tariffSummary = useMemo(
+    () => getSeatTariffConfigurationSummary({ eventSeats: workingSeats, ticketTiers: tiers }),
+    [tiers, workingSeats],
+  );
+  const activeTierAssigned = tariffSummary.byTariff.find((tier) => tier.name === activeTier)?.quantity || 0;
   const canvasEventSeats = mode === "viewer" && eventSeats.length === 0 && tiers.length === 0 ? [] : workingSeats;
 
   if (!open || typeof document === "undefined") return null;
@@ -126,8 +150,39 @@ export default function SeatMapModal({
   const applyTier = () => {
     const tier = tiers.find((item) => item.name === activeTier);
     if (!tier || selectedIds.length === 0) return;
+    const color = tier.color || SEAT_TARIFF_COLORS[tiers.indexOf(tier) % SEAT_TARIFF_COLORS.length];
+    const singleSeatAssignment = selectedIds.length === 1;
     setWorkingSeats((prev) => prev.map((seat) => selectedIds.includes(seat.seatId)
-      ? { ...seat, tariffId: tier.name, tariffName: tier.name, price: tier.price, color: tier.color || SEAT_TARIFF_COLORS[tiers.indexOf(tier) % SEAT_TARIFF_COLORS.length], status: "available" }
+      ? {
+          ...seat,
+          tariffId: tier.name,
+          tariffName: tier.name,
+          price: tier.price,
+          color,
+          baseTariffId: singleSeatAssignment ? (seat.baseTariffId || seat.tariffId || tier.name) : tier.name,
+          baseTariffName: singleSeatAssignment ? (seat.baseTariffName || seat.tariffName || tier.name) : tier.name,
+          basePrice: singleSeatAssignment ? (Number.isFinite(Number(seat.basePrice)) ? seat.basePrice : seat.price ?? tier.price) : tier.price,
+          baseColor: singleSeatAssignment ? (seat.baseColor || seat.color || color) : color,
+          isIndividualOverride: singleSeatAssignment ? Boolean((seat.baseTariffName || seat.tariffName) && (seat.baseTariffName || seat.tariffName) !== tier.name) : false,
+          status: "available",
+        }
+      : seat));
+    setSelectedIds([]);
+  };
+
+  const resetSelectedOverride = () => {
+    const selected = selectedEventSeat;
+    if (!selected || !selected.baseTariffName) return;
+    setWorkingSeats((prev) => prev.map((seat) => seat.seatId === selected.seatId
+      ? {
+          ...seat,
+          tariffId: selected.baseTariffId || selected.baseTariffName,
+          tariffName: selected.baseTariffName,
+          price: selected.basePrice,
+          color: selected.baseColor || seat.color,
+          isIndividualOverride: false,
+          status: "available",
+        }
       : seat));
     setSelectedIds([]);
   };
@@ -206,15 +261,48 @@ export default function SeatMapModal({
             {mode === "assign" && (
               <div className="space-y-3">
                 <div>
-                  <div className="text-sm font-semibold text-slate-900">Назначение тарифов</div>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">Выберите места на схеме, затем назначьте тариф или заблокируйте их.</p>
+                  <div className="inline-flex items-center gap-1 text-sm font-semibold text-slate-900">
+                    Назначить тариф группе мест
+                    <HelpTooltip text="Выберите несколько мест на текущей схеме и примените к ним один тариф. Это массовое назначение без нового конструктора." />
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Выберите тариф, отметьте места на схеме и примените его к выбранным местам.</p>
+                </div>
+                <div className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
+                  Выберите тариф
+                  <HelpTooltip text="Льготный тариф работает как обычный демонстрационный тариф, без проверки права на льготу." />
                 </div>
                 <select value={activeTier} onChange={(e) => setActiveTier(e.target.value)} className="h-10 w-full rounded-lg border px-3 text-sm">
                   {tiers.map((tier) => <option key={tier.name} value={tier.name}>{tier.name} · {tier.price} BYN</option>)}
                 </select>
-                <button onClick={applyTier} className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white">Назначить выбранным</button>
+                <div className="rounded-lg border bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  Выбрано мест: {selectedIds.length} · Места с этим тарифом: {activeTierAssigned}
+                </div>
+                <button data-seat-map-apply-tier onClick={applyTier} className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white">Применить к выбранным местам</button>
                 <button onClick={() => setStatus("blocked")} className="w-full rounded-lg border px-3 py-2 text-sm font-semibold text-slate-700">Заблокировать выбранные</button>
+                {selectedEventSeat?.isIndividualOverride && (
+                  <button onClick={resetSelectedOverride} className="w-full rounded-lg border px-3 py-2 text-sm font-semibold text-slate-700">Вернуть тариф группы</button>
+                )}
+                {selectedEventSeats.length === 1 && selectedEventSeat && (
+                  <div className="rounded-lg border bg-white p-3 text-xs text-slate-600">
+                    <div className="font-semibold text-slate-900">{selectedEventSeat.label}</div>
+                    <div className="mt-1">Текущий тариф: {selectedEventSeat.tariffName || "не назначен"} · {selectedEventSeat.price || 0} BYN</div>
+                    {selectedEventSeat.isIndividualOverride && (
+                      <div className="mt-1 text-amber-700">Индивидуальное исключение относительно тарифа группы: {selectedEventSeat.baseTariffName}</div>
+                    )}
+                  </div>
+                )}
                 <button onClick={() => onSaveEventSeats?.(workingSeats)} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white"><Save size={15} /> Сохранить назначение</button>
+                <div className="space-y-1 rounded-lg border bg-slate-50 p-3 text-xs text-slate-600">
+                  <div className="inline-flex items-center gap-1 font-semibold text-slate-900">
+                    Сводка
+                    <HelpTooltip text="Демонстрационный расчёт по текущим назначениям мест. Это не бухгалтерский отчёт." />
+                  </div>
+                  <div>Всего мест: {tariffSummary.totalSeats}</div>
+                  <div>Назначено: {tariffSummary.assignedSeats}; без тарифа: {tariffSummary.unassignedSeats}; блок: {tariffSummary.blockedSeats}</div>
+                  <div>Льготные места: {tariffSummary.benefitSeats}</div>
+                  <div>Индивидуальные исключения: {tariffSummary.individualExceptions}</div>
+                  <div>Ориентировочная максимальная выручка: {tariffSummary.maxRevenue.toFixed(2)} BYN</div>
+                </div>
               </div>
             )}
 
