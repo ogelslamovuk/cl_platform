@@ -1,165 +1,425 @@
-# skill.md — Правила постановки задач для Codex при минорных правках без локального проекта
+# SKILLS.md — cl_platform project skill for Codex Desktop
 
-## 1. Когда применять
+## 1. Purpose
 
-Этот skill применять, когда задача относится к мелким или средним правкам в проекте через Codex без локального проекта и без полноценной ручной проверки до merge/deploy.
+This file is the permanent execution guide for Codex in the `cl_platform` repository.
 
-Типовые задачи:
-- русификация UI;
-- замена видимых текстов;
-- добавление tooltip / HelpTooltip;
-- мелкие UX/UI-правки;
-- правки одного экрана или одного блока;
-- точечные изменения JSX/TSX;
-- исправление wording/copy;
-- добавление подсказок к карточкам, кнопкам, input/select/textarea;
-- визуальные правки без изменения бизнес-логики.
+Codex must read this file before any work in this repository.
 
-Не применять как основной режим для:
-- backend-логики;
-- сложных архитектурных изменений;
-- изменения store/localStorage/API;
-- миграций данных;
-- больших refactor-задач;
-- задач, где есть локальный проект и можно быстро тестировать руками.
+`cl_platform` is a demonstration prototype of a Belarus-oriented state-level platform for regulating and managing the cultural and mass-events market.
 
-Главный принцип:
-Codex — исполнитель. Он не принимает продуктовые, UX, архитектурные или текстовые решения.
+The product must look like a coherent national digital infrastructure platform for serious institutional / ministry-level presentations.
+
+This is not a production backend project. The goal is to enrich the visible demo flow, make the platform understandable and convincing, and avoid breaking existing working flows.
 
 ---
 
-## 18. Усиление для автономных flow-задач
+## 2. Core product flow that must never be broken
 
-Этот раздел применять для задач, где правка затрагивает несколько экранов, store/localStorage, demo data или сквозной пользовательский flow.
+The main demo chain is:
 
-Codex сначала читает этот файл, затем GitHub issue/task package. Issue является основным ТЗ, этот файл задаёт ограничения и формат проверки.
+```text
+Кандидат в организаторы → Организатор → Заявка на мероприятие → Центр Управления → Одобренное событие → Операторы / розница / билеты
+```
 
-Для flow-задач обязательно:
-- работать строго в scope issue;
-- не расширять задачу самостоятельно;
-- не делать broad refactor;
-- не менять зависимости без прямого требования;
-- не останавливаться после первой правки;
-- запускать `npm run build`;
-- выполнять smoke-проверки по маршрутам из issue;
-- фиксировать smoke как pass/fail, без формулировки «частично ок»;
-- возвращать отчёт на русском языке.
+Every change must preserve this chain.
 
-Для задач по залам и схемам мест:
-- источник правды по площадкам: `Центр Управления → Реестр площадок`;
-- Organizer, Partner console и B2C demo не создают площадки;
-- не делать второй независимый реестр площадок;
-- не делать вторую независимую реализацию схемы, если уже есть `SeatMapModal`;
-- не ломать покупку для событий без схемы;
-- не менять реальные ID ради короткого отображения;
-- hover по месту должен показывать место, тариф и цену;
-- published событие показывает реальные статусы продаж;
-- approved unpublished событие показывает схему без продаж.
+A task is unacceptable if, after the change:
 
-Raw technical labels не показывать в пользовательском UI, если есть человекочитаемый аналог: `sell`, `redeem`, `refund`, `issue`, `published`, `approved`, `issued`. Для таблиц использовать короткий display ID, не меняя исходный ID в state.
-
-Результат flow-задачи не принимается, если build не проходил, smoke не проходил, есть partial вместо pass/fail, изменены файлы вне scope, появились дубли JSX/массивов/кнопок, или проблема закрыта заглушкой вместо исправления.
+- organizer registration/application flow no longer works;
+- organizer event application can no longer be created, saved, reviewed or submitted;
+- Admin / Центр Управления can no longer review and approve applications;
+- approved events no longer reach event registry / sales / B2C demo;
+- B2C purchase flow is broken;
+- channel/operator flow is broken;
+- localStorage demo data is corrupted in a way that blocks the demo.
 
 ---
 
-## 19. Delivery / live-deploy gate
+## 3. Demo-first principle
 
-Этот раздел обязателен для задач, где ожидаемый результат должен быть виден на live-сайте.
+For this repository, visible demo value is more important than hidden technical depth.
 
-Если task package, issue или пользовательская команда содержит слова `deploy`, `live`, `на сайте`, `видно на сайте`, `GitHub Pages`, `задеплоить`, `довести до сайта`, то задача работает в режиме live-delivery.
+Good implementation:
 
-В режиме live-delivery задача не считается завершённой, пока изменения не прошли полный путь:
+- uses existing frontend/demo architecture;
+- enriches current screens and data;
+- makes the flow easier to understand;
+- connects visible data across modules;
+- uses mock documents, mock checks, mock payments and mock statuses where needed;
+- keeps UI mature, business-like and coherent.
 
-1. изменения внесены в рабочей ветке;
-2. изменения staged;
-3. изменения committed;
-4. ветка pushed в GitHub;
-5. создан PR в `main` или выполнен другой стандартный путь проекта в `main`;
-6. build/checks passed;
-7. изменения попали в `main`;
-8. GitHub Pages deploy completed;
-9. live URLs проверены;
-10. пользовательский результат реально виден на live-сайте.
+Bad implementation:
 
-Запрещено сдавать live-delivery задачу со статусами:
-- `изменения в working tree`;
-- `not staged`;
-- `not committed`;
-- `локально готово`;
-- `dev server доступен`;
-- `build passed`, если нет push/PR/main/deploy/live-check;
-- `PR создан`, если нет merge/deploy/live-check.
+- broad refactor without explicit task requirement;
+- production backend;
+- real API integrations;
+- real payment gateway;
+- real government integrations;
+- deep architecture work that does not improve the demo;
+- duplicate modules or duplicate flows;
+- decorative UI that hides broken product logic.
 
-Для live-delivery задач финальный отчёт должен содержать:
-- commit SHA;
-- branch;
-- PR link, если PR использовался;
-- merge/deploy status;
-- live URLs;
-- результат live-проверки по каждому маршруту;
-- список изменённых файлов;
-- `npm run build: passed`.
+---
 
-Если Codex не может выполнить push, PR, merge или deploy из-за прав/настроек, он обязан остановиться и явно написать, на каком точном шаге остановился и какая команда/действие требуется. Нельзя писать `готово`.
+## 4. DTCM / Dubai reference rule
 
-Для `cl_platform` live routes по умолчанию:
+DTCM / Dubai event licensing is a product reference only.
+
+Use it as inspiration for:
+
+- long-living application / case-file model;
+- staged application flow;
+- document attachment model;
+- fee/payment visibility;
+- approved seller/operator logic;
+- ticket tracking;
+- operational dashboards;
+- post-event reconciliation.
+
+Never introduce Dubai-specific product language into user-facing UI.
+
+Forbidden user-facing or code-level concepts unless a task explicitly requires them:
+
+- `DTCMApplication`;
+- `DubaiPermit`;
+- `NewEventNotification` / `NEN`;
+- `DubaiSettlement`;
+- `DubaiFee`;
+- Arabic/Dubai-specific legal terms.
+
+The platform is Belarus-oriented. All visible UI text must be Russian.
+
+---
+
+## 5. Existing entities are the source of truth
+
+Reuse and enrich existing entities. Do not create parallel replacements.
+
+Known concepts / entities include:
+
+- `OrganizerAccount`;
+- `OrganizerApplicationRecord`;
+- `OrganizerRegistryRecord`;
+- `EventComplianceApplicationRecord`;
+- `EventComplianceData`;
+- `EventRecord`;
+- `Ticket`;
+- `Reseller` / operator;
+- `OpRecord`;
+- `VenueRegistryRecord`;
+- `AppState`.
+
+New fields may be added to existing demo entities when required by the task.
+
+Creating a new top-level entity is allowed only when the task explicitly requires it and no existing entity can be safely extended.
+
+---
+
+## 6. Scope discipline
+
+Codex must implement only the approved scope.
+
+Forbidden without explicit task requirement:
+
+- changing routes;
+- changing branding;
+- changing unrelated screens;
+- changing dependencies;
+- replacing the store architecture;
+- replacing localStorage flow;
+- rewriting components broadly;
+- creating new design systems;
+- moving large files for aesthetic reasons;
+- deleting working modules;
+- silently changing business rules.
+
+If a requirement conflicts with current architecture, Codex must stop and report the exact conflict instead of inventing a new product direction.
+
+---
+
+## 7. UI and UX rules
+
+All new visible UI text must be Russian.
+
+Avoid raw technical labels in UI when a human-readable label exists.
+
+Examples:
+
+- `sell` → `Продажа`;
+- `redeem` → `Погашение`;
+- `refund` → `Возврат`;
+- `issue` → `Выпуск`;
+- `published` → `Опубликовано`;
+- `approved` → `Одобрено`;
+- `issued` → `Выпущен`.
+
+Do not show implementation details as user-facing business states.
+
+Buttons, KPI cards, document cards and important tiles must have clear behavior when they look clickable.
+
+Tooltip rules:
+
+- do not use HTML `title` as the main tooltip mechanism;
+- use the existing `HelpTooltip` pattern where the project already uses it;
+- tooltip must render above cards, modals, tables and containers;
+- tooltip must not be clipped by parent overflow;
+- do not create duplicated tooltips on the same element;
+- do not place `HelpTooltip` inside a button when it can break click behavior.
+
+---
+
+## 8. Demo data rules
+
+Demo data must look business-realistic.
+
+Forbidden demo data:
+
+- impossible operations;
+- random technical errors without business meaning;
+- fake passport numbers or real personal data;
+- real passport scans;
+- huge seated events pretending to be small halls;
+- duplicate records that make modules look broken;
+- inconsistent statuses across Organizer / Admin / B2C / Channel.
+
+Safe mock documents are allowed.
+
+Use clearly fake filenames and fake persons, for example:
+
+- `passport_artist_01_mock.pdf`;
+- `passport_artist_02_mock.pdf`;
+- `passport_tech_01_mock.pdf`;
+- `group_roster_mock.pdf`;
+- `venue_contract_mock.pdf`.
+
+---
+
+## 9. Geography and regional access
+
+For regional demo logic, the main access level is область.
+
+Do not implement district-level permissions unless explicitly requested.
+
+A republican / super-admin mode may see all regions.
+
+A regional user must see only their region.
+
+The event application region is determined by event venue / place of event, not by organizer legal address.
+
+Regional filtering should be visible and consistent across relevant admin registries and applications.
+
+---
+
+## 10. SeatMap / venue rules
+
+Source of truth for venues is:
+
+```text
+Центр Управления → Реестр площадок
+```
+
+Do not create a second independent venue registry.
+
+Do not create a second independent purchase flow.
+
+Do not create a second independent seatmap implementation if the existing `SeatMapModal` / seatmap flow can be reused or extended.
+
+Seatmap events:
+
+- have real seats;
+- should be limited to demo-scale seating, normally up to 500 seats;
+- must continue to support B2C seat selection;
+- must show meaningful place/tariff/price information.
+
+Capacity-only / open-air events:
+
+- may have large capacity;
+- must not render each seat;
+- must not open the detailed seatmap as if it were a hall;
+- should use general admission / entrance-ticket behavior.
+
+Open-air is not a seatmap template.
+
+Seatmap templates must only be seated configurations.
+
+---
+
+## 11. Tickets and operations
+
+Tickets and operations are different concepts.
+
+Ticket registry shows ticket records:
+
+- ticket ID;
+- event;
+- price/tariff;
+- channel/operator;
+- status;
+- QR/barcode/mock code;
+- buyer/user mock reference if available.
+
+Operation journal shows actions:
+
+- successful sale;
+- refund completed;
+- ticket redeemed;
+- event published;
+- fee paid;
+- ticket limit changed;
+- operator connected.
+
+Forbidden operation examples:
+
+- `Продажа — отказ — нет доступных билетов`;
+- technical failure without business object;
+- fake manual refusal that would never happen in the real flow.
+
+---
+
+## 12. Control / risk dashboard rules
+
+Control must show meaningful business control events.
+
+Allowed demo cases:
+
+- repeated redemption of the same ticket;
+- ticket redeemed at wrong venue;
+- issued tickets exceed approved capacity;
+- sale by operator without access to event;
+- mismatch between issued tickets and approved quota;
+- suspicious refund series;
+- invalid QR/barcode.
+
+Do not show meaningless pre-publication blockers as violations when the application flow should prevent them earlier.
+
+Every control row must explain:
+
+- object type;
+- object name;
+- region/city;
+- what happened;
+- why it matters;
+- priority;
+- action to open the related object.
+
+---
+
+## 13. B2C / poster rules
+
+B2C event cards should look like real event listings.
+
+Posters must be vertical.
+
+Use approximate ratio 2:3 or 3:4.
+
+Do not stretch horizontal banners into posters.
+
+Do not use the same poster clone for every event.
+
+Use at least several distinct poster layouts when the task touches posters.
+
+Remove internal demo labels from poster artwork, especially:
+
+```text
+Центр управления · Demo
+```
+
+---
+
+## 14. Task package workflow
+
+For large tasks prepared as a task package:
+
+- Codex must read this `SKILLS.md` first;
+- then read `CL_PLATFORM_CONTEXT.md`;
+- then read all task package files;
+- the task package is the approved source of truth;
+- Codex must not ask for intermediate approvals when the package says autonomous execution;
+- Codex must execute all phases and self-check each phase;
+- partial completion is not accepted.
+
+If the task package defines `CODEX_EXECUTOR_SKILL.md`, it is mandatory for that task and overrides generic execution style where more specific.
+
+---
+
+## 15. Build, smoke and live delivery
+
+For any task expected to be visible on GitHub Pages, delivery is not complete until the live site is updated and checked.
+
+Default live routes:
+
 - `https://ogelslamovuk.github.io/cl_platform/#/main`
 - `https://ogelslamovuk.github.io/cl_platform/#/demo`
 - `https://ogelslamovuk.github.io/cl_platform/#/organizer`
 - `https://ogelslamovuk.github.io/cl_platform/#/admin`
 - `https://ogelslamovuk.github.io/cl_platform/#/channel`
 
----
+Required completion path:
 
-## 20. Codex task package / initial-message workflow
+1. implement changes;
+2. run self-check;
+3. run `npm run build`;
+4. run smoke-check for required routes;
+5. commit changes;
+6. push branch;
+7. create PR or use the repository standard flow;
+8. merge to `main`;
+9. wait for GitHub Pages deploy;
+10. verify live routes;
+11. return final report.
 
-Этот раздел обязателен для крупных задач, которые готовятся через ChatGPT как task package для Codex.
+Do not report `готово` before live verification when live delivery is required.
 
-Правило поставки задачи:
-- initial message для Codex пользователь получает в чате ChatGPT;
-- полный пакет ТЗ, архитектуры, фаз, ограничений и acceptance хранится файлами в репозитории;
-- Codex не должен получать единственную «простыню» в чате вместо файлов task package;
-- если задача большая, Codex сначала работает в режиме `analysis only`: читает файлы, возвращает своё понимание и план реализации, но не меняет код приложения;
-- coding phase разрешается только после отдельного approval пользователя.
-
-Для task package обязательно:
-- указать rollback point, если он известен;
-- указать expected result;
-- указать phased task queue;
-- указать testing / validation protocol;
-- указать visual review points для пользователя после каждой фазы;
-- указать forbidden scope;
-- указать, какие проверки Codex обязан выполнить сам, чтобы пользователь не делал глубокое ручное тестирование.
-
-Если task package хранится в репозитории, initial message должен ссылаться на конкретные файлы и требовать прочитать их перед любыми выводами или правками.
+If a platform permission, remote conflict or deploy failure blocks delivery, report a hard blocker with exact command/output and stop. Do not hide blockers behind optimistic wording.
 
 ---
 
-## 21. SeatMap V2 epic guardrails
+## 16. Final report rules
 
-Этот раздел обязателен для задач по новому demo-grade конструктору схем залов.
+Final report must be in Russian.
 
-Цель SeatMap V2:
-- создать визуально сильный demo-grade конструктор сложных схем залов;
-- не строить enterprise-аналог seats.io;
-- сохранить текущие бизнес-flow: реестр площадок, заявки организатора, события, тарифы, билеты, B2C purchase, события без схемы;
-- заменить/расширить visual engine постепенно, без одномоментного большого refactor.
+For live-delivery tasks, include:
 
-Обязательные требования:
-- realtime booking для демо обязателен: две вкладки/окна должны видеть изменение статуса выбранного/купленного места через существующий localStorage/storage-event подход или совместимый MVP-механизм;
-- desktop-first, мобильная версия не является приоритетом;
-- сложные схемы с местами ограничивать демо-пределом до 500 мест;
-- open-air/capacity-only события могут иметь большую вместимость, но без отрисовки каждого места;
-- визуальная схема не должна обрезаться контейнерами, border, overflow или modal layout;
-- пользователь всегда должен видеть всю схему через fit-to-view/zoom/pan;
-- схема должна поддерживать сектора, группы блоков, балконы, ложи, диагональные/повёрнутые блоки и тарифные цвета;
-- после каждой фазы Codex обязан выполнить build, self-check и указать минимальный visual smoke route для пользователя.
+- branch;
+- commit SHA;
+- PR link;
+- merge status;
+- GitHub Pages deploy status;
+- live URLs;
+- changed files;
+- `npm run build: passed`;
+- local smoke-check result;
+- live smoke-check result;
+- phase summary: `done` / `not done`.
 
-Запрещено:
-- ломать текущий SeatMap v1 до появления рабочего fallback/adapter;
-- удалять старую модель схем до завершения миграции;
-- создавать второй независимый flow покупки билетов;
-- создавать второй независимый реестр площадок;
-- делать mobile-first redesign;
-- оптимизировать под десятки тысяч мест в рамках demo epic;
-- сдавать фазу без визуальной точки проверки.
+Do not use vague statuses:
+
+- `почти готово`;
+- `должно работать`;
+- `визуально должно быть нормально`;
+- `частично ок`.
+
+Use exact statuses: `passed`, `failed`, `blocked`.
+
+---
+
+## 17. Final mental model
+
+Codex is not a product owner in this repository.
+
+Codex is the implementation executor.
+
+The product direction is defined by the task package and project context.
+
+The correct behavior is:
+
+```text
+read → inspect → implement within scope → self-check → build → smoke → deploy → live-check → final report
+```
+
+The incorrect behavior is:
+
+```text
+decide product direction → refactor broadly → partially implement → ask the user to test everything manually
+```
