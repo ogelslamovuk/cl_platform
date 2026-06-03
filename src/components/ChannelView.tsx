@@ -1,7 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { AppState } from "@/lib/store";
-import { getEventSalesChannels, getSalesChannelLabel, getSeatMapLayout, getTicketRefundBlockReason, isSalesChannelAllowedForEvent, refundTicketByReseller, sellTicketsByReseller } from "@/lib/store";
+import {
+  getEventSalesChannels,
+  getResellerAdmissionStatus,
+  getResellerAgreementStatus,
+  getResellerConnectionType,
+  getResellerIntegrationStatus,
+  getResellerSalesBlockReason,
+  getSalesChannelLabel,
+  getSeatMapLayout,
+  getTicketRefundBlockReason,
+  isResellerAuthorizedForSales,
+  isSalesChannelAllowedForEvent,
+  refundTicketByReseller,
+  sellTicketsByReseller,
+} from "@/lib/store";
 import { formatDisplayId } from "@/lib/display";
 import PartnerModuleDrawer, { ModuleDrawerContent } from "@/components/channel/PartnerModuleDrawer";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
@@ -100,7 +114,7 @@ function buildModuleContent(module: PartnerModule, updatedAt: string): ModuleDra
         { label: "Статус", value: "Активен" },
         { label: "Доступ", value: "Разрешён" },
         { label: "Обновлено", value: updatedAt },
-        { label: "Среда", value: "Sandbox" },
+        { label: "Среда", value: "Песочница" },
       ],
       rows: [
         { left: "Рабочий профиль", right: "Готов", status: "ok" },
@@ -132,7 +146,7 @@ const partnerModules: PartnerModule[] = [
   { key: "stock-sync", title: "Синхронизация остатков", group: "Интеграция" },
   { key: "credentials", title: "Учетные данные", group: "Интеграция" },
   { key: "security", title: "Безопасность", group: "Интеграция" },
-  { key: "sandbox-tools", title: "Инструменты Sandbox", group: "Интеграция" },
+  { key: "sandbox-tools", title: "Инструменты песочницы", group: "Интеграция" },
   { key: "partnership", title: "Партнёрство", group: "Партнёрство" },
   { key: "contract", title: "Условия договора", group: "Партнёрство" },
   { key: "organizers", title: "Подключенные организаторы", group: "Партнёрство" },
@@ -168,6 +182,8 @@ export default function ChannelView({ state, onUpdate }: Props) {
     [selectedResellerCode, state.resellers],
   );
   const activeResellerCode = selectedReseller?.code || defaultResellerCode;
+  const saleAccessOpen = selectedReseller ? isResellerAuthorizedForSales(selectedReseller) : false;
+  const saleAccessBlockReason = selectedReseller && !saleAccessOpen ? getResellerSalesBlockReason(selectedReseller) : "";
   const channelOps = useMemo(
     () => state.ops.filter((op) => op.channel === activeResellerCode).sort((a, b) => b.ts.localeCompare(a.ts)),
     [activeResellerCode, state.ops],
@@ -329,12 +345,12 @@ export default function ChannelView({ state, onUpdate }: Props) {
   ];
 
   const apiCardRows = [
-    { left: "Среда", right: "Sandbox" },
-    { left: "Тип авторизации", right: "API Key" },
-    { left: "Статус API key", right: selectedReseller?.apiConnected ? "Активен" : "Отключён" },
+    { left: "Среда", right: "Песочница" },
+    { left: "Тип авторизации", right: "API-ключ" },
+    { left: "Статус API-ключа", right: selectedReseller?.apiConnected ? "Активен" : "Отключён" },
     { left: "Версия API", right: "v2.1" },
     { left: "Проверка подписи", right: "Включена" },
-    { left: "Лимит запросов", right: "1200 req/мин" },
+    { left: "Лимит запросов", right: "1200 запросов/мин" },
     { left: "Доступные операции", right: "продажа, возврат, погашение, проверка" },
     { left: "Последний успешный запрос", right: formatDate(todayOps.find((op) => op.result === "ok")?.ts || state.meta.updatedAt) },
     { left: "Последняя синхронизация", right: formatDate(state.meta.updatedAt) },
@@ -369,12 +385,8 @@ export default function ChannelView({ state, onUpdate }: Props) {
       toast.error("Реселлер не найден");
       return;
     }
-    if (selectedReseller.status === "disabled") {
-      toast.error("Реселлер отключён в Центре Управления. Demo-продажа недоступна.");
-      return;
-    }
-    if (!selectedReseller.apiConnected || selectedReseller.contractStatus !== "Active") {
-      toast.error("API или договор реселлера не активны.");
+    if (!saleAccessOpen) {
+      toast.error(saleAccessBlockReason || "Продажа через этого оператора недоступна.");
       return;
     }
     if (!sandboxEventId || !sandboxTier) {
@@ -411,6 +423,10 @@ export default function ChannelView({ state, onUpdate }: Props) {
       toast.error("Реселлер не найден");
       return;
     }
+    if (!saleAccessOpen) {
+      toast.error(saleAccessBlockReason || "Возврат через этого оператора недоступен.");
+      return;
+    }
     if (!refundTicketId) {
       toast.error("Нет билетов этого реселлера, доступных для возврата");
       return;
@@ -440,18 +456,23 @@ export default function ChannelView({ state, onUpdate }: Props) {
               <span className={`rounded-full border px-2 py-1 ${selectedReseller?.status === "active" ? "border-emerald-300/40 bg-emerald-500/10 text-emerald-200" : "border-rose-300/40 bg-rose-500/10 text-rose-200"}`}>
                 {selectedReseller?.status === "active" ? "Активен" : "Отключён"}
               </span>
-              <span className="rounded-full border border-cyan-300/40 bg-cyan-500/10 px-2 py-1 text-cyan-100">Sandbox</span>
-              <span className="rounded-full border border-indigo-300/40 bg-indigo-500/10 px-2 py-1 text-indigo-100">Connected to TicketHub: {selectedReseller?.apiConnected ? "Да" : "Нет"}</span>
-              <span className="rounded-full border border-violet-300/40 bg-violet-500/10 px-2 py-1 text-violet-100">Договор: {selectedReseller?.contractStatus || "—"}</span>
+              <span className="rounded-full border border-cyan-300/40 bg-cyan-500/10 px-2 py-1 text-cyan-100">Демонстрационная среда</span>
+              <span className="rounded-full border border-emerald-300/40 bg-emerald-500/10 px-2 py-1 text-emerald-100">Допуск: {selectedReseller ? getResellerAdmissionStatus(selectedReseller) : "—"}</span>
+              <span className="rounded-full border border-indigo-300/40 bg-indigo-500/10 px-2 py-1 text-indigo-100">Подключение: {selectedReseller ? getResellerConnectionType(selectedReseller) : "—"}</span>
+              <span className="rounded-full border border-violet-300/40 bg-violet-500/10 px-2 py-1 text-violet-100">Соглашение: {selectedReseller ? getResellerAgreementStatus(selectedReseller) : "—"}</span>
             </div>
           </div>
 
           <div className="grid w-full gap-2 text-sm text-slate-200 lg:w-auto lg:min-w-[420px] lg:grid-cols-2">
             <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">ID канала</p><p className="mt-1 font-mono">{channelId(activeResellerCode)}</p></div>
-            <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Статус API key</p><p className="mt-1">{selectedReseller?.apiConnected ? "Активен" : "Отключён"}</p></div>
+            <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Статус API-ключа</p><p className="mt-1">{selectedReseller?.apiConnected ? "Активен" : "Отключён"}</p></div>
             <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Комиссия</p><p className="mt-1">{selectedReseller?.commissionPercent || 0}%</p></div>
             <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Следующая выплата</p><p className="mt-1">18.04.2026</p></div>
             <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2 lg:col-span-2"><p className="text-xs text-slate-400">Менеджер партнёра</p><p className="mt-1">Ирина Ковалева · partner@tickethub.example</p></div>
+            <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2 lg:col-span-2">
+              <p className="text-xs text-slate-400">Доступ к продаже</p>
+              <p className={saleAccessOpen ? "mt-1 text-emerald-200" : "mt-1 text-amber-200"}>{saleAccessOpen ? "Доступ к продаже открыт" : saleAccessBlockReason || "Доступ к продаже закрыт"}</p>
+            </div>
           </div>
         </div>
       </section>
@@ -585,7 +606,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
           <article className="rounded-xl border border-cyan-300/20 bg-slate-900/85 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">API Sandbox / Тестовая продажа</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">API-песочница / Тестовая продажа</h2>
                 <p className="mt-1 text-xs text-slate-400">Demo-продажа меняет статусы билетов и создаёт операцию продажи.</p>
               </div>
               <select
@@ -594,29 +615,27 @@ export default function ChannelView({ state, onUpdate }: Props) {
                 className="h-9 rounded-lg border border-white/15 bg-slate-950 px-3 text-xs text-slate-100 outline-none"
               >
                 {state.resellers.map((reseller) => (
-                  <option key={reseller.resellerId} value={reseller.code}>{reseller.name}</option>
+                  <option key={reseller.resellerId} value={reseller.code} disabled={!isResellerAuthorizedForSales(reseller)}>
+                    {reseller.name}{isResellerAuthorizedForSales(reseller) ? "" : " · недоступен"}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><span className="text-slate-400">Connected to TicketHub</span><div className="mt-1 text-slate-100">{selectedReseller?.apiConnected ? "Да" : "Нет"}</div></div>
-              <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><span className="text-slate-400">Договор</span><div className="mt-1 text-slate-100">{selectedReseller?.contractStatus || "—"}</div></div>
+              <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><span className="text-slate-400">Подключение к платформе</span><div className="mt-1 text-slate-100">{selectedReseller ? getResellerConnectionType(selectedReseller) : "—"}</div></div>
+              <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><span className="text-slate-400">Допуск</span><div className="mt-1 text-slate-100">{selectedReseller ? getResellerAdmissionStatus(selectedReseller) : "—"}</div></div>
               <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><span className="text-slate-400">Комиссия</span><div className="mt-1 text-slate-100">{selectedReseller?.commissionPercent || 0}%</div></div>
-              <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><span className="text-slate-400">Статус</span><div className={selectedReseller?.status === "active" ? "mt-1 text-emerald-200" : "mt-1 text-rose-200"}>{selectedReseller?.status === "active" ? "Активен" : "Отключён"}</div></div>
+              <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><span className="text-slate-400">Соглашение</span><div className="mt-1 text-slate-100">{selectedReseller ? getResellerAgreementStatus(selectedReseller) : "—"}</div></div>
+              <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2 col-span-2"><span className="text-slate-400">Интеграция</span><div className={saleAccessOpen ? "mt-1 text-emerald-200" : "mt-1 text-amber-200"}>{selectedReseller ? getResellerIntegrationStatus(selectedReseller) : "—"} · {saleAccessOpen ? "Доступ к продаже открыт" : saleAccessBlockReason || "доступ закрыт"}</div></div>
             </div>
 
-            {selectedReseller?.status === "disabled" && (
-              <div className="mt-3 rounded-lg border border-rose-300/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
-                Реселлер отключён в Центре Управления. Demo-продажа недоступна.
-              </div>
-            )}
-            {selectedReseller?.status !== "disabled" && selectedReseller && (!selectedReseller.apiConnected || selectedReseller.contractStatus !== "Active") && (
+            {selectedReseller && !saleAccessOpen && (
               <div className="mt-3 rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-                API или договор реселлера не активны.
+                {saleAccessBlockReason}
               </div>
             )}
-            {selectedReseller && sandboxEvents.length === 0 && selectedReseller.status === "active" && selectedReseller.apiConnected && selectedReseller.contractStatus === "Active" && (
+            {selectedReseller && sandboxEvents.length === 0 && saleAccessOpen && (
               <div className="mt-3 rounded-lg border border-cyan-300/25 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
                 Нет опубликованных мероприятий с TicketID, где этот реселлер выбран в каналах продаж.
               </div>
@@ -675,7 +694,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
               <button
                 type="button"
                 onClick={handleSandboxSale}
-                disabled={!selectedReseller || selectedReseller.status === "disabled" || !selectedReseller.apiConnected || selectedReseller.contractStatus !== "Active" || !sandboxEventId || !sandboxTier}
+                disabled={!selectedReseller || !saleAccessOpen || !sandboxEventId || !sandboxTier}
                 className="h-11 rounded-lg bg-cyan-400 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
               >
                 Продать demo-билет через реселлера
@@ -701,7 +720,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
                 <button
                   type="button"
                   onClick={handleSandboxRefund}
-                  disabled={!selectedReseller || selectedReseller.status === "disabled" || !selectedReseller.apiConnected || selectedReseller.contractStatus !== "Active" || !refundTicketId}
+                  disabled={!selectedReseller || !saleAccessOpen || !refundTicketId}
                   className="mt-3 h-11 w-full rounded-lg bg-rose-400 font-semibold text-slate-950 transition hover:bg-rose-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
                 >
                   Вернуть демо-билет через реселлера

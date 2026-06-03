@@ -21,6 +21,10 @@ export type OpType = "sell" | "refund" | "redeem" | "verify";
 export type OpResult = "ok" | "error";
 export type ResellerStatus = "active" | "disabled";
 export type ResellerContractStatus = "Active" | "Suspended" | "Draft";
+export type ResellerAdmissionStatus = "На рассмотрении" | "Авторизован" | "Требует доработки" | "Приостановлен";
+export type ResellerConnectionType = "API" | "Виджет" | "Партнёрский канал" | "Собственная касса/сайт организатора";
+export type ResellerAgreementStatus = "Соглашение подписано" | "Ожидает подписания" | "Требует обновления";
+export type ResellerIntegrationStatus = "Интеграция активна" | "Ожидает настройки" | "Доступ приостановлен";
 export const OWN_SALES_CHANNEL = "OWN";
 export const OWN_SALES_CHANNEL_LABEL = "Свой канал";
 
@@ -155,6 +159,14 @@ export interface Reseller {
   name: string;
   code: string;
   status: ResellerStatus;
+  admissionStatus?: ResellerAdmissionStatus;
+  connectionType?: ResellerConnectionType;
+  agreementStatus?: ResellerAgreementStatus;
+  integrationStatus?: ResellerIntegrationStatus;
+  applicationDate?: string;
+  admissionDate?: string;
+  responsibleContact?: string;
+  applicationComment?: string;
   apiConnected: boolean;
   contractStatus: ResellerContractStatus;
   commissionPercent: number;
@@ -434,12 +446,67 @@ export const DEMO_BASE_UNIT_AMOUNT = 42;
 export const DEMO_TOP_UP_AMOUNT = 2000;
 let suppressPersistence = false;
 
+export const RESELLER_ADMISSION_STATUSES: ResellerAdmissionStatus[] = ["На рассмотрении", "Авторизован", "Требует доработки", "Приостановлен"];
+export const RESELLER_CONNECTION_TYPES: ResellerConnectionType[] = ["API", "Виджет", "Партнёрский канал", "Собственная касса/сайт организатора"];
+export const RESELLER_AGREEMENT_STATUSES: ResellerAgreementStatus[] = ["Соглашение подписано", "Ожидает подписания", "Требует обновления"];
+
+export function getResellerAdmissionStatus(reseller: Pick<Reseller, "admissionStatus" | "status">): ResellerAdmissionStatus {
+  if (reseller.admissionStatus && RESELLER_ADMISSION_STATUSES.includes(reseller.admissionStatus)) return reseller.admissionStatus;
+  return reseller.status === "disabled" ? "Приостановлен" : "Авторизован";
+}
+
+export function getResellerConnectionType(reseller: Pick<Reseller, "connectionType" | "apiConnected">): ResellerConnectionType {
+  if (reseller.connectionType && RESELLER_CONNECTION_TYPES.includes(reseller.connectionType)) return reseller.connectionType;
+  return reseller.apiConnected ? "API" : "Партнёрский канал";
+}
+
+export function getResellerAgreementStatus(reseller: Pick<Reseller, "agreementStatus" | "contractStatus">): ResellerAgreementStatus {
+  if (reseller.agreementStatus && RESELLER_AGREEMENT_STATUSES.includes(reseller.agreementStatus)) return reseller.agreementStatus;
+  if (reseller.contractStatus === "Active") return "Соглашение подписано";
+  if (reseller.contractStatus === "Draft") return "Ожидает подписания";
+  return "Требует обновления";
+}
+
+export function getResellerIntegrationStatus(reseller: Pick<Reseller, "integrationStatus" | "status" | "apiConnected" | "contractStatus" | "admissionStatus" | "agreementStatus">): ResellerIntegrationStatus {
+  if (reseller.integrationStatus) return reseller.integrationStatus;
+  if (reseller.status === "disabled" || getResellerAdmissionStatus(reseller) === "Приостановлен") return "Доступ приостановлен";
+  if (reseller.apiConnected && getResellerAgreementStatus(reseller) === "Соглашение подписано" && getResellerAdmissionStatus(reseller) === "Авторизован") return "Интеграция активна";
+  return "Ожидает настройки";
+}
+
+export function isResellerAuthorizedForSales(reseller: Pick<Reseller, "admissionStatus" | "status" | "apiConnected" | "contractStatus" | "agreementStatus" | "integrationStatus">): boolean {
+  return (
+    getResellerAdmissionStatus(reseller) === "Авторизован" &&
+    reseller.status === "active" &&
+    reseller.apiConnected &&
+    getResellerAgreementStatus(reseller) === "Соглашение подписано" &&
+    getResellerIntegrationStatus(reseller) === "Интеграция активна"
+  );
+}
+
+export function getResellerSalesBlockReason(reseller: Pick<Reseller, "admissionStatus" | "status" | "apiConnected" | "contractStatus" | "agreementStatus" | "integrationStatus">): string {
+  const admissionStatus = getResellerAdmissionStatus(reseller);
+  if (admissionStatus !== "Авторизован") return `Нельзя выбрать: статус допуска «${admissionStatus}».`;
+  if (reseller.status !== "active") return "Нельзя выбрать: оператор приостановлен в реестре.";
+  if (getResellerAgreementStatus(reseller) !== "Соглашение подписано") return "Нельзя выбрать: соглашение с платформой не подписано.";
+  if (!reseller.apiConnected || getResellerIntegrationStatus(reseller) !== "Интеграция активна") return "Нельзя выбрать: интеграция ещё не активна.";
+  return "";
+}
+
 const DEFAULT_RESELLERS: Omit<Reseller, "updatedAt">[] = [
   {
     resellerId: "reseller_bycard",
     name: "ByCard",
     code: "ByCard",
     status: "active",
+    admissionStatus: "Авторизован",
+    connectionType: "API",
+    agreementStatus: "Соглашение подписано",
+    integrationStatus: "Интеграция активна",
+    applicationDate: "2026-01-10",
+    admissionDate: "2026-01-15",
+    responsibleContact: "Анна Романова",
+    applicationComment: "Допуск подтверждён, API-канал работает в демонстрационном контуре.",
     apiConnected: true,
     contractStatus: "Active",
     commissionPercent: 8,
@@ -461,6 +528,14 @@ const DEFAULT_RESELLERS: Omit<Reseller, "updatedAt">[] = [
     name: "TicketPro",
     code: "TicketPro",
     status: "active",
+    admissionStatus: "Авторизован",
+    connectionType: "API",
+    agreementStatus: "Соглашение подписано",
+    integrationStatus: "Интеграция активна",
+    applicationDate: "2026-01-24",
+    admissionDate: "2026-02-01",
+    responsibleContact: "Сергей Ковалёв",
+    applicationComment: "Допуск подтверждён, оператор доступен организаторам.",
     apiConnected: true,
     contractStatus: "Active",
     commissionPercent: 10,
@@ -482,6 +557,14 @@ const DEFAULT_RESELLERS: Omit<Reseller, "updatedAt">[] = [
     name: "Kvitki.by",
     code: "KvitkiBY",
     status: "active",
+    admissionStatus: "Авторизован",
+    connectionType: "Партнёрский канал",
+    agreementStatus: "Соглашение подписано",
+    integrationStatus: "Интеграция активна",
+    applicationDate: "2026-02-20",
+    admissionDate: "2026-03-01",
+    responsibleContact: "Елена Соколова",
+    applicationComment: "Партнёрский канал авторизован для продажи билетов.",
     apiConnected: true,
     contractStatus: "Active",
     commissionPercent: 8,
@@ -503,6 +586,14 @@ const DEFAULT_RESELLERS: Omit<Reseller, "updatedAt">[] = [
     name: "Legacy Seller",
     code: "LegacySeller",
     status: "disabled",
+    admissionStatus: "Приостановлен",
+    connectionType: "API",
+    agreementStatus: "Требует обновления",
+    integrationStatus: "Доступ приостановлен",
+    applicationDate: "2025-11-12",
+    admissionDate: "2025-11-20",
+    responsibleContact: "Демо-менеджер",
+    applicationComment: "Доступ приостановлен до обновления соглашения и проверки интеграции.",
     apiConnected: false,
     contractStatus: "Suspended",
     commissionPercent: 6,
@@ -518,6 +609,64 @@ const DEFAULT_RESELLERS: Omit<Reseller, "updatedAt">[] = [
     webhookEndpoint: "https://sandbox.legacyseller.example/webhooks/tickethub",
     signatureValidation: false,
     lastSync: "2026-05-01T08:00:00",
+  },
+  {
+    resellerId: "reseller_national_ticket_operator",
+    name: "Национальный билетный оператор",
+    code: "NationalTickets",
+    status: "active",
+    admissionStatus: "На рассмотрении",
+    connectionType: "Виджет",
+    agreementStatus: "Ожидает подписания",
+    integrationStatus: "Ожидает настройки",
+    applicationDate: "2026-04-03",
+    admissionDate: "",
+    responsibleContact: "Марина Орлова",
+    applicationComment: "Заявка находится на рассмотрении, выбор в мероприятиях пока недоступен.",
+    apiConnected: false,
+    contractStatus: "Draft",
+    commissionPercent: 7,
+    fullName: "Национальный билетный оператор",
+    registrationNumber: "193000555",
+    legalAddress: "220030, г. Минск, пр-т Победителей, 7",
+    contactPerson: "Марина Орлова",
+    email: "operator@national-tickets.example",
+    phone: "+375 (29) 700-50-50",
+    contractNumber: "TH-NT-2026-DRAFT",
+    contractDate: "",
+    apiEndpoint: "https://sandbox.api.nationaltickets.example/v2/tickethub",
+    webhookEndpoint: "https://sandbox.nationaltickets.example/webhooks/tickethub",
+    signatureValidation: true,
+    lastSync: "",
+  },
+  {
+    resellerId: "reseller_city_ticket_partner",
+    name: "Городской билетный партнёр",
+    code: "CityTicket",
+    status: "active",
+    admissionStatus: "Требует доработки",
+    connectionType: "Собственная касса/сайт организатора",
+    agreementStatus: "Ожидает подписания",
+    integrationStatus: "Ожидает настройки",
+    applicationDate: "2026-04-18",
+    admissionDate: "",
+    responsibleContact: "Игорь Литвинов",
+    applicationComment: "Нужно уточнить схему интеграции и ответственного за возвраты.",
+    apiConnected: false,
+    contractStatus: "Draft",
+    commissionPercent: 5,
+    fullName: "Городской билетный партнёр",
+    registrationNumber: "193000666",
+    legalAddress: "220100, г. Минск, ул. Городская, 3",
+    contactPerson: "Игорь Литвинов",
+    email: "city.partner@example",
+    phone: "+375 (33) 700-60-60",
+    contractNumber: "TH-CT-2026-DRAFT",
+    contractDate: "",
+    apiEndpoint: "https://sandbox.api.cityticket.example/v2/tickethub",
+    webhookEndpoint: "https://sandbox.cityticket.example/webhooks/tickethub",
+    signatureValidation: true,
+    lastSync: "",
   },
 ];
 
@@ -732,6 +881,14 @@ export function ensureDefaultResellers(state: AppState): void {
     existing.name ||= seed.name;
     existing.code ||= seed.code;
     if (existing.status !== "active" && existing.status !== "disabled") existing.status = seed.status;
+    if (!RESELLER_ADMISSION_STATUSES.includes(existing.admissionStatus as ResellerAdmissionStatus)) existing.admissionStatus = seed.admissionStatus;
+    if (!RESELLER_CONNECTION_TYPES.includes(existing.connectionType as ResellerConnectionType)) existing.connectionType = seed.connectionType;
+    if (!RESELLER_AGREEMENT_STATUSES.includes(existing.agreementStatus as ResellerAgreementStatus)) existing.agreementStatus = seed.agreementStatus;
+    if (!["Интеграция активна", "Ожидает настройки", "Доступ приостановлен"].includes(existing.integrationStatus || "")) existing.integrationStatus = seed.integrationStatus;
+    existing.applicationDate ||= seed.applicationDate;
+    existing.admissionDate ||= seed.admissionDate;
+    existing.responsibleContact ||= seed.responsibleContact || seed.contactPerson;
+    existing.applicationComment ||= seed.applicationComment;
     if (typeof existing.apiConnected !== "boolean") existing.apiConnected = seed.apiConnected;
     if (!["Active", "Suspended", "Draft"].includes(existing.contractStatus)) existing.contractStatus = seed.contractStatus;
     if (!Number.isFinite(existing.commissionPercent)) existing.commissionPercent = seed.commissionPercent;
@@ -787,7 +944,7 @@ export function buildDefaultSalesChannels(state: Pick<AppState, "resellers">): s
     [
       OWN_SALES_CHANNEL,
       ...(state.resellers || [])
-        .filter((reseller) => reseller.status === "active")
+        .filter(isResellerAuthorizedForSales)
         .map((reseller) => reseller.code),
     ],
     state,
@@ -808,11 +965,13 @@ export function getEventSalesChannels(state: Pick<AppState, "resellers">, event:
 
 export function isSalesChannelAllowedForEvent(state: Pick<AppState, "resellers">, event: Pick<EventRecord, "salesChannels">, code: string): boolean {
   if (!code) return false;
+  if (code === OWN_SALES_CHANNEL) return true;
+  const reseller = state.resellers.find((item) => item.code === code);
+  if (!reseller || !isResellerAuthorizedForSales(reseller)) return false;
   if (Array.isArray(event.salesChannels) && event.salesChannels.length > 0) {
     return normalizeSalesChannels(event.salesChannels, state).includes(code);
   }
-  if (code === OWN_SALES_CHANNEL) return true;
-  return state.resellers.some((reseller) => reseller.code === code && reseller.status === "active");
+  return true;
 }
 
 function ensureOrganizerDocuments(state: AppState): void {
@@ -2357,6 +2516,10 @@ export type CreateResellerInput = {
   apiConnected?: boolean;
   contractStatus?: ResellerContractStatus;
   status?: ResellerStatus;
+  admissionStatus?: ResellerAdmissionStatus;
+  connectionType?: ResellerConnectionType;
+  agreementStatus?: ResellerAgreementStatus;
+  integrationStatus?: ResellerIntegrationStatus;
   contactPerson?: string;
   email?: string;
   phone?: string;
@@ -2388,6 +2551,14 @@ export function createReseller(state: AppState, input: CreateResellerInput): { o
     name,
     code,
     status: input.status || "active",
+    admissionStatus: input.admissionStatus || (input.status === "disabled" ? "Приостановлен" : "Авторизован"),
+    connectionType: input.connectionType || (input.apiConnected === false ? "Партнёрский канал" : "API"),
+    agreementStatus: input.agreementStatus || (input.contractStatus === "Draft" ? "Ожидает подписания" : input.contractStatus === "Suspended" ? "Требует обновления" : "Соглашение подписано"),
+    integrationStatus: input.integrationStatus || (input.status === "disabled" ? "Доступ приостановлен" : input.apiConnected === false || input.contractStatus === "Draft" ? "Ожидает настройки" : "Интеграция активна"),
+    applicationDate: now.slice(0, 10),
+    admissionDate: input.status === "disabled" ? "" : now.slice(0, 10),
+    responsibleContact: input.contactPerson?.trim() || "",
+    applicationComment: "",
     apiConnected: input.apiConnected ?? true,
     contractStatus: input.contractStatus || "Active",
     commissionPercent: Number(commission.toFixed(2)),
@@ -2449,6 +2620,9 @@ export function sellTicketsByReseller(
   const reseller = state.resellers.find((item) => item.code === data.resellerCode);
   if (!reseller || reseller.status === "disabled") {
     return { ok: false, reason: "Реселлер отключён в Центре Управления. Demo-продажа недоступна.", ticketIds: [] };
+  }
+  if (!isResellerAuthorizedForSales(reseller)) {
+    return { ok: false, reason: getResellerSalesBlockReason(reseller), ticketIds: [] };
   }
   if (!reseller.apiConnected || reseller.contractStatus !== "Active") {
     return { ok: false, reason: "API или договор реселлера не активны.", ticketIds: [] };
@@ -2558,6 +2732,9 @@ export function refundTicketByReseller(state: AppState, data: { resellerCode: st
   const reseller = state.resellers.find((item) => item.code === data.resellerCode);
   if (!reseller || reseller.status === "disabled") {
     return { ok: false, reason: "Реселлер отключён в Центре Управления. Demo-возврат недоступен." };
+  }
+  if (!isResellerAuthorizedForSales(reseller)) {
+    return { ok: false, reason: getResellerSalesBlockReason(reseller) };
   }
   if (!reseller.apiConnected || reseller.contractStatus !== "Active") {
     return { ok: false, reason: "API или договор реселлера не активны." };

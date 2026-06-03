@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import type { AppState, EventRecord, OpRecord, Ticket } from "@/lib/store";
+import type { AppState, EventRecord, OpRecord, ResellerAdmissionStatus, ResellerAgreementStatus, ResellerConnectionType, ResellerIntegrationStatus, Ticket } from "@/lib/store";
+import { getResellerAdmissionStatus, getResellerAgreementStatus, getResellerConnectionType, getResellerIntegrationStatus } from "@/lib/store";
 import { A } from "./adminStyles";
 import {
   Activity,
@@ -63,6 +64,10 @@ type ResellerReportRow = {
   name: string;
   code: string;
   status: string;
+  admissionStatus: ResellerAdmissionStatus;
+  connectionType: ResellerConnectionType;
+  agreementStatus: ResellerAgreementStatus;
+  integrationStatus: ResellerIntegrationStatus;
   commissionPercent: number;
   salesTurnover: number;
   commissionAmount: number;
@@ -438,6 +443,10 @@ function buildResellerRows(state: AppState): ResellerReportRow[] {
         name: reseller.name,
         code: reseller.code,
         status: reseller.status,
+        admissionStatus: getResellerAdmissionStatus(reseller),
+        connectionType: getResellerConnectionType(reseller),
+        agreementStatus: getResellerAgreementStatus(reseller),
+        integrationStatus: getResellerIntegrationStatus(reseller),
         commissionPercent: reseller.commissionPercent,
         salesTurnover,
         commissionAmount,
@@ -995,10 +1004,10 @@ export default function AdminReports({ state }: Props) {
           <EmptyState icon={Handshake} text="Нет реселлеров для отчёта. После инициализации demo-данных здесь появится комиссионная аналитика." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px] text-sm">
+            <table className="w-full min-w-[1480px] text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["Реселлер", "Код", "Статус", "Оборот продаж", "Комиссия реселлера", "Доля Минкульта", "Доля платформы", "Остаток комиссии реселлера", "Продано билетов", "Возвраты", "Погашения", "Ошибки"].map((header) => (
+                  {["Реселлер", "Код", "Допуск", "Тип подключения", "Соглашение", "Интеграция", "Статус", "Оборот продаж", "Комиссия реселлера", "Доля Минкульта", "Доля платформы", "Остаток комиссии реселлера", "Продано билетов", "Возвраты", "Погашения", "Ошибки"].map((header) => (
                     <th key={header} className="px-4 py-3 text-left text-xs font-medium" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
                       {header}
                     </th>
@@ -1010,6 +1019,10 @@ export default function AdminReports({ state }: Props) {
                   <tr key={row.resellerId} className="transition-colors" style={{ borderBottom: `1px solid ${A.border}` }}>
                     <td className="px-4 py-3 font-medium" style={{ color: A.textPrimary }}>{row.name}</td>
                     <td className="px-4 py-3 font-mono text-xs" style={{ color: A.cyan }}>{row.code}</td>
+                    <td className="px-4 py-3" style={{ color: row.admissionStatus === "Авторизован" ? A.statusOk : row.admissionStatus === "Приостановлен" ? A.statusError : A.statusWarn }}>{row.admissionStatus}</td>
+                    <td className="px-4 py-3" style={{ color: A.textSecondary }}>{row.connectionType}</td>
+                    <td className="px-4 py-3" style={{ color: row.agreementStatus === "Соглашение подписано" ? A.statusOk : A.statusWarn }}>{row.agreementStatus}</td>
+                    <td className="px-4 py-3" style={{ color: row.integrationStatus === "Интеграция активна" ? A.statusOk : row.integrationStatus === "Доступ приостановлен" ? A.statusError : A.statusWarn }}>{row.integrationStatus}</td>
                     <td className="px-4 py-3" style={{ color: row.status === "active" ? A.statusOk : A.statusError }}>{row.status === "active" ? "Активен" : "Отключён"}</td>
                     <td className="px-4 py-3 font-semibold" style={{ color: A.statusOk }}>{formatMoney(row.salesTurnover)}</td>
                     <td className="px-4 py-3" style={{ color: A.textPrimary }}>{formatMoney(row.commissionAmount)} · {row.commissionPercent}%</td>

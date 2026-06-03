@@ -16,10 +16,16 @@ import {
   generateComplianceFeeReceipt,
   getCompliancePaymentStatus,
   getOrganizerFinancialAccount,
+  getResellerAdmissionStatus,
+  getResellerAgreementStatus,
+  getResellerConnectionType,
+  getResellerIntegrationStatus,
+  getResellerSalesBlockReason,
   getSeatMapLayout,
   getSeatTariffConfigurationSummary,
   getVenueRegistryRecord,
   getSalesChannelLabel,
+  isResellerAuthorizedForSales,
   payComplianceFeeFromBalance,
   SEAT_TARIFF_COLORS,
   topUpOrganizerBalance,
@@ -156,7 +162,7 @@ export default function OrganizerEventCompliancePage() {
   const [activeStep, setActiveStep] = useState(0);
   const [seatMapOpen, setSeatMapOpen] = useState(false);
   const [performerDraft, setPerformerDraft] = useState({ name: "", country: "Беларусь" });
-  const activeResellers = useMemo(() => state.resellers.filter((reseller) => reseller.status === "active"), [state.resellers]);
+  const salesOperators = useMemo(() => state.resellers, [state.resellers]);
   const approvedVenues = useMemo(() => state.venueRegistry.filter((venue) => venue.status === "approved"), [state.venueRegistry]);
   const selectedVenue = getVenueRegistryRecord(state, form.venueId);
   const selectedHall = selectedVenue?.halls.find((hall) => hall.hallId === form.hallId) || null;
@@ -410,6 +416,8 @@ export default function OrganizerEventCompliancePage() {
 
   function toggleSalesChannel(code: string, checked: boolean) {
     if (code === "OWN") return;
+    const reseller = state.resellers.find((item) => item.code === code);
+    if (checked && (!reseller || !isResellerAuthorizedForSales(reseller))) return;
     setForm((prev) => {
       const current = new Set(["OWN", ...(prev.salesChannels || [])]);
       if (checked) current.add(code);
@@ -872,20 +880,62 @@ export default function OrganizerEventCompliancePage() {
           {activeStep === 5 && (
             <div className="space-y-4">
               <div className="inline-flex items-center gap-1">
-                <p className="text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>Свой канал включён всегда. Реселлеры берутся из текущих структур Центра Управления.</p>
-                <HelpTooltip text="Выберите каналы, через которые организатор планирует распространять билеты." />
+                <p className="text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>Продажа билетов допускается только через авторизованные каналы, связанные с платформой соглашением.</p>
+                <HelpTooltip text="Организатор видит весь реестр операторов, но выбрать можно только канал со статусом допуска «Авторизован» и активной интеграцией." />
+              </div>
+              <div className="rounded-xl border px-3 py-2 text-xs" style={{ borderColor: "rgba(96,165,250,0.35)", background: "rgba(59,130,246,0.10)", color: "rgba(219,234,254,0.96)" }}>
+                Неавторизованные, приостановленные или ожидающие доработки операторы показаны для контроля, но недоступны для выбора.
               </div>
               <div className="grid gap-2 md:grid-cols-2">
                 <label className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
                   <input type="checkbox" checked disabled />
-                  Свой канал
+                  <span>
+                    <span className="font-semibold">Свой канал</span>
+                    <span className="mt-1 block text-xs opacity-70">Собственная касса/сайт организатора · Соглашение подписано</span>
+                  </span>
                 </label>
-                {activeResellers.map((reseller) => (
-                  <label key={reseller.resellerId} className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
-                    <input type="checkbox" checked={(form.salesChannels || []).includes(reseller.code)} onChange={(event) => toggleSalesChannel(reseller.code, event.target.checked)} />
-                    {getSalesChannelLabel(state, reseller.code)}
-                  </label>
-                ))}
+                {salesOperators.map((reseller) => {
+                  const available = isResellerAuthorizedForSales(reseller);
+                  const checked = available && (form.salesChannels || []).includes(reseller.code);
+                  const blockReason = available ? "" : getResellerSalesBlockReason(reseller);
+                  return (
+                    <label
+                      key={reseller.resellerId}
+                      className="flex items-start gap-2 rounded-xl border px-3 py-2 text-sm"
+                      style={{
+                        borderColor: available ? "rgba(52,211,153,0.28)" : "rgba(255,255,255,0.12)",
+                        background: available ? "rgba(16,185,129,0.08)" : "#111A24",
+                        opacity: available ? 1 : 0.72,
+                      }}
+                    >
+                      <input
+                        className="mt-1"
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!available}
+                        onChange={(event) => toggleSalesChannel(reseller.code, event.target.checked)}
+                      />
+                      <span>
+                        <span className="font-semibold">{getSalesChannelLabel(state, reseller.code)}</span>
+                        <span className="mt-1 block text-xs opacity-75">
+                          {getResellerAdmissionStatus(reseller)} · {getResellerConnectionType(reseller)} · {getResellerAgreementStatus(reseller)}
+                        </span>
+                        <span className={available ? "mt-1 block text-xs text-emerald-200" : "mt-1 block text-xs text-amber-200"}>
+                          {available ? getResellerIntegrationStatus(reseller) : blockReason}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
+                <div className="inline-flex items-center gap-1 font-semibold">
+                  Выбранные каналы
+                  <HelpTooltip text="Этот список попадёт в заявку и затем будет виден Центру Управления в режиме просмотра." />
+                </div>
+                <div className="mt-2 text-xs opacity-75">
+                  {(form.salesChannels || ["OWN"]).map((code) => getSalesChannelLabel(state, code)).join(", ")}
+                </div>
               </div>
             </div>
           )}
