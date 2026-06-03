@@ -469,17 +469,17 @@ export default function OrganizerPage() {
               <>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                      { label: "Текущая выручка", value: formatMoney(organizerFinance.currentRevenue), icon: TrendingUp, tooltip: "Выручка по открытым мероприятиям: учитываются только проданные и не возвращённые билеты." },
-                      { label: "Продано билетов", value: String(organizerFinance.soldTickets), icon: BarChart3, tooltip: "Количество проданных билетов по открытым мероприятиям без возвращённых билетов." },
+                      { label: "Текущая выручка", value: formatMoney(organizerFinance.currentRevenue), icon: TrendingUp, tooltip: "Выручка по открытым мероприятиям: учитываются только проданные и не возвращённые билеты.", onClick: () => setActiveSection("reports") },
+                      { label: "Продано билетов", value: String(organizerFinance.soldTickets), icon: BarChart3, tooltip: "Количество проданных билетов по открытым мероприятиям без возвращённых билетов.", onClick: () => setActiveSection("sales") },
                       { label: "Баланс", value: formatMoney(organizerFinancialAccount.balance), icon: Wallet, tooltip: "Текущий баланс финансового счёта организатора. Нажмите карточку, чтобы открыть операции и квитанции.", onClick: () => setActiveSection("financial") },
-                      { label: "Открытые мероприятия", value: String(organizerFinance.openEvents), icon: Calendar, tooltip: "Опубликованные мероприятия, дата и время которых ещё не прошли." },
+                      { label: "Открытые мероприятия", value: String(organizerFinance.openEvents), icon: Calendar, tooltip: "Опубликованные мероприятия, дата и время которых ещё не прошли.", onClick: () => setActiveSection("events") },
                     ].map((k) => (
                     <div key={k.label} className="relative">
                     <button
                       type="button"
                       onClick={k.onClick}
                       className="rounded-[18px] border p-5 text-left transition-all duration-200 hover:-translate-y-0.5 w-full"
-                      style={{ background: T.cardBg, backgroundImage: T.cardGradient, borderColor: T.border, boxShadow: T.cardShadow, cursor: k.onClick ? "pointer" : "default" }}
+                      style={{ background: T.cardBg, backgroundImage: T.cardGradient, borderColor: T.border, boxShadow: T.cardShadow, cursor: "pointer" }}
                     >
                       <div className="flex items-center justify-between mb-3">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: T.goldBg }}>

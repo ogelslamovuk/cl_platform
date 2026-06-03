@@ -17,10 +17,12 @@ import { A, statusChip } from "./adminStyles";
 import { Network, Plus, Store, X } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import { toast } from "sonner";
+import { getEventRegionCity, isInAdminScope, type AdminRegionScope } from "./adminScope";
 
 interface Props {
   state: AppState;
   onUpdate: (s: AppState) => void;
+  regionScope?: AdminRegionScope;
 }
 
 type ResellerMetrics = {
@@ -48,6 +50,7 @@ type ResellerFormState = {
   legalAddress: string;
   registrationNumber: string;
 };
+type ResellerSort = "name" | "status" | "events" | "sales" | "tickets" | "region";
 
 const emptyForm: ResellerFormState = {
   name: "",
@@ -252,11 +255,21 @@ function buildResellerRows(reseller: Reseller, metrics: ResellerMetrics): Record
   };
 }
 
-export default function AdminResellers({ state, onUpdate }: Props) {
+function getCoverageLabel(state: AppState, events: EventRecord[]): string {
+  if (!events.length) return "Республика Беларусь";
+  return Array.from(new Set(events.map((event) => getEventRegionCity(state, event).region))).sort((a, b) => a.localeCompare(b, "ru")).join(", ");
+}
+
+export default function AdminResellers({ state, onUpdate, regionScope = "all" }: Props) {
   const metrics = useMemo(() => buildMetrics(state), [state]);
   const [drawer, setDrawer] = useState<Reseller | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<ResellerFormState>(emptyForm);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [admissionFilter, setAdmissionFilter] = useState("");
+  const [connectionFilter, setConnectionFilter] = useState("");
+  const [sortBy, setSortBy] = useState<ResellerSort>("name");
   const connectedEventsByCode = useMemo(() => {
     const map = new Map<string, EventRecord[]>();
     state.resellers.forEach((reseller) => map.set(reseller.code, []));
@@ -268,6 +281,30 @@ export default function AdminResellers({ state, onUpdate }: Props) {
     });
     return map;
   }, [state.events, state.resellers]);
+  const visibleResellers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return state.resellers
+      .filter((reseller) => {
+        const connectedEvents = connectedEventsByCode.get(reseller.code) || [];
+        const regions = connectedEvents.map((event) => getEventRegionCity(state, event).region);
+        if (regionScope !== "all" && regions.length && !regions.some((region) => isInAdminScope(region, regionScope))) return false;
+        if (statusFilter && reseller.status !== statusFilter) return false;
+        if (admissionFilter && getResellerAdmissionStatus(reseller) !== admissionFilter) return false;
+        if (connectionFilter && getResellerConnectionType(reseller) !== connectionFilter) return false;
+        if (!query) return true;
+        return [reseller.name, reseller.code, reseller.contactPerson, reseller.responsibleContact, getCoverageLabel(state, connectedEvents)].join(" ").toLowerCase().includes(query);
+      })
+      .sort((a, b) => {
+        const aMetrics = metrics.get(a.code) || { salesTurnover: 0, soldTickets: 0, refunds: 0, redeems: 0, lastOperation: "—" };
+        const bMetrics = metrics.get(b.code) || { salesTurnover: 0, soldTickets: 0, refunds: 0, redeems: 0, lastOperation: "—" };
+        if (sortBy === "status") return resellerStatusLabel(a.status).localeCompare(resellerStatusLabel(b.status), "ru");
+        if (sortBy === "events") return (connectedEventsByCode.get(b.code)?.length || 0) - (connectedEventsByCode.get(a.code)?.length || 0);
+        if (sortBy === "sales") return bMetrics.salesTurnover - aMetrics.salesTurnover;
+        if (sortBy === "tickets") return bMetrics.soldTickets - aMetrics.soldTickets;
+        if (sortBy === "region") return getCoverageLabel(state, connectedEventsByCode.get(a.code) || []).localeCompare(getCoverageLabel(state, connectedEventsByCode.get(b.code) || []), "ru");
+        return a.name.localeCompare(b.name, "ru");
+      });
+  }, [admissionFilter, connectedEventsByCode, connectionFilter, metrics, regionScope, search, sortBy, state, statusFilter]);
 
   const toggleStatus = (reseller: Reseller) => {
     const nextStatus = reseller.status === "active" ? "disabled" : "active";
@@ -382,8 +419,33 @@ export default function AdminResellers({ state, onUpdate }: Props) {
         Продажа билетов допускается только через авторизованные каналы, связанные с платформой соглашением.
       </div>
 
+      <div className="flex flex-wrap gap-2 rounded-xl border p-3" style={{ background: A.surfaceBg, borderColor: A.border }}>
+        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск оператора..." className="h-9 min-w-[220px] rounded-lg px-3 text-sm outline-none" style={{ background: A.cardBg, border: `1px solid ${A.border}`, color: A.textPrimary }} />
+        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.cardBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
+          <option value="">Все статусы</option>
+          <option value="active">Активен</option>
+          <option value="disabled">Отключён</option>
+        </select>
+        <select value={admissionFilter} onChange={(event) => setAdmissionFilter(event.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.cardBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
+          <option value="">Все допуски</option>
+          {RESELLER_ADMISSION_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+        </select>
+        <select value={connectionFilter} onChange={(event) => setConnectionFilter(event.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.cardBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
+          <option value="">Все подключения</option>
+          {RESELLER_CONNECTION_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+        </select>
+        <select value={sortBy} onChange={(event) => setSortBy(event.target.value as ResellerSort)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.cardBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
+          <option value="name">Сортировка: название</option>
+          <option value="status">Сортировка: статус</option>
+          <option value="events">Сортировка: события</option>
+          <option value="sales">Сортировка: оборот</option>
+          <option value="tickets">Сортировка: билеты</option>
+          <option value="region">Сортировка: регион</option>
+        </select>
+      </div>
+
       <div style={{ background: A.cardBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.cardShadow }} className="overflow-hidden">
-        {state.resellers.length === 0 ? (
+        {visibleResellers.length === 0 ? (
           <div className="flex flex-col items-center py-12">
             <Store size={28} style={{ color: A.textMuted }} className="mb-2" />
             <p style={{ color: A.textMuted }} className="text-sm">Реселлеры не настроены</p>
@@ -393,7 +455,7 @@ export default function AdminResellers({ state, onUpdate }: Props) {
             <table className="w-full min-w-[1520px] text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["Оператор", "Код", "Допуск", "Тип подключения", "Соглашение", "Интеграция", "Контакт", "События", "Статус", "API", "Договор", "Комиссия", "Оборот продаж", "Продано билетов", "Последняя операция", "Действия"].map((header) => (
+                  {["Оператор", "Код", "Допуск", "Тип подключения", "Соглашение", "Интеграция", "Контакт", "Регион покрытия", "События", "Статус", "API", "Договор", "Комиссия", "Оборот продаж", "Продано билетов", "Последняя операция", "Действия"].map((header) => (
                     <th key={header} className="px-4 py-3 text-left text-xs font-medium" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
                       {header}
                     </th>
@@ -401,7 +463,7 @@ export default function AdminResellers({ state, onUpdate }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {state.resellers.map((reseller) => {
+                {visibleResellers.map((reseller) => {
                   const row = metrics.get(reseller.code) || { salesTurnover: 0, soldTickets: 0, refunds: 0, redeems: 0, lastOperation: "—" };
                   const admissionStatus = getResellerAdmissionStatus(reseller);
                   const connectionType = getResellerConnectionType(reseller);
@@ -424,6 +486,7 @@ export default function AdminResellers({ state, onUpdate }: Props) {
                       <td className="px-4 py-3"><TextBadge value={agreementStatus} tone={agreementTone(agreementStatus)} /></td>
                       <td className="px-4 py-3"><TextBadge value={integrationStatus} tone={integrationTone(integrationStatus)} /></td>
                       <td className="px-4 py-3" style={{ color: A.textSecondary }}>{reseller.responsibleContact || reseller.contactPerson || "—"}</td>
+                      <td className="px-4 py-3" style={{ color: A.textSecondary }}>{getCoverageLabel(state, connectedEvents)}</td>
                       <td className="px-4 py-3" style={{ color: A.textSecondary }}>
                         {connectedEvents.length ? `${connectedEvents.length} · ${connectedEvents.slice(0, 2).map((event) => event.title).join(", ")}` : "—"}
                       </td>
@@ -469,60 +532,6 @@ export default function AdminResellers({ state, onUpdate }: Props) {
           </div>
         )}
       </div>
-
-      <section className="relative overflow-hidden p-5" style={{ background: A.glassGradient + ", " + A.cardBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.cardShadow }}>
-        <div className="absolute right-4 top-4">
-          <HelpTooltip text="Это демонстрационный контроль заявок операторов без отдельного onboarding wizard и без реального документооборота." />
-        </div>
-        <div className="mb-4 pr-9">
-          <h3 className="text-sm font-semibold" style={{ color: A.textPrimary }}>Заявки на подключение операторов</h3>
-          <p className="mt-1 text-xs" style={{ color: A.textSecondary }}>
-            Действия меняют демонстрационные статусы допуска в текущем реестре и сразу влияют на доступность канала для организатора и кабинета продаж.
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1160px] text-sm">
-            <thead>
-              <tr style={{ background: A.tableHeaderBg }}>
-                {["Оператор", "Дата заявки", "Тип подключения", "Статус заявки", "Контакт", "Комментарий", "Действия"].map((header) => (
-                  <th key={header} className="px-4 py-3 text-left text-xs font-medium" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {state.resellers.map((reseller) => {
-                const admissionStatus = getResellerAdmissionStatus(reseller);
-                const connectionType = getResellerConnectionType(reseller);
-                return (
-                  <tr key={`application-${reseller.resellerId}`} style={{ borderBottom: `1px solid ${A.border}` }}>
-                    <td className="px-4 py-3 font-medium" style={{ color: A.textPrimary }}>{reseller.name}</td>
-                    <td className="px-4 py-3" style={{ color: A.textSecondary }}>{reseller.applicationDate || "—"}</td>
-                    <td className="px-4 py-3" style={{ color: A.textSecondary }}>{connectionType}</td>
-                    <td className="px-4 py-3"><TextBadge value={admissionStatus} tone={admissionTone(admissionStatus)} /></td>
-                    <td className="px-4 py-3" style={{ color: A.textSecondary }}>{reseller.responsibleContact || reseller.contactPerson || "—"}</td>
-                    <td className="px-4 py-3" style={{ color: A.textSecondary }}>{reseller.applicationComment || "—"}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button type="button" onClick={() => updateAdmission(reseller, "Авторизован")} className="h-8 rounded-lg px-3 text-xs font-semibold" style={{ background: A.statusOkBg, color: A.statusOk }}>
-                          Одобрить
-                        </button>
-                        <button type="button" onClick={() => updateAdmission(reseller, "Требует доработки")} className="h-8 rounded-lg px-3 text-xs font-semibold" style={{ background: A.statusWarnBg, color: A.statusWarn }}>
-                          Вернуть на доработку
-                        </button>
-                        <button type="button" onClick={() => updateAdmission(reseller, "Приостановлен")} className="h-8 rounded-lg px-3 text-xs font-semibold" style={{ background: A.statusErrorBg, color: A.statusError }}>
-                          Приостановить
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
 
       {drawer && drawerRows && (
         <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setDrawer(null)}>
@@ -601,6 +610,141 @@ export default function AdminResellers({ state, onUpdate }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+export function AdminResellerApplications({ state, onUpdate, regionScope = "all" }: Props) {
+  const [statusFilter, setStatusFilter] = useState("");
+  const connectedEventsByCode = useMemo(() => {
+    const map = new Map<string, EventRecord[]>();
+    state.resellers.forEach((reseller) => map.set(reseller.code, []));
+    state.events.forEach((event) => {
+      (event.salesChannels || []).forEach((code) => {
+        const list = map.get(code);
+        if (list) list.push(event);
+      });
+    });
+    return map;
+  }, [state.events, state.resellers]);
+
+  const rows = useMemo(() => state.resellers
+    .filter((reseller) => {
+      const admissionStatus = getResellerAdmissionStatus(reseller);
+      if (statusFilter && admissionStatus !== statusFilter) return false;
+      const regions = (connectedEventsByCode.get(reseller.code) || []).map((event) => getEventRegionCity(state, event).region);
+      return regionScope === "all" || !regions.length || regions.some((region) => isInAdminScope(region, regionScope));
+    })
+    .sort((a, b) => (a.applicationDate || "").localeCompare(b.applicationDate || "") || a.name.localeCompare(b.name, "ru")), [connectedEventsByCode, regionScope, state, statusFilter]);
+
+  const updateAdmission = (reseller: Reseller, admissionStatus: ResellerAdmissionStatus) => {
+    const now = new Date().toISOString();
+    const patch: Partial<Omit<Reseller, "resellerId">> = {
+      admissionStatus,
+      applicationComment: admissionStatus === "Авторизован"
+        ? "Допуск подтверждён Центром Управления."
+        : admissionStatus === "Требует доработки"
+          ? "Заявка возвращена на доработку: требуется уточнить интеграцию и ответственное лицо."
+          : "Доступ оператора приостановлен решением Центра Управления.",
+    };
+    if (admissionStatus === "Авторизован") {
+      Object.assign(patch, {
+        status: "active" as ResellerStatus,
+        apiConnected: true,
+        contractStatus: "Active" as ResellerContractStatus,
+        agreementStatus: "Соглашение подписано" as ResellerAgreementStatus,
+        integrationStatus: "Интеграция активна" as ResellerIntegrationStatus,
+        admissionDate: now.slice(0, 10),
+        lastSync: now,
+      });
+    }
+    if (admissionStatus === "Требует доработки") {
+      Object.assign(patch, {
+        status: "active" as ResellerStatus,
+        apiConnected: false,
+        contractStatus: "Draft" as ResellerContractStatus,
+        agreementStatus: "Ожидает подписания" as ResellerAgreementStatus,
+        integrationStatus: "Ожидает настройки" as ResellerIntegrationStatus,
+      });
+    }
+    if (admissionStatus === "Приостановлен") {
+      Object.assign(patch, {
+        status: "disabled" as ResellerStatus,
+        apiConnected: false,
+        contractStatus: "Suspended" as ResellerContractStatus,
+        agreementStatus: "Требует обновления" as ResellerAgreementStatus,
+        integrationStatus: "Доступ приостановлен" as ResellerIntegrationStatus,
+      });
+    }
+    if (updateReseller(state, reseller.resellerId, patch)) onUpdate({ ...state });
+  };
+
+  return (
+    <section className="relative overflow-hidden p-5" style={{ background: A.glassGradient + ", " + A.cardBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.cardShadow }}>
+      <div className="absolute right-4 top-4">
+        <HelpTooltip text="Демонстрационный контроль заявок операторов без отдельного onboarding wizard и без реального документооборота." />
+      </div>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3 pr-9">
+        <div>
+          <h3 className="text-sm font-semibold" style={{ color: A.textPrimary }}>Заявки на подключение операторов</h3>
+          <p className="mt-1 text-xs" style={{ color: A.textSecondary }}>
+            Действия меняют демонстрационные статусы допуска и сразу влияют на доступность канала для организатора и кабинета продаж.
+          </p>
+        </div>
+        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
+          <option value="">Все статусы</option>
+          {RESELLER_ADMISSION_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+        </select>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1260px] text-sm">
+          <thead>
+            <tr style={{ background: A.tableHeaderBg }}>
+              {["Оператор", "Дата заявки", "Тип подключения", "Регион покрытия", "Статус заявки", "Контакт", "Комментарий", "Действия"].map((header) => (
+                <th key={header} className="px-4 py-3 text-left text-xs font-medium" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((reseller) => {
+              const admissionStatus = getResellerAdmissionStatus(reseller);
+              const connectionType = getResellerConnectionType(reseller);
+              const connectedEvents = connectedEventsByCode.get(reseller.code) || [];
+              return (
+                <tr key={`application-${reseller.resellerId}`} style={{ borderBottom: `1px solid ${A.border}` }}>
+                  <td className="px-4 py-3 font-medium" style={{ color: A.textPrimary }}>{reseller.name}</td>
+                  <td className="px-4 py-3" style={{ color: A.textSecondary }}>{reseller.applicationDate || "—"}</td>
+                  <td className="px-4 py-3" style={{ color: A.textSecondary }}>{connectionType}</td>
+                  <td className="px-4 py-3" style={{ color: A.textSecondary }}>{getCoverageLabel(state, connectedEvents)}</td>
+                  <td className="px-4 py-3"><TextBadge value={admissionStatus} tone={admissionTone(admissionStatus)} /></td>
+                  <td className="px-4 py-3" style={{ color: A.textSecondary }}>{reseller.responsibleContact || reseller.contactPerson || "—"}</td>
+                  <td className="px-4 py-3" style={{ color: A.textSecondary }}>{reseller.applicationComment || "—"}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button type="button" onClick={() => updateAdmission(reseller, "Авторизован")} className="h-8 rounded-lg px-3 text-xs font-semibold" style={{ background: A.statusOkBg, color: A.statusOk }}>
+                        Одобрить
+                      </button>
+                      <button type="button" onClick={() => updateAdmission(reseller, "Требует доработки")} className="h-8 rounded-lg px-3 text-xs font-semibold" style={{ background: A.statusWarnBg, color: A.statusWarn }}>
+                        Вернуть на доработку
+                      </button>
+                      <button type="button" onClick={() => updateAdmission(reseller, "Приостановлен")} className="h-8 rounded-lg px-3 text-xs font-semibold" style={{ background: A.statusErrorBg, color: A.statusError }}>
+                        Приостановить
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-4 py-8 text-center text-sm" style={{ color: A.textMuted }}>Заявок операторов с выбранными параметрами нет.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

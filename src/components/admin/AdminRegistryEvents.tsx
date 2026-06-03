@@ -8,10 +8,12 @@ import HelpTooltip from "@/components/ui/help-tooltip";
 import { toast } from "sonner";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import SeatMapPreview from "@/components/seatmap/SeatMapPreview";
+import { getEventRegionCity, getRegionFilterOptions, isInAdminScope, type AdminRegionScope } from "./adminScope";
 
 interface Props {
   state: AppState;
   onUpdate: (s: AppState) => void;
+  regionScope?: AdminRegionScope;
 }
 
 function CardHelp({ text }: { text: string }) {
@@ -22,14 +24,29 @@ function CardHelp({ text }: { text: string }) {
   );
 }
 
-export default function AdminRegistryEvents({ state, onUpdate }: Props) {
+export default function AdminRegistryEvents({ state, onUpdate, regionScope = "all" }: Props) {
   const [search, setSearch] = useState("");
+  const [regionFilter, setRegionFilter] = useState("");
+  const [cityFilter, setCityFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [schemeFilter, setSchemeFilter] = useState("");
   const [drawer, setDrawer] = useState<EventRecord | null>(null);
   const [schemeEvent, setSchemeEvent] = useState<EventRecord | null>(null);
   const [confirmIssue, setConfirmIssue] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
+    const statusRank: Record<string, number> = { approved: 0, published: 1 };
     return state.events.filter((event) => {
+      const regionCity = getEventRegionCity(state, event);
+      if (!isInAdminScope(regionCity.region, regionScope)) return false;
+      if (regionFilter && regionCity.region !== regionFilter) return false;
+      if (cityFilter && regionCity.city !== cityFilter) return false;
+      if (statusFilter && event.status !== statusFilter) return false;
+      if (typeFilter && event.category !== typeFilter) return false;
+      const hasScheme = Boolean(event.eventSeats?.length || getSeatMapLayout(state, event.layoutId)?.layoutV2);
+      if (schemeFilter === "scheme" && !hasScheme) return false;
+      if (schemeFilter === "capacity" && hasScheme) return false;
       if (!search) return true;
       const s = search.toLowerCase();
       return (
@@ -37,8 +54,16 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
         event.title.toLowerCase().includes(s) ||
         event.venue.toLowerCase().includes(s)
       );
+    }).sort((a, b) => {
+      const rank = (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9);
+      if (rank !== 0) return rank;
+      return a.dateTime.localeCompare(b.dateTime);
     });
-  }, [search, state.events]);
+  }, [cityFilter, regionFilter, regionScope, schemeFilter, search, state, statusFilter, typeFilter]);
+
+  const regionOptions = useMemo(() => getRegionFilterOptions(state), [state]);
+  const cityOptions = useMemo(() => Array.from(new Set(state.events.map((event) => getEventRegionCity(state, event).city))).sort((a, b) => a.localeCompare(b, "ru")), [state]);
+  const typeOptions = useMemo(() => Array.from(new Set(state.events.map((event) => event.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ru")), [state.events]);
 
   const organizerNameById = useMemo(
     () => new Map(state.organizers.map((organizer) => [organizer.organizerId, organizer.name])),
@@ -83,7 +108,7 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search size={14} style={{ color: A.textMuted }} className="absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -97,6 +122,28 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
             <HelpTooltip text="Поиск работает по EventID, названию мероприятия и площадке." />
           </div>
         </div>
+        <select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
+          <option value="">Все регионы</option>
+          {regionOptions.map((region) => <option key={region} value={region}>{region}</option>)}
+        </select>
+        <select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
+          <option value="">Все города</option>
+          {cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}
+        </select>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
+          <option value="">Все статусы</option>
+          <option value="approved">Одобрено, не опубликовано</option>
+          <option value="published">Опубликовано</option>
+        </select>
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
+          <option value="">Все типы</option>
+          {typeOptions.map((type) => <option key={type} value={type}>{type}</option>)}
+        </select>
+        <select value={schemeFilter} onChange={(e) => setSchemeFilter(e.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
+          <option value="">Все схемы</option>
+          <option value="scheme">Есть схема</option>
+          <option value="capacity">Без схемы / вместимость</option>
+        </select>
       </div>
 
       <div style={{ background: A.cardBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.cardShadow }} className="relative overflow-hidden">
@@ -111,13 +158,14 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
             <table className="w-full table-fixed text-sm">
               <colgroup>
                 <col style={{ width: "8%" }} />
-                <col style={{ width: "24%" }} />
-                <col style={{ width: "14%" }} />
+                <col style={{ width: "19%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "10%" }} />
                 <col style={{ width: "12%" }} />
-                <col style={{ width: "15%" }} />
+                <col style={{ width: "12%" }} />
                 <col style={{ width: "7%" }} />
                 <col style={{ width: "9%" }} />
-                <col style={{ width: "11%" }} />
+                <col style={{ width: "9%" }} />
               </colgroup>
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
@@ -126,6 +174,7 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
                     "Название",
                     "Организатор",
                     "Дата",
+                    "Регион / город",
                     "Площадка",
                     "Остаток",
                     "Статус",
@@ -140,6 +189,8 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
               <tbody>
                 {filtered.map((event) => {
                   const chip = event.status === "published" ? statusChip("ok") : statusChip("info");
+                  const regionCity = getEventRegionCity(state, event);
+                  const hasScheme = Boolean(event.eventSeats?.length || getSeatMapLayout(state, event.layoutId)?.layoutV2);
                   return (
                     <tr
                       key={event.eventId}
@@ -153,7 +204,8 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
                       <td className="py-3 px-3 align-top leading-5" style={{ color: A.textPrimary }}><div className="break-words">{event.title}</div></td>
                       <td className="py-3 px-3 align-top leading-5" style={{ color: A.textSecondary }}>{organizerNameById.get(event.organizerId) || formatDisplayId(event.organizerId)}</td>
                       <td className="py-3 px-3 align-top text-xs" style={{ color: A.textSecondary }}>{event.dateTime?.replace("T", " ").slice(0, 16) || "—"}</td>
-                      <td className="py-3 px-3 align-top leading-5" style={{ color: A.textSecondary }}>{event.venue}</td>
+                      <td className="py-3 px-3 align-top leading-5" style={{ color: A.textSecondary }}>{regionCity.region}<br /><span className="text-xs">{regionCity.city}</span></td>
+                      <td className="py-3 px-3 align-top leading-5" style={{ color: A.textSecondary }}>{event.venue}<div className="mt-1 text-xs" style={{ color: hasScheme ? A.statusOk : A.textMuted }}>{hasScheme ? "Есть схема" : "Без схемы / параметры входа"}</div></td>
                       <td className="py-3 px-3 align-top" style={{ color: A.textPrimary }}>{event.remaining}</td>
                       <td className="py-3 px-3 align-top">
                         <span style={{ background: chip.bg, color: chip.color, borderRadius: 999 }} className="text-xs px-2.5 py-0.5 font-medium">
@@ -202,7 +254,12 @@ export default function AdminRegistryEvents({ state, onUpdate }: Props) {
                     <SeatMapPreview eventSeats={eventSeats} tiers={drawer.tiers} title="Схема зала" layoutV2={getLayoutV2(drawer)} />
                     <button onClick={() => setSchemeEvent(drawer)} className="rounded px-3 py-2 text-sm font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>Открыть схему</button>
                   </div>
-                ) : null;
+                ) : (
+                  <div className="rounded-lg border p-3 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
+                    <div className="font-semibold" style={{ color: A.textPrimary }}>Без схемы мест</div>
+                    <div className="mt-1 text-xs" style={{ color: A.textSecondary }}>Контроль выполняется по общей вместимости, входным параметрам и количеству выпущенных TicketID.</div>
+                  </div>
+                );
               })()}
               {(() => {
                 const compliance = complianceByEventId.get(drawer.eventId);

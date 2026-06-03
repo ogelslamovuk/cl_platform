@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { A } from "@/components/admin/adminStyles";
@@ -7,22 +7,23 @@ import AdminOrganizerApplications from "@/components/admin/AdminOrganizerApplica
 import AdminEventComplianceApplications from "@/components/admin/AdminEventComplianceApplications";
 import AdminTickets from "@/components/admin/AdminTickets";
 import AdminOperations from "@/components/admin/AdminOperations";
-import AdminResellers from "@/components/admin/AdminResellers";
+import AdminResellers, { AdminResellerApplications } from "@/components/admin/AdminResellers";
 import AdminControl from "@/components/admin/AdminControl";
 import AdminCalendar from "@/components/admin/AdminCalendar";
 import AdminDecisionLog from "@/components/admin/AdminDecisionLog";
 import { AdminOrgRegistry, AdminVenueRegistry } from "@/components/admin/AdminRegistries";
 import AdminReports from "@/components/admin/AdminReports";
 import AdminRegistryEvents from "@/components/admin/AdminRegistryEvents";
+import type { AdminRegionScope } from "@/components/admin/adminScope";
 import {
   LayoutDashboard, FileText, Calendar, ShieldAlert, BookOpen, Building2, MapPin,
-  Ticket, Activity, BarChart3, Bell, Zap, Network,
+  Ticket, Activity, BarChart3, Bell, Zap, Network, MapPinned,
 } from "lucide-react";
 
 type AdminTab =
   | "dashboard" | "calendar" | "control" | "decisions"
   | "organizerApplications" | "eventComplianceApplications"
-  | "orgRegistry" | "venueRegistry" | "registryEvents" | "tickets" | "operations" | "resellers" | "reports";
+  | "orgRegistry" | "venueRegistry" | "registryEvents" | "tickets" | "operations" | "resellers" | "resellerApplications" | "reports";
 
 const sidebarSections: { label?: string; items: { key: AdminTab; label: string; icon: React.ElementType }[] }[] = [
   {
@@ -33,8 +34,9 @@ const sidebarSections: { label?: string; items: { key: AdminTab; label: string; 
   {
     label: "Регулятор",
     items: [
+      { key: "eventComplianceApplications", label: "Заявки мероприятий", icon: FileText },
       { key: "organizerApplications", label: "Заявки организаторов", icon: FileText },
-      { key: "eventComplianceApplications", label: "Заявки на проведение мероприятий", icon: FileText },
+      { key: "resellerApplications", label: "Заявки операторов", icon: Network },
       { key: "calendar", label: "Календарь", icon: Calendar },
       { key: "control", label: "Контроль", icon: ShieldAlert },
       { key: "decisions", label: "Журнал решений", icon: BookOpen },
@@ -61,7 +63,8 @@ const sidebarSections: { label?: string; items: { key: AdminTab; label: string; 
 const tabTitles: Record<AdminTab, string> = {
   dashboard: "Дашборд",
   organizerApplications: "Заявки организаторов",
-  eventComplianceApplications: "Заявки на проведение мероприятий",
+  eventComplianceApplications: "Заявки мероприятий",
+  resellerApplications: "Заявки операторов",
   calendar: "Календарь мероприятий",
   control: "Контроль и нарушения",
   decisions: "Журнал решений",
@@ -77,7 +80,15 @@ const tabTitles: Record<AdminTab, string> = {
 export default function AdminPage() {
   const { state, update } = useStorageSync();
   const [tab, setTab] = useState<AdminTab>("dashboard");
+  const [adminRegionScope, setAdminRegionScope] = useState<AdminRegionScope>("all");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const syncTime = state.meta?.updatedAt ? new Date(state.meta.updatedAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
+  const notifications = useMemo(() => [
+    { id: "event-new", title: "Новая заявка мероприятия", text: `${state.eventComplianceApplications.filter((item) => item.status === "submitted").length} ожидают рассмотрения`, tab: "eventComplianceApplications" as AdminTab },
+    { id: "operator-new", title: "Заявка оператора", text: `${state.resellers.filter((item) => (item.admissionStatus || "Авторизован") === "На рассмотрении").length} на подключение`, tab: "resellerApplications" as AdminTab },
+    { id: "publish-waiting", title: "Событие ждёт публикации", text: `${state.events.filter((event) => event.status === "approved").length} одобренных событий`, tab: "registryEvents" as AdminTab },
+    { id: "checks-ready", title: "Проверки завершены", text: `${state.eventComplianceApplications.filter((app) => app.data.interagencyChecks?.some((check) => check.status === "Проверено")).length} заявок с обновлёнными проверками`, tab: "control" as AdminTab },
+  ], [state.eventComplianceApplications, state.events, state.resellers]);
 
   return (
     <div className="min-h-screen flex" style={{ background: A.pageBg, color: A.textPrimary }}>
@@ -158,30 +169,66 @@ export default function AdminPage() {
               <span className="text-xs" style={{ color: A.textMuted }}>{state.events.length} событий</span>
               <span className="text-xs" style={{ color: A.textMuted }}>{state.tickets.length} билетов</span>
             </div>
-            <button className="p-2 rounded-lg transition-colors" style={{ color: A.textSecondary }}
+            <div className="hidden lg:flex items-center gap-2 rounded-lg border px-2 py-1.5" style={{ borderColor: A.border, background: A.surfaceBg }}>
+              <MapPinned size={14} style={{ color: A.cyan }} />
+              <select
+                value={adminRegionScope}
+                onChange={(event) => setAdminRegionScope(event.target.value as AdminRegionScope)}
+                className="bg-transparent text-xs outline-none"
+                style={{ color: A.textPrimary }}
+                title="Режим доступа администратора"
+              >
+                <option value="all">Республиканский уровень / Супер-админ</option>
+                <option value="Могилёвская область">Региональный сотрудник · Могилёвская область</option>
+              </select>
+            </div>
+            <div className="relative">
+              <button className="p-2 rounded-lg transition-colors" style={{ color: A.textSecondary }}
+              onClick={() => setNotificationsOpen((value) => !value)}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-              <Bell size={16} />
-            </button>
+                <Bell size={16} />
+              </button>
+              {notificationsOpen && (
+                <div className="absolute right-0 mt-2 w-80 rounded-xl border p-3 shadow-2xl" style={{ background: A.cardBg, borderColor: A.borderGlass }}>
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: A.textMuted }}>Уведомления</div>
+                  <div className="space-y-2">
+                    {notifications.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => { setTab(item.tab); setNotificationsOpen(false); }}
+                        className="w-full rounded-lg border px-3 py-2 text-left"
+                        style={{ background: A.surfaceBg, borderColor: A.border, color: A.textPrimary }}
+                      >
+                        <span className="block text-sm font-semibold">{item.title}</span>
+                        <span className="mt-0.5 block text-xs" style={{ color: A.textSecondary }}>{item.text}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
         {/* Content */}
         <main className="p-6">
-          {tab === "dashboard" && <AdminDashboard state={state} onNavigate={setTab} />}
-          {tab === "organizerApplications" && <AdminOrganizerApplications state={state} onUpdate={update} />}
+          {tab === "dashboard" && <AdminDashboard state={state} onNavigate={setTab} regionScope={adminRegionScope} />}
+          {tab === "organizerApplications" && <AdminOrganizerApplications state={state} onUpdate={update} regionScope={adminRegionScope} />}
           {tab === "eventComplianceApplications" && (
-            <AdminEventComplianceApplications state={state} onUpdate={update} />
+            <AdminEventComplianceApplications state={state} onUpdate={update} regionScope={adminRegionScope} />
           )}
           {tab === "calendar" && <AdminCalendar state={state} />}
-          {tab === "control" && <AdminControl state={state} />}
-          {tab === "decisions" && <AdminDecisionLog state={state} />}
-          {tab === "orgRegistry" && <AdminOrgRegistry state={state} />}
-          {tab === "venueRegistry" && <AdminVenueRegistry state={state} onUpdate={update} />}
-          {tab === "registryEvents" && <AdminRegistryEvents state={state} onUpdate={update} />}
+          {tab === "control" && <AdminControl state={state} regionScope={adminRegionScope} />}
+          {tab === "decisions" && <AdminDecisionLog state={state} regionScope={adminRegionScope} />}
+          {tab === "orgRegistry" && <AdminOrgRegistry state={state} regionScope={adminRegionScope} />}
+          {tab === "venueRegistry" && <AdminVenueRegistry state={state} onUpdate={update} regionScope={adminRegionScope} />}
+          {tab === "registryEvents" && <AdminRegistryEvents state={state} onUpdate={update} regionScope={adminRegionScope} />}
           {tab === "tickets" && <AdminTickets state={state} />}
           {tab === "operations" && <AdminOperations state={state} />}
-          {tab === "resellers" && <AdminResellers state={state} onUpdate={update} />}
+          {tab === "resellerApplications" && <AdminResellerApplications state={state} onUpdate={update} regionScope={adminRegionScope} />}
+          {tab === "resellers" && <AdminResellers state={state} onUpdate={update} regionScope={adminRegionScope} />}
           {tab === "reports" && <AdminReports state={state} />}
         </main>
       </div>

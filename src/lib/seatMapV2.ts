@@ -270,7 +270,7 @@ export function createGrandTheatreLayoutV2(): SeatMapLayoutV2 {
   return {
     version: 2,
     layoutId: COMPLEX_THEATRE_LAYOUT_ID,
-    name: "Grand Theatre V2",
+    name: "Большая концертная сцена",
     style: "theatre",
     width: 1220,
     height: 790,

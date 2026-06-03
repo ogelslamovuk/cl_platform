@@ -31,7 +31,7 @@ import {
   topUpOrganizerBalance,
   updateEventComplianceApplication,
 } from "@/lib/store";
-import type { EventInteragencyCheck, EventPerformer, EventSeat, PriceTier } from "@/lib/store";
+import type { EventInteragencyCheck, EventParticipantMember, EventPerformer, EventSeat, PriceTier } from "@/lib/store";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import SeatTariffSummary from "@/components/seatmap/SeatTariffSummary";
 import {
@@ -79,6 +79,17 @@ const DEFAULT_CHECKS: EventInteragencyCheck[] = [
 ];
 
 type StepStatus = "Не заполнено" | "Черновик" | "Заполнено" | "Требует внимания";
+type DocumentPreview = { title: string; fileName: string; rows: [string, string][] } | null;
+type ParticipantRow = {
+  id: string;
+  name: string;
+  country: string;
+  role: string;
+  type: string;
+  documentName: string;
+  checkStatus: string;
+  parent?: string;
+};
 
 function resolvePublicAsset(path: string): string {
   if (!path) return "";
@@ -124,6 +135,10 @@ function makePerformer(name = "", country = "Беларусь"): EventPerformer 
     country,
     representative: "",
     comment: "",
+    role: foreign ? "приглашённый исполнитель" : "исполнитель",
+    participationType: "физическое лицо",
+    documentName: foreign ? "passport_foreign_participant_mock.pdf" : "participant_id_mock.pdf",
+    checkStatus: foreign ? "проверка миграционного статуса" : "проверка МВД",
     documentStatus: foreign ? "макет документа иностранного участника приложен" : "макет документа участника приложен",
     documentNote: foreign ? "Проверка через демо-контекст миграционных документов." : "Проверка по демо-пакету документов участника.",
   };
@@ -134,6 +149,32 @@ function ensureChecks(rows?: EventInteragencyCheck[]): EventInteragencyCheck[] {
   return DEFAULT_CHECKS.map((fallback) => {
     const existing = source.find((row) => row.checkId === fallback.checkId);
     return { ...fallback, ...existing };
+  });
+}
+
+function flattenParticipantRows(performers: EventPerformer[]): ParticipantRow[] {
+  return performers.flatMap((performer, performerIndex) => {
+    if (performer.members?.length) {
+      return performer.members.map((member, memberIndex) => ({
+        id: member.memberId || `${performerIndex}-${memberIndex}`,
+        name: member.name,
+        country: member.country,
+        role: member.role || performer.role || "участник коллектива",
+        type: "физическое лицо в составе коллектива",
+        documentName: member.documentName || performer.documentName || "participant_id_mock.pdf",
+        checkStatus: member.checkStatus || performer.checkStatus || "проверка МВД",
+        parent: performer.name,
+      }));
+    }
+    return [{
+      id: `${performerIndex}-${performer.name}`,
+      name: performer.name || "Без имени",
+      country: performer.country || "Беларусь",
+      role: performer.role || "исполнитель",
+      type: performer.participationType || (performer.performerType === "group" ? "коллектив" : "физическое лицо"),
+      documentName: performer.documentName || "participant_id_mock.pdf",
+      checkStatus: performer.checkStatus || "проверка МВД",
+    }];
   });
 }
 
@@ -161,6 +202,7 @@ export default function OrganizerEventCompliancePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(0);
   const [seatMapOpen, setSeatMapOpen] = useState(false);
+  const [documentPreview, setDocumentPreview] = useState<DocumentPreview>(null);
   const [performerDraft, setPerformerDraft] = useState({ name: "", country: "Беларусь" });
   const salesOperators = useMemo(() => state.resellers, [state.resellers]);
   const approvedVenues = useMemo(() => state.venueRegistry.filter((venue) => venue.status === "approved"), [state.venueRegistry]);
@@ -168,7 +210,17 @@ export default function OrganizerEventCompliancePage() {
   const selectedHall = selectedVenue?.halls.find((hall) => hall.hallId === form.hallId) || null;
   const selectedLayout = getSeatMapLayout(state, form.layoutId);
   const hasSeatMap = Boolean(selectedLayout && selectedHall?.hasSeatMap);
+  const selectedVenueRegionCity = {
+    region: selectedVenue?.region || "—",
+    city: selectedVenue?.city || "—",
+  };
   const eventTypePath = form.eventTypePath || [];
+  const participantRows = useMemo<ParticipantRow[]>(() => flattenParticipantRows(form.performers), [form.performers]);
+  const foreignParticipants = useMemo(() => participantRows.filter((participant) => participant.country !== "Беларусь"), [participantRows]);
+  const venueContractDocument = useMemo(
+    () => form.eventDocuments.find((file) => file.kind === "venue-contract") || null,
+    [form.eventDocuments]
+  );
   const complianceStatusLabel: Record<string, string> = {
     draft: "Черновик",
     submitted: "На рассмотрении",
@@ -348,6 +400,19 @@ export default function OrganizerEventCompliancePage() {
     setForm((prev) => ({ ...prev, [target]: [...prev[target], file] }));
   }
 
+  function openDocumentPreview(title: string, fileName: string, extraRows: [string, string][] = []) {
+    setDocumentPreview({
+      title,
+      fileName,
+      rows: [
+        ["Файл", fileName],
+        ["Статус", "Демо-макет приложен"],
+        ["Источник", "Локальный прототип, без персональных данных"],
+        ...extraRows,
+      ],
+    });
+  }
+
   function ensureEditableApplicationForPayment(): string | null {
     if (editingId) return editingId;
     const payload = normalizeFormPayload();
@@ -500,9 +565,24 @@ export default function OrganizerEventCompliancePage() {
       projectedCapacity: hall?.capacity || selectedDemoVenue?.capacity || 220,
       eventSeats: layout ? buildEventSeatsFromLayout(layout, tiers) : [],
       performers: [
-        makePerformer("Ансамбль «Спадчына»"),
-        makePerformer("Мария Ковалёва"),
-        makePerformer("Гость программы", "Польша"),
+        {
+          ...makePerformer("Ансамбль «Спадчына»"),
+          performerType: "group",
+          role: "музыкальный коллектив",
+          participationType: "коллектив",
+          documentName: "group_roster_mock.pdf",
+          checkStatus: "состав коллектива проверен",
+          documentStatus: "макет списка участников приложен",
+          documentNote: "Список коллектива содержит только демонстрационные ФИО.",
+          members: [
+            { memberId: "spadchyna-1", name: "Алексей Миронов", country: "Беларусь", role: "солист", documentName: "participant_mironov_mock.pdf", checkStatus: "проверка МВД пройдена" },
+            { memberId: "spadchyna-2", name: "Наталья Орлова", country: "Беларусь", role: "вокал", documentName: "participant_orlova_mock.pdf", checkStatus: "проверка МВД пройдена" },
+            { memberId: "spadchyna-3", name: "Виктор Савицкий", country: "Беларусь", role: "клавишные", documentName: "participant_savitsky_mock.pdf", checkStatus: "проверка МВД пройдена" },
+          ] satisfies EventParticipantMember[],
+        },
+        { ...makePerformer("Мария Ковалёва"), documentName: "participant_kovaleva_mock.pdf", checkStatus: "проверка МВД пройдена" },
+        { ...makePerformer("Гость программы", "Польша"), documentName: "passport_foreign_guest_mock.pdf", checkStatus: "миграционный статус подтверждён" },
+        { ...makePerformer("Сергей Титов"), role: "технический директор", participationType: "технический персонал", documentName: "staff_titov_mock.pdf", checkStatus: "допуск к площадке подтверждён" },
       ],
       onlyBelarusianPerformers: false,
       hasForeignPerformers: true,
@@ -600,6 +680,37 @@ export default function OrganizerEventCompliancePage() {
           </div>
         </div>
 
+        <section className="grid gap-3 rounded-2xl border p-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]" style={{ borderColor: "rgba(96,165,250,0.24)", background: "rgba(15,22,32,0.92)" }}>
+          <div>
+            <div className="text-xs uppercase tracking-wide" style={{ color: "rgba(147,197,253,0.88)" }}>Текущая заявка мероприятия</div>
+            <h2 className="mt-2 text-xl font-semibold">{form.title || "Новое мероприятие"}</h2>
+            <div className="mt-2 grid gap-2 text-sm md:grid-cols-2" style={{ color: "rgba(245,247,250,0.72)" }}>
+              <span>{eventTypePath.length ? eventTypePath.join(" / ") : "Тип не выбран"}</span>
+              <span>{form.dateSlots.filter(Boolean)[0]?.replace("T", " ") || "Дата не указана"}</span>
+              <span>{form.venueName || "Площадка не выбрана"}</span>
+              <span>{selectedVenueRegionCity.region !== "—" ? `${selectedVenueRegionCity.region}, ${selectedVenueRegionCity.city}` : "Регион появится после выбора площадки"}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+              <div style={{ color: "rgba(245,247,250,0.60)" }}>Участники</div>
+              <div className="mt-1 text-lg font-semibold">{participantRows.length}</div>
+            </div>
+            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+              <div style={{ color: "rgba(245,247,250,0.60)" }}>Билеты</div>
+              <div className="mt-1 text-lg font-semibold">{hasSeatMap ? seatCounts.assigned : totalPlannedTickets}</div>
+            </div>
+            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+              <div style={{ color: "rgba(245,247,250,0.60)" }}>Пошлина</div>
+              <div className="mt-1 text-lg font-semibold">{formatMoney(feeAmount)}</div>
+            </div>
+            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+              <div style={{ color: "rgba(245,247,250,0.60)" }}>Готовность</div>
+              <div className="mt-1 text-lg font-semibold">{canSubmit ? "готова" : `${requiredMissing.length}`}</div>
+            </div>
+          </div>
+        </section>
+
         <section className="grid gap-2 md:grid-cols-3 xl:grid-cols-9">
           {WIZARD_STEPS.map((label, index) => {
             const active = activeStep === index;
@@ -688,41 +799,90 @@ export default function OrganizerEventCompliancePage() {
 
           {activeStep === 1 && (
             <div className="space-y-4">
-              <FieldHelp text="Опишите программу, порядок проведения и ключевые блоки мероприятия.">
-                <textarea className="w-full min-h-28 rounded px-3 py-2 pr-9 bg-[#111A24] border" placeholder="Программа мероприятия" value={form.program} onChange={(e) => updateForm({ program: e.target.value })} />
-              </FieldHelp>
-              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_auto]">
-                <FieldHelp text="Фамилия, имя или название коллектива участника.">
-                  <input className="h-10 w-full rounded px-3 pr-9 bg-[#111A24] border" placeholder="Участник или исполнитель" value={performerDraft.name} onChange={(e) => setPerformerDraft((prev) => ({ ...prev, name: e.target.value }))} />
-                </FieldHelp>
-                <FieldHelp text="Для иностранного участника показывается отдельный демо-контекст документов.">
-                  <select className="h-10 w-full rounded px-3 pr-9 bg-[#111A24] border" value={performerDraft.country} onChange={(e) => setPerformerDraft((prev) => ({ ...prev, country: e.target.value }))}>
-                    <option value="Беларусь">Беларусь</option>
-                    <option value="Польша">Польша</option>
-                    <option value="Литва">Литва</option>
-                    <option value="Армения">Армения</option>
-                  </select>
-                </FieldHelp>
-                <span className="inline-flex items-center gap-1">
-                  <button type="button" className="h-10 rounded bg-[#1d2a3b] px-3" onClick={addPerformer}>Добавить</button>
-                  <HelpTooltip text="Добавить участника в список. Лимит ручного добавления - 10 участников." />
-                </span>
-              </div>
-              <div className="text-xs" style={{ color: "rgba(245,247,250,0.65)" }}>Добавлено участников: {form.performers.length} из {MAX_PERFORMERS}</div>
-              <div className="space-y-2">
-                {form.performers.map((performer, index) => (
-                  <div key={`${performer.name}-${index}`} className="rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-semibold">{performer.name || "Без имени"}</div>
-                        <div className="text-xs opacity-70">{performer.country} · {performer.documentStatus || "макет документа приложен"}</div>
-                        <div className="mt-1 text-xs opacity-70">{performer.documentNote || "Демо-проверка документов без реальных паспортных данных."}</div>
-                      </div>
-                      <button type="button" className="rounded bg-[#1d2a3b] px-2 py-1 text-xs" onClick={() => updateForm({ performers: form.performers.filter((_, rowIndex) => rowIndex !== index) })}>Удалить</button>
-                    </div>
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+                <div className="space-y-4">
+                  <FieldHelp text="Опишите программу, порядок проведения и ключевые блоки мероприятия.">
+                    <textarea className="w-full min-h-32 rounded px-3 py-2 pr-9 bg-[#111A24] border" placeholder="Программа мероприятия" value={form.program} onChange={(e) => updateForm({ program: e.target.value })} />
+                  </FieldHelp>
+                  <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_auto]">
+                    <FieldHelp text="Фамилия, имя или название коллектива участника.">
+                      <input className="h-10 w-full rounded px-3 pr-9 bg-[#111A24] border" placeholder="Участник или исполнитель" value={performerDraft.name} onChange={(e) => setPerformerDraft((prev) => ({ ...prev, name: e.target.value }))} />
+                    </FieldHelp>
+                    <FieldHelp text="Для иностранного участника показывается отдельный демо-контекст документов.">
+                      <select className="h-10 w-full rounded px-3 pr-9 bg-[#111A24] border" value={performerDraft.country} onChange={(e) => setPerformerDraft((prev) => ({ ...prev, country: e.target.value }))}>
+                        <option value="Беларусь">Беларусь</option>
+                        <option value="Польша">Польша</option>
+                        <option value="Литва">Литва</option>
+                        <option value="Армения">Армения</option>
+                      </select>
+                    </FieldHelp>
+                    <span className="inline-flex items-center gap-1">
+                      <button type="button" className="h-10 rounded bg-[#1d2a3b] px-3" onClick={addPerformer}>Добавить</button>
+                      <HelpTooltip text="Добавить участника в список. Лимит ручного добавления - 10 участников." />
+                    </span>
                   </div>
-                ))}
-                {!form.performers.length && <div className="text-sm opacity-70">Участники пока не добавлены.</div>}
+                </div>
+                <div className="rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
+                  <div className="font-semibold">Карточка программы</div>
+                  <div className="mt-3 grid gap-2">
+                    <InfoLine label="Тип" value={eventTypePath.join(" / ") || "не выбран"} />
+                    <InfoLine label="Возраст" value={form.ageCategory} />
+                    <InfoLine label="Материалы" value={form.eventDocuments.length ? `${form.eventDocuments.length} файла` : "макеты будут приложены"} />
+                    <DocumentCard
+                      title="Программа мероприятия"
+                      fileName="program_outline_mock.pdf"
+                      onOpen={() => openDocumentPreview("Программа мероприятия", "program_outline_mock.pdf", [["Содержание", form.program || "Краткая программа будет сформирована из описания."]])}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">Участники и документы</div>
+                    <div className="mt-1 text-xs opacity-70">Добавлено участников: {form.performers.length} из {MAX_PERFORMERS}; физических лиц в проверке: {participantRows.length}</div>
+                  </div>
+                  <div className="text-xs" style={{ color: foreignParticipants.length ? "#FBBF24" : "rgba(52,211,153,0.95)" }}>
+                    {foreignParticipants.length ? `Иностранные участники: ${foreignParticipants.length}` : "Только белорусские участники"}
+                  </div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {form.performers.map((performer, index) => (
+                    <div key={`${performer.name}-${index}`} className="rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#0F1620" }}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold">{performer.name || "Без имени"}</div>
+                          <div className="text-xs opacity-70">{performer.participationType || performer.performerType} · {performer.country} · {performer.documentStatus || "макет документа приложен"}</div>
+                          <div className="mt-1 text-xs opacity-70">{performer.documentNote || "Демо-проверка документов без реальных паспортных данных."}</div>
+                        </div>
+                        <button type="button" className="rounded bg-[#1d2a3b] px-2 py-1 text-xs" onClick={() => updateForm({ performers: form.performers.filter((_, rowIndex) => rowIndex !== index) })}>Удалить</button>
+                      </div>
+                      {performer.members?.length ? (
+                        <div className="mt-3 grid gap-2 md:grid-cols-2">
+                          {performer.members.map((member) => (
+                            <DocumentCard
+                              key={member.memberId}
+                              title={`${member.name} · ${member.role || "участник"}`}
+                              fileName={member.documentName || "participant_id_mock.pdf"}
+                              caption={`${member.country} · ${member.checkStatus || "проверка МВД"}`}
+                              onOpen={() => openDocumentPreview("Документ участника коллектива", member.documentName || "participant_id_mock.pdf", [["ФИО", member.name], ["Гражданство", member.country], ["Коллектив", performer.name]])}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-3">
+                          <DocumentCard
+                            title={`${performer.name || "Участник"} · ${performer.role || "исполнитель"}`}
+                            fileName={performer.documentName || "participant_id_mock.pdf"}
+                            caption={`${performer.country} · ${performer.checkStatus || "проверка МВД"}`}
+                            onOpen={() => openDocumentPreview("Документ участника", performer.documentName || "participant_id_mock.pdf", [["ФИО", performer.name || "—"], ["Гражданство", performer.country || "—"], ["Роль", performer.role || "исполнитель"]])}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {!form.performers.length && <div className="text-sm opacity-70">Участники пока не добавлены.</div>}
+                </div>
               </div>
             </div>
           )}
@@ -791,18 +951,49 @@ export default function OrganizerEventCompliancePage() {
                 </div>
                 <div className="grid gap-2 md:grid-cols-3">
                   {(["требуется", "образец", "приложен"] as const).map((status) => (
-                    <label key={status} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "rgba(255,255,255,0.12)" }}>
-                      <input type="radio" checked={(form.venueContractStatus || "требуется") === status} onChange={() => {
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => {
                         updateForm({
                           venueContractStatus: status,
                           eventDocuments: status === "приложен" && !form.eventDocuments.some((doc) => doc.kind === "venue-contract")
                             ? [...form.eventDocuments, mockAttachment("venue-contract", "Договор с площадкой", true)]
                             : form.eventDocuments,
                         });
-                      }} />
+                      }}
+                      className="rounded-lg border px-3 py-2 text-left text-sm"
+                      style={{
+                        borderColor: (form.venueContractStatus || "требуется") === status ? "rgba(242,201,76,0.65)" : "rgba(255,255,255,0.12)",
+                        background: (form.venueContractStatus || "требуется") === status ? "rgba(242,201,76,0.10)" : "#0F1620",
+                      }}
+                    >
                       {status}
-                    </label>
+                    </button>
                   ))}
+                </div>
+                <div className="mt-3">
+                  {(form.venueContractStatus === "приложен" || venueContractDocument) ? (
+                    <DocumentCard
+                      title="Договор с площадкой"
+                      fileName={venueContractDocument?.name || "venue_contract_mock.pdf"}
+                      caption={`${form.venueName || "Площадка не выбрана"} · ${selectedVenueRegionCity.region}`}
+                      onOpen={() => openDocumentPreview("Договор с площадкой", venueContractDocument?.name || "venue_contract_mock.pdf", [["Площадка", form.venueName || "—"], ["Адрес", form.venueAddress || "—"], ["Статус", form.venueContractStatus || "требуется"]])}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => updateForm({
+                        venueContractStatus: "приложен",
+                        eventDocuments: [...form.eventDocuments, mockAttachment("venue-contract", "Договор с площадкой", true)],
+                      })}
+                      className="flex w-full flex-col items-center justify-center rounded-xl border border-dashed px-4 py-6 text-sm"
+                      style={{ borderColor: "rgba(96,165,250,0.35)", background: "rgba(59,130,246,0.08)", color: "rgba(219,234,254,0.96)" }}
+                    >
+                      Приложить mock-договор с площадкой
+                      <span className="mt-1 text-xs opacity-70">Зона загрузки без генерации договора</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -814,7 +1005,7 @@ export default function OrganizerEventCompliancePage() {
                 <p className="text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>
                   {hasSeatMap ? "Для события со схемой количество считается по назначенным местам." : "Количество билетов и стоимость задаются по каждому тарифу отдельно."}
                 </p>
-                <HelpTooltip text="Используется текущий конструктор схемы зала и тарифов. Новый конструктор не создаётся." />
+                <HelpTooltip text="Тарифы — это ценовые категории билетов. Продажи здесь не запускаются; для зала со схемой тариф назначается конкретным местам на текущей схеме." />
               </div>
               <div className="space-y-2">
                 {form.ticketTiers.map((tier, idx) => {
@@ -947,11 +1138,57 @@ export default function OrganizerEventCompliancePage() {
                 <span className="inline-flex items-center gap-1"><button className="h-9 rounded bg-[#1d2a3b] px-3" onClick={() => batchSetChecks("В обработке")}>Отправить на проверку</button><HelpTooltip text="Перевести демонстрационные проверки в обработку без реальных интеграций." /></span>
                 <span className="inline-flex items-center gap-1"><button className="h-9 rounded bg-[#1d2a3b] px-3" onClick={() => batchSetChecks("Проверено")}>Обновить статус</button><HelpTooltip text="Обновить статусы проверок для демонстрации прохождения." /></span>
               </div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <CheckScenarioCard
+                  title="МВД · участники"
+                  status={ensureChecks(form.interagencyChecks).find((row) => row.checkId === "mvd")?.status || "Не отправлено"}
+                  rows={[
+                    ["Физические лица", String(participantRows.length)],
+                    ["Коллективы", String(form.performers.filter((performer) => performer.performerType === "group").length)],
+                    ["Документы", participantRows.length ? "mock-пакет приложен" : "нет участников"],
+                  ]}
+                  actionLabel="Открыть участников"
+                  onAction={() => setActiveStep(1)}
+                />
+                <CheckScenarioCard
+                  title="Миграция · иностранные участники"
+                  status={ensureChecks(form.interagencyChecks).find((row) => row.checkId === "migration")?.status || "Не отправлено"}
+                  rows={[
+                    ["Иностранные лица", String(foreignParticipants.length)],
+                    ["Страны", foreignParticipants.length ? Array.from(new Set(foreignParticipants.map((row) => row.country))).join(", ") : "не заявлены"],
+                    ["Документы", foreignParticipants.length ? "паспорта/основания приложены" : "проверка не требуется"],
+                  ]}
+                  actionLabel="Проверить список"
+                  onAction={() => setActiveStep(1)}
+                />
+                <CheckScenarioCard
+                  title="Минкульт / экспертная проверка"
+                  status={ensureChecks(form.interagencyChecks).find((row) => row.checkId === "culture")?.status || "Не отправлено"}
+                  rows={[
+                    ["Программа", form.program ? "описана" : "не заполнена"],
+                    ["Возрастная категория", form.ageCategory],
+                    ["Категория", eventTypePath.join(" / ") || "не выбрана"],
+                  ]}
+                  actionLabel="Открыть программу"
+                  onAction={() => setActiveStep(1)}
+                />
+                <CheckScenarioCard
+                  title="Региональный орган / исполком"
+                  status={ensureChecks(form.interagencyChecks).find((row) => row.checkId === "executive")?.status || "Не отправлено"}
+                  rows={[
+                    ["Регион", selectedVenueRegionCity.region],
+                    ["Город", selectedVenueRegionCity.city],
+                    ["Площадка", form.venueName || "не выбрана"],
+                    ["Вместимость", String(form.projectedCapacity || "—")],
+                  ]}
+                  actionLabel="Открыть площадку"
+                  onAction={() => setActiveStep(3)}
+                />
+              </div>
               <div className="grid gap-3 md:grid-cols-2">
                 {ensureChecks(form.interagencyChecks).map((row) => (
                   <div key={row.checkId} className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
                     <div className="font-semibold">{row.agency}</div>
-                    <div className="mt-1 text-xs opacity-70">{row.subject}</div>
                     <FieldHelp text="Статус демонстрационной межведомственной проверки. Реальная интеграция не выполняется.">
                       <select className="mt-3 h-10 w-full rounded px-3 pr-9 bg-[#0F1620] border" value={row.status} onChange={(e) => setCheckStatus(row.checkId, e.target.value as EventInteragencyCheck["status"])}>
                         {["Не отправлено", "Отправлено", "В обработке", "Проверено", "Требует уточнения"].map((status) => <option key={status} value={status}>{status}</option>)}
@@ -970,8 +1207,8 @@ export default function OrganizerEventCompliancePage() {
                 <div className="grid gap-3 md:grid-cols-3">
                   <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
                     <div className="inline-flex items-center gap-1 text-xs opacity-75">Начислено <HelpTooltip text={COMPLIANCE_FEE_TOOLTIP} /></div>
-                    <div className="mt-2 text-xl font-semibold">{fee} БВ</div>
-                    <div className="mt-1 text-xs opacity-70">{formatMoney(feeAmount)}</div>
+                    <div className="mt-2 text-xl font-semibold">{formatMoney(feeAmount)}</div>
+                    <div className="mt-1 text-xs opacity-70">{fee} базовых величин</div>
                   </div>
                   <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
                     <div className="inline-flex items-center gap-1 text-xs opacity-75">Текущий баланс <HelpTooltip text="Баланс финансового счёта организатора, доступный для оплаты обязательных пошлин." /></div>
@@ -984,13 +1221,20 @@ export default function OrganizerEventCompliancePage() {
                     <div className="mt-1 text-xs opacity-70">{paymentStatus === "Оплачено" ? "Одобрение будет доступно после подачи." : "Подать заявку можно, одобрение откроется после оплаты."}</div>
                   </div>
                 </div>
-                <FieldHelp text="Укажите дату начала реализации билетов.">
-                  <input className="h-10 w-full rounded px-3 pr-9 bg-[#0F1620] border" type="date" value={form.salesStartDate} onChange={(e) => updateForm({ salesStartDate: e.target.value })} />
-                </FieldHelp>
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.feeExempt} onChange={(e) => updateForm({ feeExempt: e.target.checked })} /> Освобождён от пошлины <HelpTooltip text="Отметьте, если госпошлина не требуется по закону." /></label>
-                <FieldHelp text="Укажите основание освобождения от госпошлины.">
-                  <input className="h-10 w-full rounded px-3 pr-9 bg-[#0F1620] border" placeholder="Основание освобождения" value={form.feeExemptReason} onChange={(e) => updateForm({ feeExemptReason: e.target.value })} />
-                </FieldHelp>
+                <label className="block text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>
+                  <span className="mb-1 inline-flex items-center gap-1">Дата начала реализации билетов <HelpTooltip text="Дата, с которой организатор планирует открыть продажу билетов после согласования." /></span>
+                  <input className="h-10 w-full rounded px-3 bg-[#0F1620] border" type="date" value={form.salesStartDate} onChange={(e) => updateForm({ salesStartDate: e.target.value })} />
+                </label>
+                <div className="rounded-xl border p-3" style={{ borderColor: form.feeExempt ? "rgba(52,211,153,0.35)" : "rgba(255,255,255,0.12)", background: form.feeExempt ? "rgba(52,211,153,0.10)" : "#0F1620" }}>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={form.feeExempt} onChange={(e) => updateForm({ feeExempt: e.target.checked })} />
+                    Освобождение от пошлины заявлено
+                    <HelpTooltip text="Отметьте, если госпошлина не требуется по закону; основание будет видно Центру Управления." />
+                  </label>
+                  <FieldHelp text="Укажите основание освобождения от госпошлины.">
+                    <input className="mt-3 h-10 w-full rounded px-3 pr-9 bg-[#111A24] border" placeholder="Основание освобождения" value={form.feeExemptReason} onChange={(e) => updateForm({ feeExemptReason: e.target.value })} />
+                  </FieldHelp>
+                </div>
                 {paymentStatus === "Недостаточно средств" && (
                   <div className="rounded-xl border px-3 py-2 text-sm" style={{ borderColor: "rgba(251,191,36,0.45)", background: "rgba(251,191,36,0.10)", color: "#FBBF24" }}>
                     Недостаточно средств. Пополните счёт и повторите оплату.
@@ -1040,10 +1284,10 @@ export default function OrganizerEventCompliancePage() {
             <div className="space-y-4">
               <div className="grid gap-2 md:grid-cols-3">
                 {WIZARD_STEPS.map((label, index) => (
-                  <div key={label} className="rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
+                  <button key={label} type="button" onClick={() => setActiveStep(index)} className="rounded-xl border p-3 text-left text-sm transition" style={{ borderColor: stepStatuses[index] === "Требует внимания" ? "rgba(251,191,36,0.45)" : "rgba(255,255,255,0.12)", background: "#111A24" }}>
                     <div className="font-semibold">{label}</div>
                     <div className="mt-1 text-xs opacity-70">{stepStatuses[index]}</div>
-                  </div>
+                  </button>
                 ))}
               </div>
               <SummaryRow label="Тип мероприятия" value={eventTypePath.join(" / ") || "—"} />
@@ -1063,7 +1307,7 @@ export default function OrganizerEventCompliancePage() {
               <SummaryRow label="Проверки" value={ensureChecks(form.interagencyChecks).map((row) => `${row.agency}: ${row.status}`).join("; ")} />
               <SummaryRow label="Пошлина" value={`${paymentStatus} · ${formatMoney(feeAmount)}`} />
               <div className="rounded-xl border p-3" style={{ borderColor: canSubmit ? "rgba(52,211,153,0.35)" : "rgba(251,191,36,0.35)", background: canSubmit ? "rgba(52,211,153,0.10)" : "rgba(251,191,36,0.10)" }}>
-                {canSubmit ? "Обязательный минимум заполнен. Заявку можно подать на рассмотрение." : `Не заполнено: ${requiredMissing.join(", ")}.`}
+                {canSubmit ? "Заявка готова к подаче" : `Заявка не готова к подаче. Не заполнены: ${requiredMissing.join(", ")}.`}
               </div>
             </div>
           )}
@@ -1082,10 +1326,12 @@ export default function OrganizerEventCompliancePage() {
             <button className="px-4 h-10 rounded bg-[#1d2a3b]" onClick={nextStep} disabled={activeStep === WIZARD_STEPS.length - 1}>Далее</button>
             <HelpTooltip text="Перейти к следующему этапу. Заполнение можно вести в любом порядке." />
           </span>
-          <span className="inline-flex items-center gap-1">
-            <button className="px-4 h-10 rounded font-semibold disabled:opacity-50" style={{ background: "#F2C94C", color: "#111" }} onClick={() => save(true)} disabled={!canSubmit}>Подать на рассмотрение</button>
-            <HelpTooltip text="Отправить заполненную заявку в Центр Управления. Черновики там не отображаются." />
-          </span>
+          {activeStep === WIZARD_STEPS.length - 1 && (
+            <span className="inline-flex items-center gap-1">
+              <button className="px-4 h-10 rounded font-semibold disabled:opacity-50" style={{ background: "#F2C94C", color: "#111" }} onClick={() => save(true)} disabled={!canSubmit}>Подать на рассмотрение</button>
+              <HelpTooltip text="Отправить заполненную заявку в Центр Управления. Черновики там не отображаются." />
+            </span>
+          )}
         </div>
 
         <section className="space-y-2">
@@ -1129,6 +1375,7 @@ export default function OrganizerEventCompliancePage() {
           )}
         </section>
       </div>
+      <DocumentPreviewModal preview={documentPreview} onClose={() => setDocumentPreview(null)} />
       <SeatMapModal
         open={seatMapOpen}
         title="Назначение тарифов на схеме"
@@ -1172,6 +1419,73 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
     <div className="grid gap-1 rounded-xl border p-3 text-sm md:grid-cols-[220px_minmax(0,1fr)]" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
       <div className="opacity-70">{label}</div>
       <div>{value}</div>
+    </div>
+  );
+}
+
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[98px_minmax(0,1fr)] gap-2 text-xs">
+      <span className="opacity-60">{label}</span>
+      <span className="font-medium">{value || "—"}</span>
+    </div>
+  );
+}
+
+function DocumentCard({ title, fileName, caption, onOpen }: { title: string; fileName: string; caption?: string; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full rounded-xl border p-3 text-left transition hover:border-blue-300"
+      style={{ borderColor: "rgba(96,165,250,0.28)", background: "rgba(59,130,246,0.08)" }}
+    >
+      <span className="block text-sm font-semibold">{title}</span>
+      <span className="mt-1 block font-mono text-xs" style={{ color: "rgba(191,219,254,0.96)" }}>{fileName}</span>
+      {caption && <span className="mt-1 block text-xs opacity-70">{caption}</span>}
+      <span className="mt-2 inline-flex rounded-full px-2 py-0.5 text-[11px]" style={{ background: "rgba(52,211,153,0.14)", color: "#A7F3D0" }}>Просмотреть</span>
+    </button>
+  );
+}
+
+function CheckScenarioCard({ title, status, rows, actionLabel, onAction }: { title: string; status: string; rows: [string, string][]; actionLabel: string; onAction: () => void }) {
+  const tone = status === "Проверено" ? "rgba(52,211,153,0.35)" : status === "Требует уточнения" ? "rgba(251,191,36,0.45)" : "rgba(96,165,250,0.30)";
+  return (
+    <div className="rounded-xl border p-3" style={{ borderColor: tone, background: "#111A24" }}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-semibold">{title}</div>
+          <div className="mt-1 text-xs opacity-70">{status}</div>
+        </div>
+        <button type="button" onClick={onAction} className="rounded bg-[#1d2a3b] px-2 py-1 text-xs">{actionLabel}</button>
+      </div>
+      <div className="mt-3 space-y-1">
+        {rows.map(([label, value]) => <InfoLine key={label} label={label} value={value} />)}
+      </div>
+    </div>
+  );
+}
+
+function DocumentPreviewModal({ preview, onClose }: { preview: DocumentPreview; onClose: () => void }) {
+  if (!preview) return null;
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" />
+      <div className="relative w-full max-w-xl rounded-2xl border p-5" style={{ borderColor: "rgba(255,255,255,0.14)", background: "#111A24", color: "#F5F7FA" }} onClick={(event) => event.stopPropagation()}>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold">{preview.title}</h3>
+            <div className="mt-1 font-mono text-xs" style={{ color: "rgba(191,219,254,0.96)" }}>{preview.fileName}</div>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg border px-3 py-1 text-sm" style={{ borderColor: "rgba(255,255,255,0.14)" }}>Закрыть</button>
+        </div>
+        <div className="rounded-xl border p-4" style={{ borderColor: "rgba(96,165,250,0.28)", background: "rgba(59,130,246,0.08)" }}>
+          <div className="mb-3 text-xs uppercase tracking-wide" style={{ color: "rgba(147,197,253,0.88)" }}>Предпросмотр mock-документа</div>
+          <div className="space-y-2">
+            {preview.rows.map(([label, value]) => <InfoLine key={label} label={label} value={value} />)}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

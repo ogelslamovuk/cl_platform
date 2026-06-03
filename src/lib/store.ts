@@ -94,6 +94,15 @@ export interface EventSeat extends SeatMapSeat {
   status: SeatStatus;
 }
 
+export interface EventParticipantMember {
+  memberId: string;
+  name: string;
+  country: string;
+  role?: string;
+  documentName?: string;
+  checkStatus?: string;
+}
+
 export interface Application {
   appId: string;
   organizerId: string;
@@ -335,6 +344,11 @@ export interface EventPerformer {
   country: string;
   representative: string;
   comment: string;
+  role?: string;
+  participationType?: string;
+  documentName?: string;
+  checkStatus?: string;
+  members?: EventParticipantMember[];
   documentStatus?: string;
   documentNote?: string;
 }
@@ -728,7 +742,7 @@ function grandTheatreLayout(): SeatMapLayout {
     layoutId: layoutV2.layoutId,
     venueId: "venue_grand_theatre_v2",
     hallId: "hall_grand_theatre_v2",
-    name: "Большая сцена · SeatMap V2",
+    name: "Большая сцена · посадочная схема",
     seats: flattenSeatMapLayoutV2(layoutV2).map((seat) => ({
       seatId: seat.seatId,
       label: seat.label,
@@ -804,7 +818,7 @@ const DEFAULT_VENUE_REGISTRY: VenueRegistryRecord[] = [
   },
   {
     venueId: "venue_grand_theatre_v2",
-    name: "Grand Theatre · SeatMap V2 Demo",
+    name: "Большая концертная сцена",
     city: "Минск",
     region: "Минск",
     type: "театр",
