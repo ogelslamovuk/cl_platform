@@ -82,6 +82,11 @@ export interface EventSeat extends SeatMapSeat {
   tariffName?: string;
   price?: number;
   color?: string;
+  baseTariffId?: string;
+  baseTariffName?: string;
+  basePrice?: number;
+  baseColor?: string;
+  isIndividualOverride?: boolean;
   status: SeatStatus;
 }
 
@@ -525,6 +530,12 @@ const ORGANIZER_DOCUMENT_TEMPLATES: Omit<OrganizerDocument, "organizerId" | "upd
 ];
 
 export const SEAT_TARIFF_COLORS = ["#2563EB", "#16A34A", "#D97706", "#7C3AED", "#DC2626", "#0891B2"];
+export const DEFAULT_COMPLIANCE_TICKET_TIERS: PriceTier[] = [
+  { name: "Стандарт", price: 100, quantity: 0, color: SEAT_TARIFF_COLORS[0] },
+  { name: "Премиум", price: 150, quantity: 0, color: SEAT_TARIFF_COLORS[1] },
+  { name: "VIP", price: 200, quantity: 0, color: SEAT_TARIFF_COLORS[2] },
+  { name: "Льготный (пример)", price: 50, quantity: 0, color: SEAT_TARIFF_COLORS[3] },
+];
 
 export function createRectangularSeats(prefix: string, rows: number, cols: number): SeatMapSeat[] {
   const safeRows = Math.max(1, Math.min(20, Math.floor(rows || 1)));
@@ -1004,6 +1015,11 @@ function normalizeEventSeats(rawSeats: unknown): EventSeat[] {
       tariffName: typeof value.tariffName === "string" ? value.tariffName : undefined,
       price: Number.isFinite(Number(value.price)) ? Number(value.price) : undefined,
       color: typeof value.color === "string" ? value.color : undefined,
+      baseTariffId: typeof value.baseTariffId === "string" ? value.baseTariffId : undefined,
+      baseTariffName: typeof value.baseTariffName === "string" ? value.baseTariffName : undefined,
+      basePrice: Number.isFinite(Number(value.basePrice)) ? Number(value.basePrice) : undefined,
+      baseColor: typeof value.baseColor === "string" ? value.baseColor : undefined,
+      isIndividualOverride: Boolean(value.isIndividualOverride),
       status,
     };
   });
@@ -1083,9 +1099,112 @@ export function buildEventSeatsFromLayout(layout: SeatMapLayout, tiers: PriceTie
       tariffName: tier?.name,
       price: tier?.price,
       color: tier?.color || (presetTier ? v2Seat?.color : undefined) || SEAT_TARIFF_COLORS[normalized.indexOf(tier) % SEAT_TARIFF_COLORS.length],
+      baseTariffId: tier?.name,
+      baseTariffName: tier?.name,
+      basePrice: tier?.price,
+      baseColor: tier?.color || (presetTier ? v2Seat?.color : undefined) || SEAT_TARIFF_COLORS[normalized.indexOf(tier) % SEAT_TARIFF_COLORS.length],
+      isIndividualOverride: false,
       status: "available",
     };
   });
+}
+
+export interface SeatTariffExceptionSummary {
+  seatId: string;
+  label: string;
+  row: string;
+  number: number;
+  tariffName: string;
+  baseTariffName: string;
+  price: number;
+}
+
+export interface SeatTariffConfigurationSummary {
+  hasSeatMap: boolean;
+  totalSeats: number;
+  assignedSeats: number;
+  unassignedSeats: number;
+  blockedSeats: number;
+  benefitSeats: number;
+  individualExceptions: number;
+  maxRevenue: number;
+  byTariff: Array<PriceTier & { isBenefit: boolean }>;
+  exceptionSeats: SeatTariffExceptionSummary[];
+}
+
+export function isBenefitTariffName(name?: string): boolean {
+  return Boolean(name && name.trim().toLowerCase().startsWith("льгот"));
+}
+
+export function getSeatTariffConfigurationSummary(data: { eventSeats?: EventSeat[]; ticketTiers?: PriceTier[] }): SeatTariffConfigurationSummary {
+  const seats = normalizeEventSeats(data.eventSeats);
+  const normalizedTiers = normalizeTierRows(data.ticketTiers, 0);
+  const tierMap = new Map<string, PriceTier & { isBenefit: boolean }>();
+  normalizedTiers.forEach((tier, index) => {
+    if (!tier.name.trim()) return;
+    tierMap.set(tier.name, {
+      ...tier,
+      quantity: 0,
+      color: tier.color || SEAT_TARIFF_COLORS[index % SEAT_TARIFF_COLORS.length],
+      isBenefit: isBenefitTariffName(tier.name),
+    });
+  });
+
+  let assignedSeats = 0;
+  let unassignedSeats = 0;
+  let benefitSeats = 0;
+  let maxRevenue = 0;
+  const exceptionSeats: SeatTariffExceptionSummary[] = [];
+
+  seats.forEach((seat) => {
+    if (seat.status === "blocked") return;
+    const tariffName = seat.tariffName?.trim();
+    if (!tariffName) {
+      unassignedSeats += 1;
+      return;
+    }
+    assignedSeats += 1;
+    const existing = tierMap.get(tariffName);
+    const price = Number.isFinite(seat.price) ? Number(seat.price) : existing?.price || 0;
+    if (existing) {
+      existing.quantity += 1;
+      if (!Number.isFinite(existing.price) || existing.price === 0) existing.price = price;
+    } else {
+      tierMap.set(tariffName, {
+        name: tariffName,
+        price,
+        quantity: 1,
+        color: seat.color || SEAT_TARIFF_COLORS[tierMap.size % SEAT_TARIFF_COLORS.length],
+        isBenefit: isBenefitTariffName(tariffName),
+      });
+    }
+    if (isBenefitTariffName(tariffName)) benefitSeats += 1;
+    maxRevenue += price;
+    if (seat.isIndividualOverride) {
+      exceptionSeats.push({
+        seatId: seat.seatId,
+        label: seat.label,
+        row: seat.row,
+        number: seat.number,
+        tariffName,
+        baseTariffName: seat.baseTariffName || "групповой тариф не указан",
+        price,
+      });
+    }
+  });
+
+  return {
+    hasSeatMap: seats.length > 0,
+    totalSeats: seats.length,
+    assignedSeats,
+    unassignedSeats,
+    blockedSeats: seats.filter((seat) => seat.status === "blocked").length,
+    benefitSeats,
+    individualExceptions: exceptionSeats.length,
+    maxRevenue,
+    byTariff: Array.from(tierMap.values()),
+    exceptionSeats,
+  };
 }
 
 export function getEventSeatSummary(event: Pick<EventRecord, "eventSeats" | "tiers">): {
@@ -1439,6 +1558,7 @@ function normalizeTierRows(rawTiers: unknown, fallbackTotal = 0): PriceTier[] {
       name: parseTierName(row.name),
       price: parseTierPrice(row.price),
       quantity: quantity ?? 0,
+      color: typeof row.color === "string" ? row.color : undefined,
     };
   });
   if (missingIndexes.length > 0 && fallbackTotal > 0) {
@@ -1532,7 +1652,7 @@ export function defaultEventComplianceData(): EventComplianceData {
     venueType: "",
     projectedCapacity: null,
     plannedTicketsForSale: null,
-    ticketTiers: [{ name: "Стандарт", price: 0, quantity: 0 }],
+    ticketTiers: DEFAULT_COMPLIANCE_TICKET_TIERS.map((tier) => ({ ...tier })),
     ageCategory: "0+",
     ageComment: "",
     approvalMode: "certificate_required",

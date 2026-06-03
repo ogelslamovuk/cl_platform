@@ -11,11 +11,13 @@ import {
   buildEventSeatsFromLayout,
   createEventComplianceApplication,
   defaultEventComplianceData,
+  DEFAULT_COMPLIANCE_TICKET_TIERS,
   DEMO_TOP_UP_AMOUNT,
   generateComplianceFeeReceipt,
   getCompliancePaymentStatus,
   getOrganizerFinancialAccount,
   getSeatMapLayout,
+  getSeatTariffConfigurationSummary,
   getVenueRegistryRecord,
   getSalesChannelLabel,
   payComplianceFeeFromBalance,
@@ -25,6 +27,7 @@ import {
 } from "@/lib/store";
 import type { EventInteragencyCheck, EventPerformer, EventSeat, PriceTier } from "@/lib/store";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
+import SeatTariffSummary from "@/components/seatmap/SeatTariffSummary";
 import {
   selectCurrentOrganizer,
   selectIsCurrentOrganizerApproved,
@@ -143,6 +146,7 @@ export default function OrganizerEventCompliancePage() {
   const myApps = useMemo(() => selectMyEventComplianceApplications(state), [state]);
   const makeDefaultForm = () => ({
     ...defaultEventComplianceData(),
+    ticketTiers: DEFAULT_COMPLIANCE_TICKET_TIERS.map((tier) => ({ ...tier })),
     salesChannels: buildDefaultSalesChannels(state),
     interagencyChecks: ensureChecks(),
   });
@@ -176,7 +180,7 @@ export default function OrganizerEventCompliancePage() {
       ...editingApplication.data,
       eventTypePath: editingApplication.data.eventTypePath || [],
       salesChannels: editingApplication.data.salesChannels?.length ? editingApplication.data.salesChannels : buildDefaultSalesChannels(state),
-      ticketTiers: editingApplication.data.ticketTiers?.length ? editingApplication.data.ticketTiers : [{ name: "Стандарт", quantity: 0, price: 0 }],
+      ticketTiers: editingApplication.data.ticketTiers?.length ? editingApplication.data.ticketTiers : DEFAULT_COMPLIANCE_TICKET_TIERS.map((tier) => ({ ...tier })),
       dateSlots: editingApplication.data.dateSlots?.length ? editingApplication.data.dateSlots : [""],
       performers: editingApplication.data.performers || [],
       venueContractStatus: editingApplication.data.venueContractStatus || "требуется",
@@ -205,7 +209,18 @@ export default function OrganizerEventCompliancePage() {
     );
   }
 
-  const totalPlannedTickets = form.ticketTiers.reduce((acc, tier) => acc + (Number.isFinite(tier.quantity) ? Math.max(0, Math.floor(tier.quantity)) : 0), 0);
+  const normalizedTiersWithColors = (form.ticketTiers || []).map((tier, index): PriceTier => ({
+    ...tier,
+    color: tier.color || SEAT_TARIFF_COLORS[index % SEAT_TARIFF_COLORS.length],
+  }));
+  const tariffConfigurationSummary = getSeatTariffConfigurationSummary({ eventSeats: form.eventSeats, ticketTiers: normalizedTiersWithColors });
+  const seatCounts = (form.eventSeats || []).reduce((acc, seat) => {
+    if (seat.status === "blocked") acc.blocked += 1;
+    else if (seat.tariffName) acc.assigned += 1;
+    else acc.unassigned += 1;
+    return acc;
+  }, { assigned: 0, blocked: 0, unassigned: 0 });
+  const totalPlannedTickets = hasSeatMap ? tariffConfigurationSummary.assignedSeats : form.ticketTiers.reduce((acc, tier) => acc + (Number.isFinite(tier.quantity) ? Math.max(0, Math.floor(tier.quantity)) : 0), 0);
   const fee = calculateComplianceFee(form.projectedCapacity, totalPlannedTickets, form.ticketTiers);
   const feeAmount = calculateComplianceFeeAmount({ ...form, plannedTicketsForSale: totalPlannedTickets, ticketTiers: form.ticketTiers });
   const organizerFinancialAccount = getOrganizerFinancialAccount(state, organizer.organizerId);
@@ -219,16 +234,6 @@ export default function OrganizerEventCompliancePage() {
     .filter((receipt) => receipt.organizerId === organizer.organizerId && (!editingId || receipt.eventComplianceApplicationId === editingId))
     .slice()
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const normalizedTiersWithColors = (form.ticketTiers || []).map((tier, index): PriceTier => ({
-    ...tier,
-    color: tier.color || SEAT_TARIFF_COLORS[index % SEAT_TARIFF_COLORS.length],
-  }));
-  const seatCounts = (form.eventSeats || []).reduce((acc, seat) => {
-    if (seat.status === "blocked") acc.blocked += 1;
-    else if (seat.tariffName) acc.assigned += 1;
-    else acc.unassigned += 1;
-    return acc;
-  }, { assigned: 0, blocked: 0, unassigned: 0 });
 
   const requiredMissing = [
     !form.title.trim() && "наименование мероприятия",
@@ -464,10 +469,10 @@ export default function OrganizerEventCompliancePage() {
     const selectedDemoVenue = approvedVenues.find((venue) => venue.halls.some((hall) => hall.hasSeatMap)) || approvedVenues[0];
     const hall = selectedDemoVenue?.halls[0];
     const layout = hall?.layoutId ? getSeatMapLayout(state, hall.layoutId) : null;
-    const tiers = [
-      { name: "Стандарт", quantity: hall?.hasSeatMap ? 0 : 180, price: 25, color: SEAT_TARIFF_COLORS[0] },
-      { name: "Льготный", quantity: hall?.hasSeatMap ? 0 : 40, price: 15, color: SEAT_TARIFF_COLORS[1] },
-    ];
+    const tiers = DEFAULT_COMPLIANCE_TICKET_TIERS.map((tier, index) => ({
+      ...tier,
+      quantity: hall?.hasSeatMap ? 0 : index === 0 ? 180 : index === 3 ? 40 : 0,
+    }));
     setForm((prev) => ({
       ...prev,
       title: "Гала-концерт «Беларусь культурная»",
@@ -836,14 +841,29 @@ export default function OrganizerEventCompliancePage() {
                 </div>
               </div>
               {hasSeatMap && (
-                <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="text-sm">
-                      <div className="font-semibold">Схема тарифов</div>
-                      <div className="text-xs opacity-70">Назначено: {seatCounts.assigned}; без тарифа: {seatCounts.unassigned}; блок: {seatCounts.blocked}</div>
+                <div className="space-y-3">
+                  <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-sm">
+                        <div className="inline-flex items-center gap-1 font-semibold">
+                          Схема тарифов
+                          <HelpTooltip text="Массовое назначение выполняется через выделение нескольких существующих мест на текущей схеме." />
+                        </div>
+                        <div className="text-xs opacity-70">Назначено: {seatCounts.assigned}; без тарифа: {seatCounts.unassigned}; блок: {seatCounts.blocked}</div>
+                      </div>
+                      <span className="inline-flex items-center gap-1">
+                        <button type="button" onClick={() => setSeatMapOpen(true)} className="rounded bg-[#1d2a3b] px-3 py-2 text-sm font-semibold">Назначить тарифы на схеме</button>
+                        <HelpTooltip text="Открыть текущий конструктор схемы зала и тарифов для группового назначения и индивидуальных исключений." />
+                      </span>
                     </div>
-                    <button type="button" onClick={() => setSeatMapOpen(true)} className="rounded bg-[#1d2a3b] px-3 py-2 text-sm font-semibold">Назначить тарифы на схеме</button>
                   </div>
+                  <SeatTariffSummary
+                    summary={tariffConfigurationSummary}
+                    venueName={form.venueName}
+                    hallName={selectedHall?.name}
+                    capacity={form.projectedCapacity}
+                    variant="dark"
+                  />
                 </div>
               )}
             </div>
@@ -981,6 +1001,15 @@ export default function OrganizerEventCompliancePage() {
               <SummaryRow label="Площадка" value={form.venueName || "—"} />
               <SummaryRow label="Договор с площадкой" value={form.venueContractStatus || "требуется"} />
               <SummaryRow label="Показы" value={form.dateSlots.filter(Boolean).map((slot) => slot.replace("T", " ")).join(", ") || "—"} />
+              {hasSeatMap && (
+                <SeatTariffSummary
+                  summary={tariffConfigurationSummary}
+                  venueName={form.venueName}
+                  hallName={selectedHall?.name}
+                  capacity={form.projectedCapacity}
+                  variant="dark"
+                />
+              )}
               <SummaryRow label="Проверки" value={ensureChecks(form.interagencyChecks).map((row) => `${row.agency}: ${row.status}`).join("; ")} />
               <SummaryRow label="Пошлина" value={`${paymentStatus} · ${formatMoney(feeAmount)}`} />
               <div className="rounded-xl border p-3" style={{ borderColor: canSubmit ? "rgba(52,211,153,0.35)" : "rgba(251,191,36,0.35)", background: canSubmit ? "rgba(52,211,153,0.10)" : "rgba(251,191,36,0.10)" }}>
@@ -1031,7 +1060,7 @@ export default function OrganizerEventCompliancePage() {
                             eventTypePath: app.data.eventTypePath || [],
                             dateSlots: app.data.dateSlots?.length ? app.data.dateSlots : [""],
                             performers: app.data.performers || [],
-                            ticketTiers: app.data.ticketTiers?.length ? app.data.ticketTiers : [{ name: "Стандарт", quantity: 0, price: 0 }],
+                            ticketTiers: app.data.ticketTiers?.length ? app.data.ticketTiers : DEFAULT_COMPLIANCE_TICKET_TIERS.map((tier) => ({ ...tier })),
                             venueContractStatus: app.data.venueContractStatus || "требуется",
                             interagencyChecks: ensureChecks(app.data.interagencyChecks),
                           });
