@@ -1,6 +1,19 @@
 import React, { useMemo, useState } from "react";
 import type { AppState } from "@/lib/store";
-import { calculateComplianceFee, calculateComplianceFeeAmount, getCompliancePaymentStatus, getSalesChannelLabel, getSeatTariffConfigurationSummary, setEventComplianceReview } from "@/lib/store";
+import {
+  calculateComplianceFee,
+  calculateComplianceFeeAmount,
+  getCompliancePaymentStatus,
+  getResellerAdmissionStatus,
+  getResellerAgreementStatus,
+  getResellerConnectionType,
+  getResellerIntegrationStatus,
+  getResellerSalesBlockReason,
+  getSalesChannelLabel,
+  getSeatTariffConfigurationSummary,
+  isResellerAuthorizedForSales,
+  setEventComplianceReview,
+} from "@/lib/store";
 import { A } from "./adminStyles";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import SeatTariffSummary from "@/components/seatmap/SeatTariffSummary";
@@ -118,7 +131,12 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
           const canApprove = r.status === "submitted" && paymentStatus === "Оплачено";
           const paidReceipt = state.finance.organizerReceipts.find((receipt) => receipt.eventComplianceApplicationId === r.eventComplianceApplicationId && receipt.status === "оплачена");
           const features = getApplicationFeatures(r);
-          const salesChannels = (r.data.salesChannels?.length ? r.data.salesChannels : ["OWN"]).map((code) => getSalesChannelLabel(state, code));
+          const selectedSalesChannelCodes = r.data.salesChannels?.length ? r.data.salesChannels : ["OWN"];
+          const salesChannels = selectedSalesChannelCodes.map((code) => getSalesChannelLabel(state, code));
+          const selectedOperatorRows = selectedSalesChannelCodes
+            .filter((code) => code !== "OWN")
+            .map((code) => state.resellers.find((reseller) => reseller.code === code))
+            .filter((reseller): reseller is AppState["resellers"][number] => Boolean(reseller));
           const eventTypePath = r.data.eventTypePath?.length ? r.data.eventTypePath.join(" / ") : r.data.eventType || "—";
           const performers = r.data.performers || [];
           const checks = r.data.interagencyChecks || [];
@@ -197,6 +215,34 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                     <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
                       <div className="mb-1" style={{ color: A.textMuted }}>Каналы продаж</div>
                       {salesChannels.join(", ")}
+                    </div>
+                    <div className="rounded-lg border px-3 py-2 text-xs md:col-span-2" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
+                      <div className="mb-2 inline-flex items-center gap-1" style={{ color: A.textMuted }}>
+                        Выбранные билетные операторы
+                        <HelpTooltip text="Центр Управления видит выбранные организатором каналы в режиме просмотра и не настраивает продажи вручную внутри заявки." />
+                      </div>
+                      {selectedOperatorRows.length === 0 ? (
+                        <div style={{ color: A.textPrimary }}>Выбран только собственный канал организатора.</div>
+                      ) : (
+                        <div className="grid gap-2">
+                          {selectedOperatorRows.map((reseller) => {
+                            const available = isResellerAuthorizedForSales(reseller);
+                            const warning = available ? "" : getResellerSalesBlockReason(reseller);
+                            return (
+                              <div key={reseller.resellerId} className="rounded-lg border px-3 py-2" style={{ borderColor: available ? "rgba(52,211,153,0.35)" : "rgba(251,191,36,0.45)", background: A.cardBg }}>
+                                <div className="font-semibold" style={{ color: A.textPrimary }}>{reseller.name}</div>
+                                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                                  <span>Допуск: {getResellerAdmissionStatus(reseller)}</span>
+                                  <span>Тип: {getResellerConnectionType(reseller)}</span>
+                                  <span>Соглашение: {getResellerAgreementStatus(reseller)}</span>
+                                  <span>Интеграция: {getResellerIntegrationStatus(reseller)}</span>
+                                </div>
+                                {!available && <div className="mt-1" style={{ color: A.statusWarn }}>{warning}</div>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                     <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
                       <div className="mb-1" style={{ color: A.textMuted }}>Участники и документы</div>

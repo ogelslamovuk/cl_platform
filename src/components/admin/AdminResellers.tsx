@@ -1,6 +1,18 @@
 import React, { useMemo, useState } from "react";
-import type { AppState, EventRecord, Reseller, ResellerContractStatus, ResellerStatus, Ticket } from "@/lib/store";
-import { createReseller, setResellerCommission, setResellerStatus } from "@/lib/store";
+import type { AppState, EventRecord, Reseller, ResellerAdmissionStatus, ResellerAgreementStatus, ResellerConnectionType, ResellerContractStatus, ResellerIntegrationStatus, ResellerStatus, Ticket } from "@/lib/store";
+import {
+  createReseller,
+  getResellerAdmissionStatus,
+  getResellerAgreementStatus,
+  getResellerConnectionType,
+  getResellerIntegrationStatus,
+  RESELLER_ADMISSION_STATUSES,
+  RESELLER_AGREEMENT_STATUSES,
+  RESELLER_CONNECTION_TYPES,
+  setResellerCommission,
+  setResellerStatus,
+  updateReseller,
+} from "@/lib/store";
 import { A, statusChip } from "./adminStyles";
 import { Network, Plus, Store, X } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
@@ -26,6 +38,10 @@ type ResellerFormState = {
   apiConnected: boolean;
   contractStatus: ResellerContractStatus;
   status: ResellerStatus;
+  admissionStatus: ResellerAdmissionStatus;
+  connectionType: ResellerConnectionType;
+  agreementStatus: ResellerAgreementStatus;
+  integrationStatus: ResellerIntegrationStatus;
   contactPerson: string;
   email: string;
   phone: string;
@@ -40,6 +56,10 @@ const emptyForm: ResellerFormState = {
   apiConnected: true,
   contractStatus: "Active",
   status: "active",
+  admissionStatus: "Авторизован",
+  connectionType: "API",
+  agreementStatus: "Соглашение подписано",
+  integrationStatus: "Интеграция активна",
   contactPerson: "",
   email: "",
   phone: "",
@@ -115,13 +135,49 @@ function StatusBadge({ active }: { active: boolean }) {
   );
 }
 
+function contractStatusLabel(status: Reseller["contractStatus"]): string {
+  if (status === "Active") return "Активен";
+  if (status === "Suspended") return "Приостановлен";
+  return "Черновик";
+}
+
+function resellerStatusLabel(status: ResellerStatus): string {
+  return status === "active" ? "Активен" : "Отключён";
+}
+
 function ContractBadge({ status }: { status: Reseller["contractStatus"] }) {
   const chip = status === "Active" ? statusChip("ok") : status === "Suspended" ? statusChip("error") : statusChip("warn");
   return (
     <span className="rounded-full px-2.5 py-1 text-xs font-medium" style={{ background: chip.bg, color: chip.color }}>
-      {status}
+      {contractStatusLabel(status)}
     </span>
   );
+}
+
+function TextBadge({ value, tone = "neutral" }: { value: string; tone?: "ok" | "warn" | "error" | "neutral" | "info" }) {
+  const chip = statusChip(tone);
+  return (
+    <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-medium" style={{ background: chip.bg, color: chip.color }}>
+      {value}
+    </span>
+  );
+}
+
+function admissionTone(status: ResellerAdmissionStatus): "ok" | "warn" | "error" | "info" {
+  if (status === "Авторизован") return "ok";
+  if (status === "Приостановлен") return "error";
+  if (status === "На рассмотрении") return "info";
+  return "warn";
+}
+
+function agreementTone(status: ResellerAgreementStatus): "ok" | "warn" {
+  return status === "Соглашение подписано" ? "ok" : "warn";
+}
+
+function integrationTone(status: ResellerIntegrationStatus): "ok" | "warn" | "error" {
+  if (status === "Интеграция активна") return "ok";
+  if (status === "Доступ приостановлен") return "error";
+  return "warn";
 }
 
 function DetailBlock({ title, rows }: { title: string; rows: [string, string][] }) {
@@ -147,8 +203,22 @@ function buildResellerRows(reseller: Reseller, metrics: ResellerMetrics): Record
   const endpoint = reseller.apiEndpoint || `https://sandbox.api.${reseller.code.toLowerCase()}.example/v2/tickethub`;
   const webhook = reseller.webhookEndpoint || `https://sandbox.${reseller.code.toLowerCase()}.example/webhooks/tickethub`;
   const sync = reseller.lastSync || metrics.lastOperation || reseller.updatedAt;
+  const admissionStatus = getResellerAdmissionStatus(reseller);
+  const connectionType = getResellerConnectionType(reseller);
+  const agreementStatus = getResellerAgreementStatus(reseller);
+  const integrationStatus = getResellerIntegrationStatus(reseller);
 
   return {
+    admission: [
+      ["Статус допуска", admissionStatus],
+      ["Тип подключения", connectionType],
+      ["Статус соглашения", agreementStatus],
+      ["Интеграция", integrationStatus],
+      ["Дата заявки", reseller.applicationDate || mockDate(reseller)],
+      ["Дата допуска", reseller.admissionDate || "—"],
+      ["Ответственный контакт", reseller.responsibleContact || reseller.contactPerson || "—"],
+      ["Комментарий", reseller.applicationComment || "—"],
+    ],
     registration: [
       ["Полное наименование", reseller.fullName || `ООО «${reseller.name}»`],
       ["УНП / рег. номер", reseller.registrationNumber || String(190000000 + (hashCode(reseller.code) % 9000000))],
@@ -158,19 +228,19 @@ function buildResellerRows(reseller: Reseller, metrics: ResellerMetrics): Record
       ["Телефон", reseller.phone || "+375 (29) 000-00-00"],
     ],
     contract: [
-      ["Статус договора", reseller.contractStatus],
+      ["Статус договора", contractStatusLabel(reseller.contractStatus)],
       ["Номер договора", contractNumber],
       ["Дата договора", contractDate],
       ["Комиссия", `${reseller.commissionPercent}%`],
     ],
     api: [
       ["API подключён", reseller.apiConnected ? "Да" : "Нет"],
-      ["Environment", "Sandbox"],
-      ["API version", "v2.1"],
-      ["Endpoint", endpoint],
-      ["Webhook endpoint", webhook],
-      ["Signature validation", reseller.signatureValidation === false ? "Отключена" : "Включена"],
-      ["Last sync", formatDateTime(sync)],
+      ["Среда", "Песочница"],
+      ["Версия API", "v2.1"],
+      ["Адрес API", endpoint],
+      ["Адрес webhook", webhook],
+      ["Проверка подписи", reseller.signatureValidation === false ? "Отключена" : "Включена"],
+      ["Последняя синхронизация", formatDateTime(sync)],
     ],
     movement: [
       ["Оборот продаж", formatMoney(metrics.salesTurnover)],
@@ -187,10 +257,63 @@ export default function AdminResellers({ state, onUpdate }: Props) {
   const [drawer, setDrawer] = useState<Reseller | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<ResellerFormState>(emptyForm);
+  const connectedEventsByCode = useMemo(() => {
+    const map = new Map<string, EventRecord[]>();
+    state.resellers.forEach((reseller) => map.set(reseller.code, []));
+    state.events.forEach((event) => {
+      (event.salesChannels || []).forEach((code) => {
+        const list = map.get(code);
+        if (list) list.push(event);
+      });
+    });
+    return map;
+  }, [state.events, state.resellers]);
 
   const toggleStatus = (reseller: Reseller) => {
     const nextStatus = reseller.status === "active" ? "disabled" : "active";
     if (setResellerStatus(state, reseller.resellerId, nextStatus)) onUpdate({ ...state });
+  };
+
+  const updateAdmission = (reseller: Reseller, admissionStatus: ResellerAdmissionStatus) => {
+    const now = new Date().toISOString();
+    const patch: Partial<Omit<Reseller, "resellerId">> = {
+      admissionStatus,
+      applicationComment: admissionStatus === "Авторизован"
+        ? "Допуск подтверждён Центром Управления."
+        : admissionStatus === "Требует доработки"
+          ? "Заявка возвращена на доработку: требуется уточнить интеграцию и ответственное лицо."
+          : "Доступ оператора приостановлен решением Центра Управления.",
+    };
+    if (admissionStatus === "Авторизован") {
+      Object.assign(patch, {
+        status: "active" as ResellerStatus,
+        apiConnected: true,
+        contractStatus: "Active" as ResellerContractStatus,
+        agreementStatus: "Соглашение подписано" as ResellerAgreementStatus,
+        integrationStatus: "Интеграция активна" as ResellerIntegrationStatus,
+        admissionDate: now.slice(0, 10),
+        lastSync: now,
+      });
+    }
+    if (admissionStatus === "Требует доработки") {
+      Object.assign(patch, {
+        status: "active" as ResellerStatus,
+        apiConnected: false,
+        contractStatus: "Draft" as ResellerContractStatus,
+        agreementStatus: "Ожидает подписания" as ResellerAgreementStatus,
+        integrationStatus: "Ожидает настройки" as ResellerIntegrationStatus,
+      });
+    }
+    if (admissionStatus === "Приостановлен") {
+      Object.assign(patch, {
+        status: "disabled" as ResellerStatus,
+        apiConnected: false,
+        contractStatus: "Suspended" as ResellerContractStatus,
+        agreementStatus: "Требует обновления" as ResellerAgreementStatus,
+        integrationStatus: "Доступ приостановлен" as ResellerIntegrationStatus,
+      });
+    }
+    if (updateReseller(state, reseller.resellerId, patch)) onUpdate({ ...state });
   };
 
   const updateCommission = (reseller: Reseller, value: number) => {
@@ -226,7 +349,7 @@ export default function AdminResellers({ state, onUpdate }: Props) {
         style={{ background: A.glassGradient + ", " + A.cardBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.cardShadow }}
       >
         <div className="absolute right-4 top-4">
-          <HelpTooltip text="Реселлеры используют demo API Sandbox. Отключённый реселлер не может выполнить продажу на странице канала." />
+          <HelpTooltip text="Билетные операторы используют текущий кабинет продаж. Продажа доступна только операторам со статусом допуска «Авторизован»." />
         </div>
         <div className="flex flex-col gap-4 pr-9 md:flex-row md:items-start md:justify-between">
           <div className="flex items-start gap-3">
@@ -234,9 +357,9 @@ export default function AdminResellers({ state, onUpdate }: Props) {
               <Network size={20} />
             </div>
             <div>
-              <h2 className="text-base font-semibold" style={{ color: A.textPrimary }}>Реселлеры</h2>
+              <h2 className="text-base font-semibold" style={{ color: A.textPrimary }}>Реестр билетных операторов</h2>
               <p className="mt-1 max-w-3xl text-sm" style={{ color: A.textSecondary }}>
-                Управление demo-партнёрами продаж: статус, API-подключение, договор и комиссия, которая используется в отчётах.
+                Центр Управления контролирует допуск операторов, тип подключения, соглашение и доступ к существующему каналу продаж.
               </p>
             </div>
           </div>
@@ -248,11 +371,15 @@ export default function AdminResellers({ state, onUpdate }: Props) {
               style={{ background: A.statusInfoBg, color: A.statusInfo, border: `1px solid ${A.borderLight}` }}
             >
               <Plus size={16} />
-              Добавить реселлера
+              Добавить оператора
             </button>
-            <HelpTooltip text="Добавить нового demo-реселлера в localStorage." />
+            <HelpTooltip text="Добавить нового демонстрационного оператора в существующий реестр реселлеров локального хранилища." />
           </div>
         </div>
+      </div>
+
+      <div className="rounded-xl border px-4 py-3 text-sm" style={{ background: A.statusInfoBg, borderColor: A.borderLight, color: A.textPrimary }}>
+        Продажа билетов допускается только через авторизованные каналы, связанные с платформой соглашением.
       </div>
 
       <div style={{ background: A.cardBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.cardShadow }} className="overflow-hidden">
@@ -263,10 +390,10 @@ export default function AdminResellers({ state, onUpdate }: Props) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px] text-sm">
+            <table className="w-full min-w-[1520px] text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["Реселлер", "Код", "Статус", "API", "Договор", "Комиссия", "Оборот продаж", "Продано билетов", "Последняя операция", "Действия"].map((header) => (
+                  {["Оператор", "Код", "Допуск", "Тип подключения", "Соглашение", "Интеграция", "Контакт", "События", "Статус", "API", "Договор", "Комиссия", "Оборот продаж", "Продано билетов", "Последняя операция", "Действия"].map((header) => (
                     <th key={header} className="px-4 py-3 text-left text-xs font-medium" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
                       {header}
                     </th>
@@ -276,6 +403,11 @@ export default function AdminResellers({ state, onUpdate }: Props) {
               <tbody>
                 {state.resellers.map((reseller) => {
                   const row = metrics.get(reseller.code) || { salesTurnover: 0, soldTickets: 0, refunds: 0, redeems: 0, lastOperation: "—" };
+                  const admissionStatus = getResellerAdmissionStatus(reseller);
+                  const connectionType = getResellerConnectionType(reseller);
+                  const agreementStatus = getResellerAgreementStatus(reseller);
+                  const integrationStatus = getResellerIntegrationStatus(reseller);
+                  const connectedEvents = connectedEventsByCode.get(reseller.code) || [];
                   return (
                     <tr
                       key={reseller.resellerId}
@@ -287,6 +419,14 @@ export default function AdminResellers({ state, onUpdate }: Props) {
                     >
                       <td className="px-4 py-3 font-medium" style={{ color: A.textPrimary }}>{reseller.name}</td>
                       <td className="px-4 py-3 font-mono text-xs" style={{ color: A.cyan }}>{reseller.code}</td>
+                      <td className="px-4 py-3"><TextBadge value={admissionStatus} tone={admissionTone(admissionStatus)} /></td>
+                      <td className="px-4 py-3" style={{ color: A.textSecondary }}>{connectionType}</td>
+                      <td className="px-4 py-3"><TextBadge value={agreementStatus} tone={agreementTone(agreementStatus)} /></td>
+                      <td className="px-4 py-3"><TextBadge value={integrationStatus} tone={integrationTone(integrationStatus)} /></td>
+                      <td className="px-4 py-3" style={{ color: A.textSecondary }}>{reseller.responsibleContact || reseller.contactPerson || "—"}</td>
+                      <td className="px-4 py-3" style={{ color: A.textSecondary }}>
+                        {connectedEvents.length ? `${connectedEvents.length} · ${connectedEvents.slice(0, 2).map((event) => event.title).join(", ")}` : "—"}
+                      </td>
                       <td className="px-4 py-3"><StatusBadge active={reseller.status === "active"} /></td>
                       <td className="px-4 py-3" style={{ color: reseller.apiConnected ? A.statusOk : A.statusError }}>{reseller.apiConnected ? "Да" : "Нет"}</td>
                       <td className="px-4 py-3"><ContractBadge status={reseller.contractStatus} /></td>
@@ -330,6 +470,60 @@ export default function AdminResellers({ state, onUpdate }: Props) {
         )}
       </div>
 
+      <section className="relative overflow-hidden p-5" style={{ background: A.glassGradient + ", " + A.cardBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.cardShadow }}>
+        <div className="absolute right-4 top-4">
+          <HelpTooltip text="Это демонстрационный контроль заявок операторов без отдельного onboarding wizard и без реального документооборота." />
+        </div>
+        <div className="mb-4 pr-9">
+          <h3 className="text-sm font-semibold" style={{ color: A.textPrimary }}>Заявки на подключение операторов</h3>
+          <p className="mt-1 text-xs" style={{ color: A.textSecondary }}>
+            Действия меняют демонстрационные статусы допуска в текущем реестре и сразу влияют на доступность канала для организатора и кабинета продаж.
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1160px] text-sm">
+            <thead>
+              <tr style={{ background: A.tableHeaderBg }}>
+                {["Оператор", "Дата заявки", "Тип подключения", "Статус заявки", "Контакт", "Комментарий", "Действия"].map((header) => (
+                  <th key={header} className="px-4 py-3 text-left text-xs font-medium" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {state.resellers.map((reseller) => {
+                const admissionStatus = getResellerAdmissionStatus(reseller);
+                const connectionType = getResellerConnectionType(reseller);
+                return (
+                  <tr key={`application-${reseller.resellerId}`} style={{ borderBottom: `1px solid ${A.border}` }}>
+                    <td className="px-4 py-3 font-medium" style={{ color: A.textPrimary }}>{reseller.name}</td>
+                    <td className="px-4 py-3" style={{ color: A.textSecondary }}>{reseller.applicationDate || "—"}</td>
+                    <td className="px-4 py-3" style={{ color: A.textSecondary }}>{connectionType}</td>
+                    <td className="px-4 py-3"><TextBadge value={admissionStatus} tone={admissionTone(admissionStatus)} /></td>
+                    <td className="px-4 py-3" style={{ color: A.textSecondary }}>{reseller.responsibleContact || reseller.contactPerson || "—"}</td>
+                    <td className="px-4 py-3" style={{ color: A.textSecondary }}>{reseller.applicationComment || "—"}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button type="button" onClick={() => updateAdmission(reseller, "Авторизован")} className="h-8 rounded-lg px-3 text-xs font-semibold" style={{ background: A.statusOkBg, color: A.statusOk }}>
+                          Одобрить
+                        </button>
+                        <button type="button" onClick={() => updateAdmission(reseller, "Требует доработки")} className="h-8 rounded-lg px-3 text-xs font-semibold" style={{ background: A.statusWarnBg, color: A.statusWarn }}>
+                          Вернуть на доработку
+                        </button>
+                        <button type="button" onClick={() => updateAdmission(reseller, "Приостановлен")} className="h-8 rounded-lg px-3 text-xs font-semibold" style={{ background: A.statusErrorBg, color: A.statusError }}>
+                          Приостановить
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       {drawer && drawerRows && (
         <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setDrawer(null)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
@@ -346,6 +540,7 @@ export default function AdminResellers({ state, onUpdate }: Props) {
               <button type="button" onClick={() => setDrawer(null)} style={{ color: A.textMuted }}><X size={18} /></button>
             </div>
             <div className="space-y-4 p-5">
+              <DetailBlock title="Допуск оператора" rows={drawerRows.admission} />
               <DetailBlock title="Регистрационные данные" rows={drawerRows.registration} />
               <DetailBlock title="Договор" rows={drawerRows.contract} />
               <DetailBlock title="API-настройки" rows={drawerRows.api} />
@@ -365,14 +560,14 @@ export default function AdminResellers({ state, onUpdate }: Props) {
           >
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-semibold" style={{ color: A.textPrimary }}>Добавить реселлера</h3>
-                <p className="mt-1 text-xs" style={{ color: A.textSecondary }}>Новый партнёр сохраняется в localStorage и сразу появляется в таблице.</p>
+                <h3 className="text-base font-semibold" style={{ color: A.textPrimary }}>Добавить оператора</h3>
+                <p className="mt-1 text-xs" style={{ color: A.textSecondary }}>Новый партнёр сохраняется в локальном хранилище и сразу появляется в таблице.</p>
               </div>
               <button type="button" onClick={() => setFormOpen(false)} style={{ color: A.textMuted }}><X size={18} /></button>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
-              <FormInput label="Название реселлера" value={form.name} onChange={(value) => setForm((prev) => ({ ...prev, name: value }))} />
+              <FormInput label="Название оператора" value={form.name} onChange={(value) => setForm((prev) => ({ ...prev, name: value }))} />
               <FormInput label="Код канала" value={form.code} onChange={(value) => setForm((prev) => ({ ...prev, code: value }))} />
               <FormInput label="Комиссия %" type="number" value={String(form.commissionPercent)} onChange={(value) => setForm((prev) => ({ ...prev, commissionPercent: Number(value) }))} />
               <label className="flex h-10 items-center gap-2 rounded-lg px-3 text-sm" style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
@@ -381,6 +576,10 @@ export default function AdminResellers({ state, onUpdate }: Props) {
               </label>
               <FormSelect label="Статус договора" value={form.contractStatus} options={["Active", "Suspended", "Draft"]} onChange={(value) => setForm((prev) => ({ ...prev, contractStatus: value as ResellerContractStatus }))} />
               <FormSelect label="Статус" value={form.status} options={["active", "disabled"]} onChange={(value) => setForm((prev) => ({ ...prev, status: value as ResellerStatus }))} />
+              <FormSelect label="Статус допуска" value={form.admissionStatus} options={RESELLER_ADMISSION_STATUSES} onChange={(value) => setForm((prev) => ({ ...prev, admissionStatus: value as ResellerAdmissionStatus }))} />
+              <FormSelect label="Тип подключения" value={form.connectionType} options={RESELLER_CONNECTION_TYPES} onChange={(value) => setForm((prev) => ({ ...prev, connectionType: value as ResellerConnectionType }))} />
+              <FormSelect label="Статус соглашения" value={form.agreementStatus} options={RESELLER_AGREEMENT_STATUSES} onChange={(value) => setForm((prev) => ({ ...prev, agreementStatus: value as ResellerAgreementStatus }))} />
+              <FormSelect label="Интеграция" value={form.integrationStatus} options={["Интеграция активна", "Ожидает настройки", "Доступ приостановлен"]} onChange={(value) => setForm((prev) => ({ ...prev, integrationStatus: value as ResellerIntegrationStatus }))} />
               <FormInput label="Контактное лицо" value={form.contactPerson} onChange={(value) => setForm((prev) => ({ ...prev, contactPerson: value }))} />
               <FormInput label="Email" value={form.email} onChange={(value) => setForm((prev) => ({ ...prev, email: value }))} />
               <FormInput label="Телефон" value={form.phone} onChange={(value) => setForm((prev) => ({ ...prev, phone: value }))} />
@@ -420,6 +619,15 @@ function FormInput({ label, value, onChange, type = "text" }: { label: string; v
   );
 }
 
+function formOptionLabel(option: string): string {
+  if (option === "Active") return "Активен";
+  if (option === "Suspended") return "Приостановлен";
+  if (option === "Draft") return "Черновик";
+  if (option === "active") return "Активен";
+  if (option === "disabled") return "Отключён";
+  return option;
+}
+
 function FormSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   return (
     <label className="block text-xs" style={{ color: A.textSecondary }}>
@@ -431,7 +639,7 @@ function FormSelect({ label, value, options, onChange }: { label: string; value:
         style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}
       >
         {options.map((option) => (
-          <option key={option} value={option}>{option}</option>
+          <option key={option} value={option}>{formOptionLabel(option)}</option>
         ))}
       </select>
     </label>

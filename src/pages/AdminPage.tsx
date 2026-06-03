@@ -46,7 +46,7 @@ const sidebarSections: { label?: string; items: { key: AdminTab; label: string; 
       { key: "orgRegistry", label: "Организаторы", icon: Building2 },
       { key: "venueRegistry", label: "Площадки", icon: MapPin },
       { key: "registryEvents", label: "Мероприятия", icon: Calendar },
-      { key: "resellers", label: "Реселлеры", icon: Network },
+      { key: "resellers", label: "Операторы", icon: Network },
       { key: "tickets", label: "Билеты", icon: Ticket },
       { key: "operations", label: "Операции", icon: Activity },
     ],
@@ -70,7 +70,7 @@ const tabTitles: Record<AdminTab, string> = {
   registryEvents: "Мероприятия",
   tickets: "Реестр билетов",
   operations: "Журнал операций",
-  resellers: "Реселлеры",
+  resellers: "Билетные операторы",
   reports: "Отчёты",
 };
 
