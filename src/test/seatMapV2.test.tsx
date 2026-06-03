@@ -4,9 +4,13 @@ import { useStorageSync } from "@/hooks/useStorageSync";
 import {
   buildEventSeatsFromLayout,
   createDemoPurchaseTicket,
+  createEventComplianceApplication,
   createVenueRegistryRecord,
+  DEFAULT_COMPLIANCE_TICKET_TIERS,
+  defaultEventComplianceData,
   defaultState,
   getSeatMapLayout,
+  getSeatTariffConfigurationSummary,
   issueMarks,
   type EventRecord,
   type PriceTier,
@@ -148,6 +152,71 @@ describe("SeatMap V2 demo contract", () => {
       buyerName: "Second buyer",
       seatId,
     })).toBeNull();
+  });
+
+  it("keeps group tariff assignments, individual exceptions and benefit seats in the submitted application", () => {
+    const state = defaultState();
+    const layout = getSeatMapLayout(state, "layout_palace_main")!;
+    const tiers = DEFAULT_COMPLIANCE_TICKET_TIERS.map((tier) => ({ ...tier }));
+    const standard = tiers[0];
+    const premium = tiers[1];
+    const benefit = tiers[3];
+    const eventSeats = buildEventSeatsFromLayout(layout, [standard]).map((seat, index) => {
+      if (index === 0) {
+        return {
+          ...seat,
+          tariffId: premium.name,
+          tariffName: premium.name,
+          price: premium.price,
+          color: premium.color,
+          isIndividualOverride: true,
+        };
+      }
+      if (index === 1) {
+        return {
+          ...seat,
+          tariffId: benefit.name,
+          tariffName: benefit.name,
+          price: benefit.price,
+          color: benefit.color,
+          isIndividualOverride: true,
+        };
+      }
+      return seat;
+    });
+
+    const data = {
+      ...defaultEventComplianceData(),
+      title: "Проверка тарифов",
+      eventType: "Эстрадный концерт",
+      eventTypePath: ["Культура", "Концерт", "Эстрадный концерт"],
+      program: "Демо-программа",
+      dateSlots: ["2026-08-20T19:00"],
+      venueId: "venue_palace_republic",
+      hallId: "hall_palace_main",
+      layoutId: layout.layoutId,
+      venueName: "Дворец Республики",
+      venueAddress: "Октябрьская площадь, 1",
+      venueType: "концертный зал",
+      projectedCapacity: layout.seats.length,
+      venueContractStatus: "приложен" as const,
+      ticketTiers: tiers,
+      eventSeats,
+      salesChannels: ["OWN"],
+      performers: [{ name: "Ансамбль", performerType: "solo" as const, country: "Беларусь", representative: "", comment: "" }],
+    };
+
+    const summary = getSeatTariffConfigurationSummary(data);
+    expect(summary.assignedSeats).toBe(layout.seats.length);
+    expect(summary.benefitSeats).toBe(1);
+    expect(summary.individualExceptions).toBe(2);
+    expect(summary.byTariff.find((tier) => tier.name === benefit.name)?.quantity).toBe(1);
+
+    const app = createEventComplianceApplication(state, "org_demo_1", data, true);
+    const storedSummary = getSeatTariffConfigurationSummary(app.data);
+    expect(app.status).toBe("submitted");
+    expect(storedSummary.benefitSeats).toBe(1);
+    expect(storedSummary.individualExceptions).toBe(2);
   });
 
   it("keeps capacity-only events on the original purchase path", () => {

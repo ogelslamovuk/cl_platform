@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
 import type { AppState } from "@/lib/store";
-import { calculateComplianceFee, calculateComplianceFeeAmount, getCompliancePaymentStatus, getSalesChannelLabel, setEventComplianceReview } from "@/lib/store";
+import { calculateComplianceFee, calculateComplianceFeeAmount, getCompliancePaymentStatus, getSalesChannelLabel, getSeatTariffConfigurationSummary, setEventComplianceReview } from "@/lib/store";
 import { A } from "./adminStyles";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import SeatTariffSummary from "@/components/seatmap/SeatTariffSummary";
 import { toast } from "sonner";
 
 interface Props { state: AppState; onUpdate: (s: AppState) => void; }
@@ -122,6 +123,12 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
           const performers = r.data.performers || [];
           const checks = r.data.interagencyChecks || [];
           const contractStatus = r.data.venueContractStatus || "требуется";
+          const venue = state.venueRegistry.find((item) => item.venueId === r.data.venueId);
+          const hall = venue?.halls.find((item) => item.hallId === r.data.hallId);
+          const tariffConfigurationSummary = getSeatTariffConfigurationSummary({
+            eventSeats: r.data.eventSeats,
+            ticketTiers: r.data.ticketTiers,
+          });
 
           return (
             <article
@@ -248,6 +255,17 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                     ))}
                     <div className="pt-1" style={{ color: A.textSecondary }}>Итого билетов: {totalTickets}</div>
                   </div>
+
+                  {tariffConfigurationSummary.hasSeatMap && (
+                    <SeatTariffSummary
+                      summary={tariffConfigurationSummary}
+                      venueName={r.data.venueName}
+                      hallName={hall?.name}
+                      capacity={r.data.projectedCapacity}
+                      variant="admin"
+                      readOnly
+                    />
+                  )}
 
                   <div className="flex gap-2 flex-wrap">
                     <span className="inline-flex items-center gap-1">
