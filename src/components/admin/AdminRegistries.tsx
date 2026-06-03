@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from "react";
 import type { AppState, CreateVenueRegistryInput, VenueRegistryRecord } from "@/lib/store";
-import { createVenueRegistryRecord, ensureMockVenueRegistryRecord, getSeatMapLayout, saveSeatMapLayout } from "@/lib/store";
+import { createVenueRegistryRecord, getSeatMapLayout, saveSeatMapLayout } from "@/lib/store";
 import { A, statusChip } from "./adminStyles";
-import { Building2, Database, MapPin, Plus, X } from "lucide-react";
+import { Building2, MapPin, Plus, X } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import SeatMapConstructorCanvas from "@/components/seatmap/SeatMapConstructorCanvas";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import type { SeatMapLayoutV2 } from "@/lib/seatMapV2";
 import { toast } from "sonner";
+import { getRegionFilterOptions, isInAdminScope, normalizeRegion, type AdminRegionScope } from "./adminScope";
 
 function CardHelp({ text }: { text: string }) {
   return (
@@ -42,8 +43,9 @@ function defaultVenueForm(): CreateVenueRegistryInput {
 }
 
 // Organizer Registry
-export function AdminOrgRegistry({ state }: { state: AppState }) {
+export function AdminOrgRegistry({ state, regionScope = "all" }: { state: AppState; regionScope?: AdminRegionScope }) {
   const [drawer, setDrawer] = useState<any>(null);
+  const [regionFilter, setRegionFilter] = useState("");
   const organizerMetaFallback: Record<string, { address: string; activities: string }> = {
     demo_org_1: {
       address: "220004, г. Минск, пр-т Победителей, 11",
@@ -55,6 +57,7 @@ export function AdminOrgRegistry({ state }: { state: AppState }) {
     },
   };
 
+  const regionOptions = useMemo(() => getRegionFilterOptions(state), [state]);
   const orgs = useMemo(() => {
     const approvedOrganizerIds = new Set(state.organizerRegistry.map((record) => record.organizerId));
     return state.organizers
@@ -82,9 +85,12 @@ export function AdminOrgRegistry({ state }: { state: AppState }) {
           lastActivity: updatedAt,
           risk: violations > 2 ? "high" : violations > 0 ? "medium" : "low",
           latestOrganizerApplication,
+          region: normalizeRegion(latestOrganizerApplication?.data.region),
         };
-      });
-  }, [state]);
+      })
+      .filter((organizer) => isInAdminScope(organizer.region, regionScope))
+      .filter((organizer) => !regionFilter || organizer.region === regionFilter);
+  }, [regionFilter, regionScope, state]);
 
   const riskChip = (r: string) => r === 'high' ? statusChip('error') : r === 'medium' ? statusChip('warn') : statusChip('ok');
 
@@ -93,6 +99,12 @@ export function AdminOrgRegistry({ state }: { state: AppState }) {
       <div className="flex items-center gap-1.5">
         <span className="text-xs" style={{ color: A.textSecondary }}>Реестр организаторов</span>
         <HelpTooltip text="Нажмите на строку, чтобы открыть карточку организатора с деталями и риском." />
+      </div>
+      <div className="max-w-xs">
+        <select value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)} className="h-9 w-full rounded-lg border px-3 text-sm outline-none" style={{ background: A.surfaceBg, borderColor: A.border, color: A.textPrimary }}>
+          <option value="">Все регионы</option>
+          {regionOptions.map((region) => <option key={region} value={region}>{region}</option>)}
+        </select>
       </div>
       <div style={{ background: A.cardBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.cardShadow }} className="relative overflow-hidden">
         <CardHelp text="Реестр показывает утверждённых организаторов, их активность, количество мероприятий и риск по операциям." />
@@ -106,7 +118,7 @@ export function AdminOrgRegistry({ state }: { state: AppState }) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["Организатор", "№ в реестре", "Заявки", "Мероприятия", "Нарушения", "Риск", "Последняя активность"].map((h, i) => (
+                  {["Организатор", "Регион", "№ в реестре", "Заявки", "Мероприятия", "Нарушения", "Риск", "Последняя активность"].map((h, i) => (
                     <th key={i} className="text-left py-3 px-4 font-medium text-xs" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>{h}</th>
                   ))}
                 </tr>
@@ -121,6 +133,7 @@ export function AdminOrgRegistry({ state }: { state: AppState }) {
                       onMouseEnter={e => (e.currentTarget.style.background = A.rowHover)}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{o.name}</td>
+                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{o.region}</td>
                       <td className="py-3 px-4" style={{ color: A.textSecondary }}>{o.registryNumber}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{o.apps}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{o.events}</td>
@@ -165,7 +178,7 @@ export function AdminOrgRegistry({ state }: { state: AppState }) {
 }
 
 // Venue Registry
-export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpdate: (s: AppState) => void }) {
+export function AdminVenueRegistry({ state, onUpdate, regionScope = "all" }: { state: AppState; onUpdate: (s: AppState) => void; regionScope?: AdminRegionScope }) {
   const [drawer, setDrawer] = useState<VenueRegistryRecord | null>(null);
   const [schemeVenue, setSchemeVenue] = useState<VenueRegistryRecord | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -174,14 +187,18 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
   const [constructorOpen, setConstructorOpen] = useState(false);
   const [constructorLayoutId, setConstructorLayoutId] = useState("");
   const [cityFilter, setCityFilter] = useState("");
+  const [regionFilter, setRegionFilter] = useState("");
 
   const venues = useMemo(() => {
     return state.venueRegistry
       .slice()
       .sort((a, b) => a.city.localeCompare(b.city) || a.name.localeCompare(b.name))
+      .filter((venue) => isInAdminScope(venue.region, regionScope))
+      .filter((venue) => !regionFilter || normalizeRegion(venue.region) === regionFilter)
       .filter((venue) => !cityFilter || venue.city === cityFilter);
-  }, [cityFilter, state.venueRegistry]);
+  }, [cityFilter, regionFilter, regionScope, state.venueRegistry]);
   const cityOptions = useMemo(() => Array.from(new Set(state.venueRegistry.map((venue) => venue.city))).sort(), [state.venueRegistry]);
+  const regionOptions = useMemo(() => getRegionFilterOptions(state), [state]);
   const activeHall = schemeVenue?.halls.find((hall) => hall.layoutId) || null;
   const activeLayout = getSeatMapLayout(state, activeHall?.layoutId);
   const inputStyle = { background: A.surfaceBg, borderColor: A.border, color: A.textPrimary };
@@ -216,14 +233,6 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
     toast.success("Площадка со сложной схемой сохранена в реестре");
   };
 
-  const handleEnsureMockVenues = () => {
-    const venue = ensureMockVenueRegistryRecord(state);
-    setCityFilter("");
-    setDrawer(venue);
-    onUpdate({ ...state });
-    toast.success("Mock-площадка со схемой добавлена в реестр");
-  };
-
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -235,14 +244,15 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
           <button onClick={() => { setCreateOpen(true); setLayoutMode("simple"); }} className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>
             <Plus size={15} /> Создать площадку
           </button>
-          <button onClick={handleEnsureMockVenues} className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold" style={{ background: A.statusOkBg, color: A.statusOk }}>
-            <Database size={15} /> Заполнить mock-данными
-          </button>
         </div>
       </div>
-      <div className="max-w-xs">
+      <div className="flex max-w-2xl flex-wrap gap-2">
+        <select value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)} className="h-9 rounded-lg border px-3 text-sm outline-none" style={inputStyle}>
+          <option value="">Все регионы</option>
+          {regionOptions.map((region) => <option key={region} value={region}>{region}</option>)}
+        </select>
         <select value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} className="h-9 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle}>
-          <option value="">Все города / регионы</option>
+          <option value="">Все города</option>
           {cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}
         </select>
       </div>
@@ -258,7 +268,7 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["Площадка", "Город", "Тип", "Вместимость", "Статус", "Схема", "Действия"].map((h, i) => (
+                  {["Площадка", "Регион", "Город", "Тип", "Вместимость", "Статус", "Схема", "Действия"].map((h, i) => (
                     <th key={i} className="text-left py-3 px-4 font-medium text-xs" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>{h}</th>
                   ))}
                 </tr>
@@ -273,6 +283,7 @@ export function AdminVenueRegistry({ state, onUpdate }: { state: AppState; onUpd
                     onMouseEnter={e => (e.currentTarget.style.background = A.rowHover)}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td className="py-3 px-4" style={{ color: A.textPrimary }}>{v.name}</td>
+                    <td className="py-3 px-4" style={{ color: A.textSecondary }}>{v.region}</td>
                     <td className="py-3 px-4" style={{ color: A.textSecondary }}>{v.city}</td>
                     <td className="py-3 px-4" style={{ color: A.textSecondary }}>{v.type}</td>
                     <td className="py-3 px-4" style={{ color: A.textPrimary }}>{v.capacity}</td>

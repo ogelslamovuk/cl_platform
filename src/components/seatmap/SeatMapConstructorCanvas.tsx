@@ -34,6 +34,16 @@ type Selection = { kind: "block"; id: string } | { kind: "object"; id: string } 
 const MIN_SCALE = 0.28;
 const MAX_SCALE = 2.1;
 const FIELD_CLASS = "mt-1 h-9 w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 text-sm text-slate-100 outline-none focus:border-blue-400";
+type ConstructorTemplateKey = "theatre" | "amphitheatre" | "circus" | "sports" | "ice" | "palace";
+
+const CONSTRUCTOR_TEMPLATES: { key: ConstructorTemplateKey; title: string; caption: string }[] = [
+  { key: "theatre", title: "Театр", caption: "партер, балкон, ложи" },
+  { key: "amphitheatre", title: "Амфитеатр", caption: "сектора вокруг сцены" },
+  { key: "circus", title: "Цирк", caption: "арена и круговые сектора" },
+  { key: "sports", title: "Малая арена", caption: "спортзал до 500 мест" },
+  { key: "ice", title: "Ледовая арена", caption: "лед и трибуны" },
+  { key: "palace", title: "Дворец спорта", caption: "концертная арена" },
+];
 
 function blockBounds(block: SeatMapBlockV2) {
   const seats = block.rows.flatMap((row) => row.seats);
@@ -68,6 +78,51 @@ function objectTypeLabel(type: SeatMapObjectV2Type): string {
   if (type === "arena") return "Арена";
   if (type === "pit") return "Оркестровая яма";
   return "Сцена";
+}
+
+function addTemplateBlock(
+  source: SeatMapLayoutV2,
+  type: SeatMapConstructorBlockType,
+  patch: Partial<SeatMapConstructorBlockSettings> & Partial<Pick<SeatMapBlockV2, "x" | "y">>,
+): SeatMapLayoutV2 {
+  const added = addConstructorBlockV2(source, type);
+  const block = added.sectors.flatMap((sector) => sector.blocks).filter((item) => item.type === type).at(-1);
+  return block ? updateConstructorBlockV2(added, block.id, patch) : added;
+}
+
+function buildTemplateLayout(layoutId: string, layoutName: string, key: ConstructorTemplateKey): SeatMapLayoutV2 {
+  let next = createConstructorLayoutV2(layoutId, layoutName);
+  next = updateConstructorBlockV2(next, "straight-1", { name: "Центральный сектор", rows: 8, seatsPerRow: 12, x: 438, y: 254, rowSpacing: 29, seatSpacing: 27 });
+  if (key === "theatre") {
+    next = addTemplateBlock(next, "diagonal", { name: "Левый боковой сектор", rows: 7, seatsPerRow: 6, x: 210, y: 292, rotation: -11 });
+    next = addTemplateBlock(next, "diagonal", { name: "Правый боковой сектор", rows: 7, seatsPerRow: 6, x: 858, y: 268, rotation: 11 });
+    next = addTemplateBlock(next, "balcony", { name: "Балкон", rows: 4, seatsPerRow: 18, x: 328, y: 608 });
+    next = addTemplateBlock(next, "box", { name: "Ложа L", rows: 2, seatsPerRow: 4, x: 92, y: 255, rotation: -5 });
+    next = addTemplateBlock(next, "box", { name: "Ложа R", rows: 2, seatsPerRow: 4, x: 1030, y: 255, rotation: 5 });
+  }
+  if (key === "amphitheatre") {
+    next = updateConstructorBlockV2(next, "straight-1", { name: "Нижний сектор", rows: 6, seatsPerRow: 18, x: 360, y: 390 });
+    next = addTemplateBlock(next, "diagonal", { name: "Левый амфитеатр", rows: 8, seatsPerRow: 8, x: 184, y: 280, rotation: -18 });
+    next = addTemplateBlock(next, "diagonal", { name: "Правый амфитеатр", rows: 8, seatsPerRow: 8, x: 850, y: 246, rotation: 18 });
+    next = addTemplateBlock(next, "balcony", { name: "Верхний ярус", rows: 5, seatsPerRow: 20, x: 300, y: 610 });
+  }
+  if (key === "circus") {
+    next = updateConstructorBlockV2(next, "straight-1", { name: "Южная трибуна", rows: 6, seatsPerRow: 16, x: 380, y: 542 });
+    next = addTemplateBlock(next, "straight", { name: "Северная трибуна", rows: 5, seatsPerRow: 16, x: 385, y: 122 });
+    next = addTemplateBlock(next, "diagonal", { name: "Западная трибуна", rows: 7, seatsPerRow: 7, x: 195, y: 292, rotation: -34 });
+    next = addTemplateBlock(next, "diagonal", { name: "Восточная трибуна", rows: 7, seatsPerRow: 7, x: 886, y: 240, rotation: 34 });
+    next = { ...next, style: "arena", objects: [{ id: `${layoutId}-object-arena`, type: "arena", x: 405, y: 285, width: 410, height: 180, radius: 90, label: "МАНЕЖ", fill: "#083344", stroke: "#22D3EE" }] };
+  }
+  if (key === "sports" || key === "ice" || key === "palace") {
+    const arenaLabel = key === "ice" ? "ЛЕДОВАЯ ЗОНА" : key === "palace" ? "АРЕНА / СЦЕНА" : "ИГРОВАЯ ЗОНА";
+    next = updateConstructorBlockV2(next, "straight-1", { name: "Трибуна A", rows: 6, seatsPerRow: 18, x: 350, y: 106 });
+    next = addTemplateBlock(next, "straight", { name: "Трибуна B", rows: 6, seatsPerRow: 18, x: 350, y: 560 });
+    next = addTemplateBlock(next, "diagonal", { name: "Трибуна C", rows: 7, seatsPerRow: 8, x: 160, y: 300, rotation: -18 });
+    next = addTemplateBlock(next, "diagonal", { name: "Трибуна D", rows: 7, seatsPerRow: 8, x: 900, y: 265, rotation: 18 });
+    if (key === "palace") next = addTemplateBlock(next, "box", { name: "VIP-ложи", rows: 2, seatsPerRow: 10, x: 450, y: 470 });
+    next = { ...next, style: "arena", objects: [{ id: `${layoutId}-object-arena`, type: "arena", x: 365, y: 285, width: 500, height: 190, radius: 34, label: arenaLabel, fill: "#082F49", stroke: "#38BDF8" }] };
+  }
+  return next;
 }
 
 export default function SeatMapConstructorCanvas({ layoutId, layoutName, onClose, onSave }: Props) {
@@ -140,6 +195,14 @@ export default function SeatMapConstructorCanvas({ layoutId, layoutName, onClose
     const object = nextObject(layout, type);
     setLayout((current) => ({ ...current, objects: [...current.objects, object] }));
     setSelection({ kind: "object", id: object.id });
+  };
+
+  const applyTemplate = (key: ConstructorTemplateKey) => {
+    const candidate = buildTemplateLayout(layoutId, layoutName, key);
+    if (!commitLayout(candidate)) return;
+    const firstBlock = candidate.sectors.flatMap((sector) => sector.blocks)[0];
+    setSelection(firstBlock ? { kind: "block", id: firstBlock.id } : null);
+    window.setTimeout(fitToView, 0);
   };
 
   const updateObject = (patch: Partial<SeatMapObjectV2>) => {
@@ -225,6 +288,22 @@ export default function SeatMapConstructorCanvas({ layoutId, layoutName, onClose
                 <button data-add-object="stage" type="button" onClick={() => addObject("stage")} className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-left text-sm hover:border-blue-500">+ Сцена</button>
                 <button data-add-object="pit" type="button" onClick={() => addObject("pit")} className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-left text-sm hover:border-slate-500">+ Оркестровая яма</button>
                 <button data-add-object="arena" type="button" onClick={() => addObject("arena")} className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-left text-sm hover:border-sky-500">+ Арена</button>
+              </div>
+            </div>
+            <div className="border-t border-slate-700 pt-4">
+              <p className="mb-2 text-sm font-semibold">Шаблоны посадки</p>
+              <div className="grid grid-cols-2 gap-2">
+                {CONSTRUCTOR_TEMPLATES.map((template) => (
+                  <button
+                    key={template.key}
+                    type="button"
+                    onClick={() => applyTemplate(template.key)}
+                    className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-left hover:border-blue-500"
+                  >
+                    <span className="block text-xs font-semibold text-slate-100">{template.title}</span>
+                    <span className="mt-1 block text-[10px] leading-4 text-slate-400">{template.caption}</span>
+                  </button>
+                ))}
               </div>
             </div>
             <button data-delete-selection type="button" disabled={!selection} onClick={removeSelected} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-800/70 bg-red-950/30 px-3 py-2 text-sm font-semibold text-red-200 disabled:cursor-not-allowed disabled:opacity-40">

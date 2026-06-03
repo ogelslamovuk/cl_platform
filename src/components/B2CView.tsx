@@ -121,6 +121,43 @@ const D = {
   radius: "12px",
 };
 
+function posterPalette(category: string) {
+  const palettes = [
+    { bg: "#0F172A", accent: "#F59E0B", soft: "#FEF3C7" },
+    { bg: "#12372A", accent: "#34D399", soft: "#D1FAE5" },
+    { bg: "#1F2937", accent: "#60A5FA", soft: "#DBEAFE" },
+    { bg: "#3F1D2B", accent: "#F472B6", soft: "#FCE7F3" },
+    { bg: "#263238", accent: "#A3E635", soft: "#ECFCCB" },
+  ];
+  const index = Math.abs(category.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0)) % palettes.length;
+  return palettes[index];
+}
+
+function PosterArtwork({ event, large = false }: { event: DemoEvent; large?: boolean }) {
+  const palette = posterPalette(event.category);
+  const dt = formatDateTime(event.dateTime);
+  return (
+    <div
+      className="relative flex h-full w-full flex-col overflow-hidden rounded-lg p-5 text-white"
+      style={{ background: palette.bg }}
+      aria-label={`Постер: ${event.title}`}
+    >
+      <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full opacity-30" style={{ background: palette.accent }} />
+      <div className="absolute bottom-24 left-[-35%] h-32 w-[130%] rotate-[-10deg] opacity-20" style={{ background: palette.accent }} />
+      <div className="relative z-[1] flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wide">
+        <span>{event.category}</span>
+        <span style={{ color: palette.soft }}>{formatDateShort(event.dateTime) || dt.date}</span>
+      </div>
+      <div className="relative z-[1] mt-auto">
+        <div className="mb-4 h-1.5 w-16 rounded-full" style={{ background: palette.accent }} />
+        <h3 className={`${large ? "text-3xl" : "text-xl"} font-semibold leading-tight`}>{event.title}</h3>
+        <div className="mt-4 text-sm" style={{ color: palette.soft }}>{event.city}</div>
+        <div className="mt-1 line-clamp-2 text-xs opacity-80">{event.venue}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function B2CView({ state, onUpdate }: Props) {
   const [search, setSearch] = useState("");
   const [city, setCity] = useState<"" | (typeof CITY_WHITELIST)[number]>("");
@@ -275,9 +312,10 @@ export default function B2CView({ state, onUpdate }: Props) {
           }
         }}
       >
-        <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
-          <img src={resolvePublicAsset(event.poster)} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-xl transition duration-300 group-hover:scale-[1.15]" />
-          <img src={resolvePublicAsset(event.poster)} alt={event.title} className="relative z-[1] h-full w-full object-contain p-1 transition duration-300 group-hover:scale-[1.02]" />
+        <div className="relative bg-slate-100 px-10 py-5">
+          <div className="mx-auto aspect-[2/3] w-full max-w-[230px] transition duration-300 group-hover:scale-[1.02]">
+            <PosterArtwork event={event} />
+          </div>
         </div>
 
         <div className="flex flex-1 flex-col p-4 sm:p-5">
@@ -377,7 +415,7 @@ export default function B2CView({ state, onUpdate }: Props) {
                 CinemaLab
               </div>
               <div className="truncate text-xs" style={{ color: D.textMuted }}>
-                прототип билетной платформы
+                билеты на события
               </div>
             </div>
           </div>
@@ -406,13 +444,13 @@ export default function B2CView({ state, onUpdate }: Props) {
         <div>
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-xs font-semibold" style={{ borderColor: D.borderSoft, color: D.accentText }}>
             <Sparkles size={14} />
-            Витрина розничной продажи билетов
+            Афиша и билеты
           </div>
           <h1 className="max-w-3xl text-[2rem] font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl" style={{ color: D.text }}>
             Афиша мероприятий
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 sm:text-lg" style={{ color: D.textSoft }}>
-            На этой странице показан покупательский экран платформы: поиск события, фильтрация афиши, выбор ценовой категории и оформление билета в прототипе без изменения реальных данных.
+            Культурные, театральные и фестивальные события с понятными ценовыми категориями и выбором мест там, где площадка использует схему зала.
           </p>
         </div>
 
@@ -452,7 +490,7 @@ export default function B2CView({ state, onUpdate }: Props) {
               Поиск и фильтры
             </div>
             <p className="mt-1 text-sm" style={{ color: D.textMuted }}>
-              Быстро отберите события по городу, категории или названию.
+              Город, категория и название события.
             </p>
           </div>
           <div className="text-sm" style={{ color: D.textMuted }}>
@@ -530,7 +568,7 @@ export default function B2CView({ state, onUpdate }: Props) {
               Афиша
             </h2>
             <p className="mt-1 text-sm" style={{ color: D.textMuted }}>
-              Ровная витрина событий с единым форматом карточек и понятным CTA.
+              Опубликованные события, доступные для покупки.
             </p>
           </div>
           <div className="inline-flex w-fit items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-sm" style={{ borderColor: D.borderSoft, color: D.textSoft }}>
@@ -574,9 +612,9 @@ export default function B2CView({ state, onUpdate }: Props) {
 
       <section className="mt-10 grid gap-4 border-t pt-6 md:grid-cols-3" style={{ borderColor: D.borderSoft }}>
         {[
-          { icon: CheckCircle2, title: "Сценарий без лишнего шума", text: "Покупатель видит только афишу, выбор билета и результат покупки." },
-          { icon: Ticket, title: "Билет в один поток", text: "После оформления билет появляется в панели «Мои билеты» без перехода на другие страницы." },
-          { icon: Star, title: "Готово для презентации", text: "Интерфейс выдержан в спокойной B2C-стилистике для деловой демонстрации." },
+          { icon: CheckCircle2, title: "Концерты", text: "Камерные, эстрадные и большие концертные программы." },
+          { icon: Ticket, title: "Театр и сцена", text: "Спектакли, форумы и события с выбором места в зале." },
+          { icon: Star, title: "Фестивали", text: "Региональные праздники, выставки и открытые площадки." },
         ].map((item) => (
           <div key={item.title} className="flex gap-3 rounded-xl border bg-white p-4" style={{ borderColor: D.borderSoft }}>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: D.panel, color: D.accent }}>
@@ -612,9 +650,11 @@ export default function B2CView({ state, onUpdate }: Props) {
               </button>
 
               <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)]">
-                <div className="relative min-h-[320px] bg-slate-100 lg:min-h-full">
-                  <img src={resolvePublicAsset(detailsEvent.poster)} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-2xl" />
-                  <img src={resolvePublicAsset(detailsEvent.poster)} alt={detailsEvent.title} className="absolute inset-0 h-full w-full object-contain p-5" />
+                <div className="relative flex min-h-[420px] items-center justify-center bg-slate-100 p-8 lg:min-h-full">
+                  <div className="absolute inset-0 opacity-10" style={{ background: posterPalette(detailsEvent.category).accent }} />
+                  <div className="relative aspect-[2/3] w-full max-w-[340px] shadow-2xl">
+                    <PosterArtwork event={detailsEvent} large />
+                  </div>
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/70 to-transparent p-5 text-white">
                     <div className="flex flex-wrap gap-2">
                       <span className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur">

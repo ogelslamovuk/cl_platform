@@ -3,11 +3,16 @@ import type { AppState } from "@/lib/store";
 import { A, statusChip } from "./adminStyles";
 import { ShieldAlert, X } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import { getEventRegionCity, isInAdminScope, type AdminRegionScope } from "./adminScope";
 
 interface Flag {
   id: string;
-  object: string;
+  objectType: string;
+  objectName: string;
   objectId: string;
+  region: string;
+  city: string;
+  eventType: string;
   type: string;
   priority: 'high' | 'medium' | 'low';
   status: string;
@@ -15,7 +20,7 @@ interface Flag {
   ts: string;
 }
 
-interface Props { state: AppState; }
+interface Props { state: AppState; regionScope?: AdminRegionScope; }
 
 function CardHelp({ text }: { text: string }) {
   return (
@@ -39,36 +44,93 @@ const priorityLabel: Record<Flag['priority'], string> = {
   low: "Низкий",
 };
 
-export default function AdminControl({ state }: Props) {
+function isSyntheticNoTicketError(reason?: string): boolean {
+  return /нет доступных билетов/i.test(reason || "");
+}
+
+export default function AdminControl({ state, regionScope = "all" }: Props) {
   const [drawer, setDrawer] = useState<Flag | null>(null);
 
   const flags = useMemo<Flag[]>(() => {
     const result: Flag[] = [];
-    // Error ops → flags
-    state.ops.filter(o => o.result === "error").forEach(o => {
-      let flagType = "Ошибка операции";
-      if (o.reason?.includes("погашен")) flagType = "Повторное погашение";
-      else if (o.reason?.includes("возвращён")) flagType = "Операция над возвратом";
-      else if (o.reason?.includes("Нет доступных")) flagType = "Превышение лимита";
+    const eventById = new Map(state.events.map((event) => [event.eventId, event]));
+    state.ops
+      .filter((op) => op.result === "error" && !(op.type === "sell" && isSyntheticNoTicketError(op.reason)))
+      .forEach((op) => {
+      const event = eventById.get(op.eventId);
+      const regionCity = event ? getEventRegionCity(state, event) : { region: "—", city: "—" };
+      if (!isInAdminScope(regionCity.region, regionScope)) return;
+      let flagType = "Операция требует проверки";
+      if (op.reason?.includes("погашен")) flagType = "Повторное погашение TicketID";
+      else if (op.reason?.includes("возвращён")) flagType = "Операция над возвращённым билетом";
       result.push({
-        id: `FLG-${o.opId}`,
-        object: o.type,
-        objectId: o.ticketId || o.eventId,
+        id: `FLG-${op.opId}`,
+        objectType: op.ticketId ? "TicketID" : "Операция",
+        objectName: event?.title || "Операция билета",
+        objectId: op.ticketId || op.eventId,
+        region: regionCity.region,
+        city: regionCity.city,
+        eventType: event?.category || "—",
         type: flagType,
-        priority: flagType === "Повторное погашение" ? 'high' : 'medium',
+        priority: flagType.includes("Повторное") ? 'high' : 'medium',
         status: "Открыт",
-        reason: o.reason || "",
-        ts: o.ts,
+        reason: op.reason || "",
+        ts: op.ts,
       });
     });
-    // High refund rate
+    state.events.forEach((event) => {
+      const regionCity = getEventRegionCity(state, event);
+      if (!isInAdminScope(regionCity.region, regionScope)) return;
+      const tickets = state.tickets.filter((ticket) => ticket.eventId === event.eventId);
+      if (tickets.length > event.capacity) {
+        result.push({
+          id: `FLG-CAP-${event.eventId}`,
+          objectType: "Мероприятие",
+          objectName: event.title,
+          objectId: event.eventId,
+          region: regionCity.region,
+          city: regionCity.city,
+          eventType: event.category,
+          type: "Выпущено больше вместимости",
+          priority: "high",
+          status: "Открыт",
+          reason: `TicketID: ${tickets.length}, утверждённая вместимость: ${event.capacity}`,
+          ts: event.updatedAt,
+        });
+      }
+      const channels = new Set(event.salesChannels || []);
+      const unauthorizedOps = state.ops.filter((op) => op.eventId === event.eventId && op.result === "ok" && op.type === "sell" && !channels.has(op.channel));
+      if (unauthorizedOps.length) {
+        result.push({
+          id: `FLG-CHANNEL-${event.eventId}`,
+          objectType: "Оператор",
+          objectName: event.title,
+          objectId: unauthorizedOps[0].channel,
+          region: regionCity.region,
+          city: regionCity.city,
+          eventType: event.category,
+          type: "Продажа неавторизованным каналом",
+          priority: "high",
+          status: "Открыт",
+          reason: `Канал ${unauthorizedOps[0].channel} отсутствует в согласованных каналах события`,
+          ts: unauthorizedOps[0].ts,
+        });
+      }
+    });
     const refunds = state.ops.filter(o => o.type === "refund" && o.result === "ok").length;
     const sells = state.ops.filter(o => o.type === "sell" && o.result === "ok").length;
     if (sells > 0 && refunds / sells > 0.3) {
+      const event = state.events[0];
+      const regionCity = event ? getEventRegionCity(state, event) : { region: "Минск", city: "Минск" };
+      if (!isInAdminScope(regionCity.region, regionScope)) return result;
       result.push({
         id: "FLG-REFUND-RATE",
-        object: "Система",
+        objectType: "Система",
+        objectName: "Возвраты по платформе",
         objectId: "—",
+        region: regionCity.region,
+        city: regionCity.city,
+        eventType: "операции",
         type: "Возвраты выше нормы",
         priority: 'high',
         status: "Мониторинг",
@@ -77,7 +139,7 @@ export default function AdminControl({ state }: Props) {
       });
     }
     return result;
-  }, [state.ops]);
+  }, [regionScope, state]);
 
   return (
     <div className="space-y-5">
@@ -93,7 +155,7 @@ export default function AdminControl({ state }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["ID", "Объект", "Тип нарушения", "Приоритет", "Статус", "Основание", "Время"].map((h, i) => (
+                  {["ID", "Объект", "Регион / город", "Тип события", "Тип нарушения", "Приоритет", "Статус", "Основание", "Действие"].map((h, i) => (
                     <th key={i} className="text-left py-3 px-4 font-medium text-xs" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>{h}</th>
                   ))}
                 </tr>
@@ -108,14 +170,16 @@ export default function AdminControl({ state }: Props) {
                       onMouseEnter={e => (e.currentTarget.style.background = A.rowHover)}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                       <td className="py-3 px-4 font-mono text-xs" style={{ color: A.cyan }}>{f.id}</td>
-                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{f.objectId}</td>
+                      <td className="py-3 px-4" style={{ color: A.textSecondary }}><div>{f.objectType}</div><div className="text-xs">{f.objectName}</div><div className="font-mono text-xs">{f.objectId}</div></td>
+                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{f.region}<br /><span className="text-xs">{f.city}</span></td>
+                      <td className="py-3 px-4" style={{ color: A.textSecondary }}>{f.eventType}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{f.type}</td>
                       <td className="py-3 px-4">
                         <span style={{ background: pChip.bg, color: pChip.color, borderRadius: 999 }} className="text-xs px-2.5 py-0.5 font-medium">{priorityLabel[f.priority]}</span>
                       </td>
                       <td className="py-3 px-4" style={{ color: A.textSecondary }}>{f.status}</td>
-                      <td className="py-3 px-4 text-xs max-w-[200px] truncate" style={{ color: A.textMuted }}>{f.reason}</td>
-                      <td className="py-3 px-4 text-xs" style={{ color: A.textMuted }}>{f.ts?.replace("T", " ").slice(0, 16)}</td>
+                      <td className="py-3 px-4 text-xs max-w-[220px] truncate" style={{ color: A.textMuted }}>{f.reason}</td>
+                      <td className="py-3 px-4 text-xs" style={{ color: A.cyan }}>Открыть</td>
                     </tr>
                   );
                 })}
@@ -139,7 +203,7 @@ export default function AdminControl({ state }: Props) {
 </span>
             </div>
             <div className="p-5 space-y-4">
-              {([["Тип", drawer.type], ["Объект", drawer.objectId], ["Приоритет", priorityLabel[drawer.priority]], ["Статус", drawer.status], ["Основание", drawer.reason], ["Время", drawer.ts?.replace("T", " ").slice(0, 19)]] as [string, string][]).map(([k, v]) => (
+              {([["Тип", drawer.type], ["Объект", `${drawer.objectType}: ${drawer.objectName}`], ["ID объекта", drawer.objectId], ["Регион", drawer.region], ["Город", drawer.city], ["Тип события", drawer.eventType], ["Приоритет", priorityLabel[drawer.priority]], ["Статус", drawer.status], ["Основание", drawer.reason], ["Время", drawer.ts?.replace("T", " ").slice(0, 19)]] as [string, string][]).map(([k, v]) => (
                 <div key={k}>
                   <div style={{ color: A.textMuted }} className="text-xs font-medium mb-1">{k}</div>
                   <div style={{ color: A.textPrimary }} className="text-sm">{v}</div>

@@ -18,10 +18,12 @@ import { A } from "./adminStyles";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import SeatTariffSummary from "@/components/seatmap/SeatTariffSummary";
 import { toast } from "sonner";
+import { resolveRegionCity, isInAdminScope, type AdminRegionScope } from "./adminScope";
 
-interface Props { state: AppState; onUpdate: (s: AppState) => void; }
+interface Props { state: AppState; onUpdate: (s: AppState) => void; regionScope?: AdminRegionScope; }
 
 type StatusFilter = "all" | "submitted" | "approved" | "needs_rework" | "rejected";
+type PreviewDoc = { title: string; rows: [string, string][] } | null;
 
 function CardHelp({ text }: { text: string }) {
   return (
@@ -63,11 +65,16 @@ function getApplicationFeatures(row: AppState["eventComplianceApplications"][num
   return features;
 }
 
-export default function AdminEventComplianceApplications({ state, onUpdate }: Props) {
+export default function AdminEventComplianceApplications({ state, onUpdate, regionScope = "all" }: Props) {
   const [comment, setComment] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("submitted");
+  const [previewDoc, setPreviewDoc] = useState<PreviewDoc>(null);
 
-  const allRows = useMemo(() => state.eventComplianceApplications.filter((row) => row.status !== "draft").slice().reverse(), [state.eventComplianceApplications]);
+  const allRows = useMemo(() => state.eventComplianceApplications
+    .filter((row) => row.status !== "draft")
+    .filter((row) => isInAdminScope(resolveRegionCity(state, { venueId: row.data.venueId, city: row.data.venueName, venueName: row.data.venueName, venueAddress: row.data.venueAddress }).region, regionScope))
+    .slice()
+    .reverse(), [regionScope, state]);
   const rows = useMemo(
     () => statusFilter === "all" ? allRows : allRows.filter((row) => row.status === statusFilter),
     [allRows, statusFilter]
@@ -97,7 +104,7 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold" style={{ color: A.textPrimary }}>Заявки на проведение мероприятий</h2>
+          <h2 className="text-sm font-semibold" style={{ color: A.textPrimary }}>Заявки мероприятий</h2>
           <p className="mt-1 text-xs" style={{ color: A.textSecondary }}>Согласование, госпошлина и выдача удостоверения.</p>
         </div>
         <HelpTooltip text="Заявки проходят рассмотрение в Центре Управления; после одобрения создаётся мероприятие и присваивается удостоверение, если оно требуется." />
@@ -142,6 +149,7 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
           const checks = r.data.interagencyChecks || [];
           const contractStatus = r.data.venueContractStatus || "требуется";
           const venue = state.venueRegistry.find((item) => item.venueId === r.data.venueId);
+          const regionCity = resolveRegionCity(state, { venueId: r.data.venueId, venueName: r.data.venueName, venueAddress: r.data.venueAddress });
           const hall = venue?.halls.find((item) => item.hallId === r.data.hallId);
           const tariffConfigurationSummary = getSeatTariffConfigurationSummary({
             eventSeats: r.data.eventSeats,
@@ -176,6 +184,10 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                     <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
                       <div className="text-xs" style={{ color: A.textMuted }}>Площадка</div>
                       <div style={{ color: A.textPrimary }}>{r.data.venueName || "—"}</div>
+                    </div>
+                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
+                      <div className="text-xs" style={{ color: A.textMuted }}>Регион / город</div>
+                      <div style={{ color: A.textPrimary }}>{regionCity.region} · {regionCity.city}</div>
                     </div>
                     <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
                       <div className="text-xs" style={{ color: A.textMuted }}>Возрастная категория</div>
@@ -243,6 +255,32 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
                           })}
                         </div>
                       )}
+                    </div>
+                    <div className="rounded-lg border px-3 py-2 text-xs md:col-span-2" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
+                      <div className="mb-2" style={{ color: A.textMuted }}>Документы заявки</div>
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {(r.data.eventDocuments?.length ? r.data.eventDocuments : [{ attachmentId: "program", kind: "program", name: "program_outline_mock.pdf", uploadedAt: r.updatedAt, isSample: true }]).map((document) => (
+                          <button
+                            key={document.attachmentId}
+                            type="button"
+                            onClick={() => setPreviewDoc({ title: document.name, rows: [["Файл", document.name], ["Тип", document.kind], ["Статус", "mock-документ приложен"], ["Заявка", r.eventComplianceApplicationId]] })}
+                            className="rounded-lg border px-3 py-2 text-left"
+                            style={{ borderColor: A.border, background: A.cardBg, color: A.textPrimary }}
+                          >
+                            <span className="block font-medium">{document.name}</span>
+                            <span className="mt-1 block text-[11px]" style={{ color: A.textMuted }}>Просмотреть</span>
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setPreviewDoc({ title: "Договор с площадкой", rows: [["Площадка", r.data.venueName || "—"], ["Адрес", r.data.venueAddress || "—"], ["Статус", contractStatus], ["Регион", regionCity.region]] })}
+                          className="rounded-lg border px-3 py-2 text-left"
+                          style={{ borderColor: A.border, background: A.cardBg, color: A.textPrimary }}
+                        >
+                          <span className="block font-medium">Договор с площадкой</span>
+                          <span className="mt-1 block text-[11px]" style={{ color: A.textMuted }}>Просмотреть</span>
+                        </button>
+                      </div>
                     </div>
                     <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
                       <div className="mb-1" style={{ color: A.textMuted }}>Участники и документы</div>
@@ -338,6 +376,25 @@ export default function AdminEventComplianceApplications({ state, onUpdate }: Pr
           </div>
         )}
       </div>
+      {previewDoc && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" onClick={() => setPreviewDoc(null)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative w-full max-w-lg rounded-2xl border p-5" style={{ background: A.cardBg, borderColor: A.borderGlass, boxShadow: A.cardShadow }} onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-base font-semibold" style={{ color: A.textPrimary }}>{previewDoc.title}</h3>
+              <button type="button" onClick={() => setPreviewDoc(null)} className="rounded-lg px-3 py-1 text-sm" style={{ background: A.surfaceBg, color: A.textPrimary }}>Закрыть</button>
+            </div>
+            <div className="mt-4 space-y-2">
+              {previewDoc.rows.map(([label, value]) => (
+                <div key={label} className="grid grid-cols-[130px_minmax(0,1fr)] gap-3 rounded-lg px-3 py-2 text-sm" style={{ background: A.surfaceBg }}>
+                  <span style={{ color: A.textMuted }}>{label}</span>
+                  <span style={{ color: A.textPrimary }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

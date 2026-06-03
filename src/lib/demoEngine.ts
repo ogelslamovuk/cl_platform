@@ -562,7 +562,7 @@ function ensureSoldOutEvent(state: AppState): void {
 function ensureApprovedUnpublishedEvent(state: AppState): void {
   const now = new Date().toISOString();
   const organizerId = "demo_org_minskconcert";
-  const eventTitle = "Вечер симфонической музыки · Grand Theatre";
+  const eventTitle = "Вечер симфонической музыки";
   const dateTime = toDateTime(15, "19:30");
   const tiers = [{ ...APPROVED_UNPUBLISHED_TIER }];
   const layout = getSeatMapLayout(state, "layout_grand_theatre_v2");
@@ -579,7 +579,7 @@ function ensureApprovedUnpublishedEvent(state: AppState): void {
     appId: APPROVED_UNPUBLISHED_APP_ID,
     organizerId,
     title: eventTitle,
-    venue: "Grand Theatre · SeatMap V2 Demo",
+    venue: "Большая концертная сцена",
     dateTime,
     capacity,
     tiers: tierCounts,
@@ -603,7 +603,7 @@ function ensureApprovedUnpublishedEvent(state: AppState): void {
     licenseId: "LIC-DEMO-APPROVED",
     appId: APPROVED_UNPUBLISHED_APP_ID,
     title: eventTitle,
-    venue: "Grand Theatre · SeatMap V2 Demo",
+    venue: "Большая концертная сцена",
     dateTime,
     capacity,
     tiers: tierCounts,
@@ -830,14 +830,14 @@ function ensureSeatMapDemoEvent(state: AppState): void {
     licenseId: "LIC-SEAT-MAP-DEMO",
     appId: "EVAPP-SEAT-MAP-DEMO",
     complianceApplicationId: "EVAPP-SEAT-MAP-DEMO",
-    title: "Гала-концерт в Grand Theatre",
-    venue: "Grand Theatre · SeatMap V2 Demo",
+    title: "Гала-концерт в Большой концертной сцене",
+    venue: "Большая концертная сцена",
     dateTime: toDateTime(16, "19:00"),
     capacity: 0,
     tiers: tierCounts,
     city: "Минск",
     category: "Концерты",
-    description: "Демо-событие SeatMap V2: партер, диагональные сектора, балкон, ложи и realtime-продажи.",
+    description: "Концертное событие с партером, боковыми секторами, балконом, ложами и продажей мест по схеме.",
     poster: DEMO_POSTERS.belarusUSertsy,
     salesChannels: ALL_ACTIVE_RESELLER_CHANNELS,
     status: "published" as const,
@@ -850,9 +850,9 @@ function ensureSeatMapDemoEvent(state: AppState): void {
     updatedAt: now,
   };
   Object.assign(next, {
-    title: "Гала-концерт в Grand Theatre",
-    venue: "Grand Theatre · SeatMap V2 Demo",
-    description: "Демо-событие SeatMap V2: партер, диагональные сектора, балкон, ложи и realtime-продажи.",
+    title: "Гала-концерт в Большой концертной сцене",
+    venue: "Большая концертная сцена",
+    description: "Концертное событие с партером, боковыми секторами, балконом, ложами и продажей мест по схеме.",
     venueId: "venue_grand_theatre_v2",
     hallId: "hall_grand_theatre_v2",
     layoutId: "layout_grand_theatre_v2",
@@ -1540,10 +1540,6 @@ function ensureDemoTicketOperations(state: AppState): void {
     if (ticket) redeem(state, ticket.ticketId, "KvitkiBY");
   }
 
-  const errorEvent = findSeedEvent(state, 0);
-  if (errorEvent && !state.ops.some((op) => op.channel === "LegacySeller" && op.result === "error")) {
-    sell(state, errorEvent.eventId, "Недоступный demo-тариф", "LegacySeller", "Demo Legacy Seller");
-  }
 }
 
 export function runDemoScenario(): AppState {

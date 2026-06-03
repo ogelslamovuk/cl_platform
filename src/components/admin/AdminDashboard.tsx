@@ -5,15 +5,22 @@ import {
   LayoutDashboard, FileText, Calendar, Ticket, AlertTriangle, Activity,
 } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import { getEventRegionCity, isInAdminScope, type AdminRegionScope } from "./adminScope";
 
-interface Props { state: AppState; onNavigate: (tab: AdminDashboardTab) => void; }
+interface Props { state: AppState; onNavigate: (tab: AdminDashboardTab) => void; regionScope?: AdminRegionScope; }
 
 const statusLabel: Record<string, string> = {
   draft: "Черновик", submitted: "Отправлена", approved: "Одобрена", rejected: "Отклонена", needs_rework: "На доработке",
 };
 const opTypeLabel: Record<string, string> = { sell: "Продажа", refund: "Возврат", redeem: "Погашение", verify: "Проверка" };
 
-type AdminDashboardTab = "organizerApplications" | "eventComplianceApplications" | "events" | "operations";
+type AdminDashboardTab =
+  | "organizerApplications"
+  | "eventComplianceApplications"
+  | "registryEvents"
+  | "tickets"
+  | "control"
+  | "operations";
 type DashboardApplicationRow = {
   id: string;
   title: string;
@@ -37,19 +44,33 @@ function CardHelp({ text }: { text: string }) {
   );
 }
 
-export default function AdminDashboard({ state, onNavigate }: Props) {
+function isSyntheticNoTicketError(reason?: string): boolean {
+  return /нет доступных билетов/i.test(reason || "");
+}
+
+export default function AdminDashboard({ state, onNavigate, regionScope = "all" }: Props) {
+  const visibleEvents = useMemo(
+    () => state.events.filter((event) => isInAdminScope(getEventRegionCity(state, event).region, regionScope)),
+    [regionScope, state]
+  );
+  const visibleOps = useMemo(() => {
+    const eventIds = new Set(visibleEvents.map((event) => event.eventId));
+    return state.ops.filter((op) => eventIds.has(op.eventId) && !(op.type === "sell" && op.result === "error" && isSyntheticNoTicketError(op.reason)));
+  }, [state.ops, visibleEvents]);
+
   const kpi = useMemo(() => {
     const apps = state.applications;
     const eventApplications = state.eventComplianceApplications;
     const newApps = apps.filter(a => a.status === "submitted").length
       + eventApplications.filter((a) => a.status === "submitted").length;
     const reviewing = eventApplications.filter((a) => a.status === "submitted").length;
-    const activeEvents = state.events.filter(e => e.status === "published").length;
-    const totalTickets = state.tickets.length;
-    const errorOps = state.ops.filter(o => o.result === "error").length;
-    const suspiciousOps = state.ops.filter(o => o.result === "error" && (o.type === "redeem" || o.type === "refund")).length;
+    const activeEvents = visibleEvents.filter(e => e.status === "published").length;
+    const visibleEventIds = new Set(visibleEvents.map((event) => event.eventId));
+    const totalTickets = state.tickets.filter((ticket) => visibleEventIds.has(ticket.eventId)).length;
+    const errorOps = visibleOps.filter(o => o.result === "error").length;
+    const suspiciousOps = visibleOps.filter(o => o.result === "error" && (o.type === "redeem" || o.type === "refund")).length;
     return { newApps, reviewing, activeEvents, totalTickets, errorOps, suspiciousOps };
-  }, [state]);
+  }, [state.applications, state.eventComplianceApplications, state.tickets, visibleEvents, visibleOps]);
 
   const recentApps = useMemo<DashboardApplicationRow[]>(() => {
     const legacyRows = state.applications.map((a) => ({
@@ -70,24 +91,24 @@ export default function AdminDashboard({ state, onNavigate }: Props) {
       .sort((a, b) => b.sortAt.localeCompare(a.sortAt))
       .slice(0, 5);
   }, [state.applications, state.eventComplianceApplications]);
-  const recentOps = useMemo(() => [...state.ops].reverse().slice(0, 6), [state.ops]);
+  const recentOps = useMemo(() => [...visibleOps].reverse().slice(0, 6), [visibleOps]);
   const criticalFlags = useMemo(() => {
     const flags: { id: string; text: string; type: 'error' | 'warn' }[] = [];
-    state.ops.filter(o => o.result === "error").slice(-4).forEach(o => {
+    visibleOps.filter(o => o.result === "error").slice(-4).forEach(o => {
       flags.push({ id: o.opId, text: `${opTypeLabel[o.type] || o.type} отказ: ${o.reason || "неизвестно"}`, type: 'error' });
     });
-    const refundCount = state.ops.filter(o => o.type === "refund").length;
-    const soldCount = state.ops.filter(o => o.type === "sell" && o.result === "ok").length;
+    const refundCount = visibleOps.filter(o => o.type === "refund").length;
+    const soldCount = visibleOps.filter(o => o.type === "sell" && o.result === "ok").length;
     if (soldCount > 0 && refundCount / soldCount > 0.3) {
       flags.push({ id: 'refund_rate', text: `Высокий уровень возвратов: ${Math.round(refundCount / soldCount * 100)}%`, type: 'warn' });
     }
     return flags;
-  }, [state.ops]);
+  }, [visibleOps]);
 
   const todayEvents = useMemo(() => {
     const today = localDateKey();
-    return state.events.filter(e => e.dateTime?.startsWith(today));
-  }, [state.events]);
+    return visibleEvents.filter(e => e.dateTime?.startsWith(today));
+  }, [visibleEvents]);
   const attentionItems = useMemo(() => {
     const organizerPending = state.organizerApplications.filter((app) => app.status === "submitted").length;
     const eventPending = state.eventComplianceApplications.filter((app) => app.status === "submitted").length;
@@ -108,19 +129,19 @@ export default function AdminDashboard({ state, onNavigate }: Props) {
       { label: "заявки организаторов на рассмотрении", count: organizerPending, tab: "organizerApplications" as const },
       { label: "заявки мероприятий на рассмотрении", count: eventPending, tab: "eventComplianceApplications" as const },
       { label: "заявки на доработке", count: needsRework, tab: "eventComplianceApplications" as const },
-      { label: "события сегодня", count: todayCount, tab: "events" as const },
-      { label: "события почти распроданы", count: almostSoldOut, tab: "events" as const },
+      { label: "события сегодня", count: todayCount, tab: "registryEvents" as const },
+      { label: "события почти распроданы", count: almostSoldOut, tab: "registryEvents" as const },
       { label: "операции требуют проверки", count: operationsToCheck, tab: "operations" as const },
     ];
   }, [state.organizerApplications, state.eventComplianceApplications, state.events, state.tickets, state.ops, todayEvents]);
 
   const kpiCards = [
-    { label: "Новые заявки", value: kpi.newApps, icon: FileText, accent: A.cyan, tooltip: "Количество новых заявок, ожидающих первичного рассмотрения." },
-    { label: "На проверке", value: kpi.reviewing, icon: Activity, accent: A.blue, tooltip: "Количество заявок, находящихся на проверке." },
-    { label: "Активные события", value: kpi.activeEvents, icon: Calendar, accent: A.violet, tooltip: "Количество опубликованных событий, доступных в системе." },
-    { label: "Билеты выпущено", value: kpi.totalTickets, icon: Ticket, accent: A.gold, tooltip: "Общее количество выпущенных билетов по всем событиям." },
-    { label: "Нарушения", value: kpi.errorOps, icon: AlertTriangle, accent: A.statusError, tooltip: "Количество ошибок и нарушений, требующих внимания." },
-    { label: "Подозрительные", value: kpi.suspiciousOps, icon: Activity, accent: A.statusWarn, tooltip: "Количество подозрительных операций, требующих проверки." },
+    { label: "Новые заявки", value: kpi.newApps, icon: FileText, accent: A.cyan, tooltip: "Количество новых заявок, ожидающих первичного рассмотрения.", tab: "eventComplianceApplications" as const },
+    { label: "На проверке", value: kpi.reviewing, icon: Activity, accent: A.blue, tooltip: "Количество заявок, находящихся на проверке.", tab: "eventComplianceApplications" as const },
+    { label: "Активные события", value: kpi.activeEvents, icon: Calendar, accent: A.violet, tooltip: "Количество опубликованных событий, доступных в системе.", tab: "registryEvents" as const },
+    { label: "Билеты выпущено", value: kpi.totalTickets, icon: Ticket, accent: A.gold, tooltip: "Общее количество выпущенных билетов по всем событиям.", tab: "tickets" as const },
+    { label: "Нарушения", value: kpi.errorOps, icon: AlertTriangle, accent: A.statusError, tooltip: "Количество ошибок и нарушений, требующих внимания.", tab: "control" as const },
+    { label: "Подозрительные", value: kpi.suspiciousOps, icon: Activity, accent: A.statusWarn, tooltip: "Количество подозрительных операций, требующих проверки.", tab: "control" as const },
   ];
 
   return (
@@ -128,12 +149,12 @@ export default function AdminDashboard({ state, onNavigate }: Props) {
       {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {kpiCards.map((k, i) => (
-          <div key={i} style={{
+          <button key={i} type="button" onClick={() => onNavigate(k.tab)} style={{
             background: A.glassGradient + ', ' + A.cardBg,
             border: `1px solid ${A.border}`,
             boxShadow: A.glassShadow,
             borderRadius: 16,
-          }} className="relative p-5 transition-all duration-200 hover:-translate-y-0.5"
+          }} className="relative p-5 text-left transition-all duration-200 hover:-translate-y-0.5"
             onMouseEnter={e => (e.currentTarget.style.borderColor = k.accent + '40')}
             onMouseLeave={e => (e.currentTarget.style.borderColor = A.border)}>
             <CardHelp text={k.tooltip} />
@@ -144,7 +165,7 @@ export default function AdminDashboard({ state, onNavigate }: Props) {
             </div>
             <div style={{ color: A.textPrimary }} className="text-2xl font-bold tracking-tight">{k.value}</div>
             <div style={{ color: A.textSecondary }} className="text-xs mt-1">{k.label}</div>
-          </div>
+          </button>
         ))}
       </div>
 

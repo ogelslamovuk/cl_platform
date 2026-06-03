@@ -7,6 +7,9 @@ import HelpTooltip from "@/components/ui/help-tooltip";
 interface Props { state: AppState; }
 
 const opTypeLabel: Record<string, string> = { sell: "Продажа", refund: "Возврат", redeem: "Погашение", verify: "Проверка" };
+function isSyntheticNoTicketError(reason?: string): boolean {
+  return /нет доступных билетов/i.test(reason || "");
+}
 
 export default function AdminOperations({ state }: Props) {
   const [search, setSearch] = useState("");
@@ -15,6 +18,7 @@ export default function AdminOperations({ state }: Props) {
 
   const filtered = useMemo(() => {
     return state.ops.filter(o => {
+      if (o.type === "sell" && o.result === "error" && isSyntheticNoTicketError(o.reason)) return false;
       if (typeFilter && o.type !== typeFilter) return false;
       if (resultFilter && o.result !== resultFilter) return false;
       if (search) {
