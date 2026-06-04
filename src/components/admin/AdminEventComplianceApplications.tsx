@@ -1,37 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { AppState } from "@/lib/store";
-import {
-  calculateComplianceFee,
-  calculateComplianceFeeAmount,
-  getCompliancePaymentStatus,
-  getResellerAdmissionStatus,
-  getResellerAgreementStatus,
-  getResellerConnectionType,
-  getResellerIntegrationStatus,
-  getResellerSalesBlockReason,
-  getSalesChannelLabel,
-  getSeatTariffConfigurationSummary,
-  isResellerAuthorizedForSales,
-  setEventComplianceReview,
-} from "@/lib/store";
-import { A } from "./adminStyles";
+import { calculateComplianceFeeAmount, getCompliancePaymentStatus } from "@/lib/store";
+import { A, appStatusChip } from "./adminStyles";
 import HelpTooltip from "@/components/ui/help-tooltip";
-import MockDocumentPreview, { type MockDocumentPreviewData } from "@/components/MockDocumentPreview";
-import SeatTariffSummary from "@/components/seatmap/SeatTariffSummary";
-import { toast } from "sonner";
 import { getScopedRegionFilterOptions, resolveRegionCity, isInAdminScope, type AdminRegionScope } from "./adminScope";
 
 interface Props { state: AppState; onUpdate: (s: AppState) => void; regionScope?: AdminRegionScope; }
 
 type StatusFilter = "all" | "submitted" | "approved" | "needs_rework" | "rejected";
-
-function CardHelp({ text }: { text: string }) {
-  return (
-    <div className="absolute right-4 top-4 z-10">
-      <HelpTooltip text={text} />
-    </div>
-  );
-}
 
 const statusLabel: Record<string, string> = {
   draft: "Черновик",
@@ -49,38 +26,35 @@ const statusFilterOptions: { value: StatusFilter; label: string }[] = [
   { value: "rejected", label: "Отклонена" },
 ];
 
-const approvalModeLabel: Record<string, string> = {
-  certificate_required: "Требуется удостоверение",
-  notice_only: "Требуется только уведомление",
-  certificate_not_required: "Удостоверение не требуется",
-};
-
-function getApplicationFeatures(row: AppState["eventComplianceApplications"][number]): string[] {
-  const features: string[] = [];
-  if (row.data.approvalMode === "notice_only") features.push("уведомление");
-  if (row.data.approvalMode === "certificate_not_required") features.push("без удостоверения");
-  if (row.data.hasForeignPerformers) features.push("иностранные исполнители");
-  if (row.data.feeExempt) features.push("освобождение от пошлины");
-  if (row.data.posterPath) features.push("постер выбран");
-  return features;
+function formatDate(value?: string): string {
+  return value ? value.replace("T", " ").slice(0, 16) : "—";
 }
 
-export default function AdminEventComplianceApplications({ state, onUpdate, regionScope = "all" }: Props) {
-  const [comment, setComment] = useState<Record<string, string>>({});
+export default function AdminEventComplianceApplications({ state, regionScope = "all" }: Props) {
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("submitted");
   const [regionFilter, setRegionFilter] = useState("");
-  const [previewDoc, setPreviewDoc] = useState<MockDocumentPreviewData>(null);
   const regionOptions = useMemo(() => getScopedRegionFilterOptions(state, regionScope), [regionScope, state]);
+  const organizerNameById = useMemo(
+    () => new Map(state.organizers.map((organizer) => [organizer.organizerId, organizer.name])),
+    [state.organizers]
+  );
 
   const allRows = useMemo(() => state.eventComplianceApplications
     .filter((row) => row.status !== "draft")
-    .filter((row) => isInAdminScope(resolveRegionCity(state, { venueId: row.data.venueId, city: row.data.venueName, venueName: row.data.venueName, venueAddress: row.data.venueAddress }).region, regionScope))
     .filter((row) => {
-      if (!regionFilter) return true;
-      return resolveRegionCity(state, { venueId: row.data.venueId, venueName: row.data.venueName, venueAddress: row.data.venueAddress }).region === regionFilter;
+      const regionCity = resolveRegionCity(state, {
+        venueId: row.data.venueId,
+        venueName: row.data.venueName,
+        venueAddress: row.data.venueAddress,
+      });
+      if (!isInAdminScope(regionCity.region, regionScope)) return false;
+      if (regionFilter && regionCity.region !== regionFilter) return false;
+      return true;
     })
     .slice()
-    .reverse(), [regionFilter, regionScope, state]);
+    .sort((a, b) => (b.submittedAt || b.updatedAt).localeCompare(a.submittedAt || a.updatedAt)), [regionFilter, regionScope, state]);
+
   const rows = useMemo(
     () => statusFilter === "all" ? allRows : allRows.filter((row) => row.status === statusFilter),
     [allRows, statusFilter]
@@ -90,24 +64,8 @@ export default function AdminEventComplianceApplications({ state, onUpdate, regi
     if (regionFilter && !regionOptions.includes(regionFilter)) setRegionFilter("");
   }, [regionFilter, regionOptions]);
 
-  const applyDecision = (id: string, decision: "approved" | "rejected" | "needs_rework") => {
-    const text = (comment[id] || "").trim();
-    if ((decision === "rejected" || decision === "needs_rework") && !text) {
-      toast.error("Укажите комментарий для отклонения или возврата на доработку.");
-      return;
-    }
-    const ok = setEventComplianceReview(state, id, {
-      decision,
-      comment: text,
-    });
-    if (!ok) {
-      toast.error("Недопустимый переход статуса.");
-      return;
-    }
-    if (decision === "approved") toast.success("Заявка одобрена. Мероприятие создано в статусе «Одобрено», публикация и выпуск TicketID выполняются вручную.");
-    if (decision === "needs_rework") toast.success("Заявка возвращена на доработку.");
-    if (decision === "rejected") toast.success("Заявка отклонена.");
-    onUpdate({ ...state });
+  const openApplication = (id: string) => {
+    navigate(`/organizer/compliance?mode=admin&edit=${encodeURIComponent(id)}`);
   };
 
   return (
@@ -115,10 +73,13 @@ export default function AdminEventComplianceApplications({ state, onUpdate, regi
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold" style={{ color: A.textPrimary }}>Заявки мероприятий</h2>
-          <p className="mt-1 text-xs" style={{ color: A.textSecondary }}>Согласование, госпошлина и выдача удостоверения.</p>
+          <p className="mt-1 text-xs" style={{ color: A.textSecondary }}>
+            Список заявок. Просмотр и решение открываются в едином 9-этапном compliance-интерфейсе.
+          </p>
         </div>
-        <HelpTooltip text="Заявки проходят рассмотрение в Центре Управления; после одобрения создаётся мероприятие и присваивается удостоверение, если оно требуется." />
+        <HelpTooltip text="Клик по строке открывает ту же заявку, которую видит организатор, но с действиями Центра Управления." />
       </div>
+
       <div className="flex flex-wrap gap-3 rounded-xl border p-3" style={{ background: A.surfaceBg, borderColor: A.border }}>
         <label className="block min-w-[220px] max-w-sm" htmlFor="event-compliance-status-filter">
           <span className="mb-2 block text-xs font-semibold" style={{ color: A.textSecondary }}>Статус заявки</span>
@@ -148,277 +109,94 @@ export default function AdminEventComplianceApplications({ state, onUpdate, regi
           </select>
         </label>
       </div>
-      <div className="space-y-3">
-        {rows.map((r) => {
-          const organizerName = state.organizers.find((o) => o.organizerId === r.organizerId)?.name || r.organizerId;
-          const totalTickets = (r.data.ticketTiers || []).reduce((acc, tier) => acc + (tier.quantity || 0), 0);
-          const fee = r.data.approvalMode === "certificate_required"
-            ? `${calculateComplianceFee(r.data.projectedCapacity, r.data.plannedTicketsForSale, r.data.ticketTiers)} БВ`
-            : "—";
-          const feeAmount = calculateComplianceFeeAmount(r.data);
-          const paymentStatus = getCompliancePaymentStatus(r);
-          const isPaymentWaiting = paymentStatus === "Ожидает оплаты";
-          const canApprove = r.status === "submitted" && paymentStatus === "Оплачено";
-          const paidReceipt = state.finance.organizerReceipts.find((receipt) => receipt.eventComplianceApplicationId === r.eventComplianceApplicationId && receipt.status === "оплачена");
-          const features = getApplicationFeatures(r);
-          const selectedSalesChannelCodes = r.data.salesChannels?.length ? r.data.salesChannels : ["OWN"];
-          const salesChannels = selectedSalesChannelCodes.map((code) => getSalesChannelLabel(state, code));
-          const selectedOperatorRows = selectedSalesChannelCodes
-            .filter((code) => code !== "OWN")
-            .map((code) => state.resellers.find((reseller) => reseller.code === code))
-            .filter((reseller): reseller is AppState["resellers"][number] => Boolean(reseller));
-          const eventTypePath = r.data.eventTypePath?.length ? r.data.eventTypePath.join(" / ") : r.data.eventType || "—";
-          const performers = r.data.performers || [];
-          const checks = r.data.interagencyChecks || [];
-          const contractStatus = r.data.venueContractStatus || "требуется";
-          const venue = state.venueRegistry.find((item) => item.venueId === r.data.venueId);
-          const regionCity = resolveRegionCity(state, { venueId: r.data.venueId, venueName: r.data.venueName, venueAddress: r.data.venueAddress });
-          const hall = venue?.halls.find((item) => item.hallId === r.data.hallId);
-          const tariffConfigurationSummary = getSeatTariffConfigurationSummary({
-            eventSeats: r.data.eventSeats,
-            ticketTiers: r.data.ticketTiers,
-          });
 
-          return (
-            <article
-              key={r.eventComplianceApplicationId}
-              className="relative rounded-xl border p-4"
-              style={{ background: isPaymentWaiting ? "rgba(251,191,36,0.10)" : A.cardBg, borderColor: isPaymentWaiting ? "rgba(251,191,36,0.45)" : A.border, boxShadow: A.cardShadow }}
-            >
-              <CardHelp text="Список заявок на проведение конкретных мероприятий. При одобрении удостоверение присваивается автоматически, если оно требуется." />
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)]">
-                <div className="space-y-3 pr-8">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="font-mono text-xs" style={{ color: A.textMuted }}>{r.eventComplianceApplicationId}</div>
-                      <h3 className="mt-1 text-base font-semibold" style={{ color: A.textPrimary }}>{r.data.title || "Без названия"}</h3>
-                      <div className="mt-1 text-sm" style={{ color: A.textSecondary }}>{organizerName}</div>
-                    </div>
-                    <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: A.statusInfoBg, color: A.statusInfo }}>
-                      {statusLabel[r.status] || r.status}
+      <div className="overflow-x-auto rounded-xl border" style={{ background: A.cardBg, borderColor: A.border, boxShadow: A.cardShadow }}>
+        <table className="w-full min-w-[980px] text-left text-sm">
+          <thead style={{ background: A.surfaceBg, color: A.textSecondary }}>
+            <tr>
+              <th className="px-4 py-3 font-semibold">ID</th>
+              <th className="px-4 py-3 font-semibold">Мероприятие</th>
+              <th className="px-4 py-3 font-semibold">Организатор</th>
+              <th className="px-4 py-3 font-semibold">Регион / город</th>
+              <th className="px-4 py-3 font-semibold">Дата</th>
+              <th className="px-4 py-3 font-semibold">Статус</th>
+              <th className="px-4 py-3 font-semibold">Оплата</th>
+              <th className="px-4 py-3 font-semibold">Документы</th>
+              <th className="px-4 py-3 font-semibold">Действие</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const chip = appStatusChip(row.status);
+              const regionCity = resolveRegionCity(state, {
+                venueId: row.data.venueId,
+                venueName: row.data.venueName,
+                venueAddress: row.data.venueAddress,
+              });
+              const paymentStatus = getCompliancePaymentStatus(row);
+              const feeAmount = calculateComplianceFeeAmount(row.data);
+              const documentsCount =
+                (row.data.eventDocuments?.length || 0) +
+                (row.data.paymentAttachments?.length || 0) +
+                (row.data.notificationsAttachment?.length || 0) +
+                (row.data.venueContractStatus === "приложен" ? 1 : 0);
+              return (
+                <tr
+                  key={row.eventComplianceApplicationId}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openApplication(row.eventComplianceApplicationId)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openApplication(row.eventComplianceApplicationId);
+                    }
+                  }}
+                  className="cursor-pointer border-t transition-colors hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40"
+                  style={{ borderColor: A.border }}
+                >
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: A.textMuted }}>{row.eventComplianceApplicationId}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-semibold" style={{ color: A.textPrimary }}>{row.data.title || "Без названия"}</div>
+                    <div className="mt-1 text-xs" style={{ color: A.textSecondary }}>{row.data.venueName || "Площадка не указана"}</div>
+                  </td>
+                  <td className="px-4 py-3" style={{ color: A.textSecondary }}>{organizerNameById.get(row.organizerId) || row.organizerId}</td>
+                  <td className="px-4 py-3" style={{ color: A.textSecondary }}>{regionCity.region} · {regionCity.city}</td>
+                  <td className="px-4 py-3" style={{ color: A.textSecondary }}>{formatDate(row.data.dateSlots?.[0])}</td>
+                  <td className="px-4 py-3">
+                    <span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: chip.bg, color: chip.color }}>
+                      {statusLabel[row.status] || row.status}
                     </span>
-                  </div>
-
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
-                      <div className="text-xs" style={{ color: A.textMuted }}>Дата</div>
-                      <div style={{ color: A.textPrimary }}>{r.data.dateSlots[0]?.replace("T", " ") || "—"}</div>
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
-                      <div className="text-xs" style={{ color: A.textMuted }}>Площадка</div>
-                      <div style={{ color: A.textPrimary }}>{r.data.venueName || "—"}</div>
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
-                      <div className="text-xs" style={{ color: A.textMuted }}>Регион / город</div>
-                      <div style={{ color: A.textPrimary }}>{regionCity.region} · {regionCity.city}</div>
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
-                      <div className="text-xs" style={{ color: A.textMuted }}>Возрастная категория</div>
-                      <div style={{ color: A.textPrimary }}>{r.data.ageCategory || "—"}</div>
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
-                      <div className="text-xs" style={{ color: A.textMuted }}>Режим</div>
-                      <div style={{ color: A.textPrimary }}>{approvalModeLabel[r.data.approvalMode] || r.data.approvalMode}</div>
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
-                      <div className="text-xs" style={{ color: A.textMuted }}>Пошлина</div>
-                      <div style={{ color: A.textPrimary }}>{fee} · {feeAmount.toFixed(2)} BYN</div>
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
-                      <div className="text-xs" style={{ color: A.textMuted }}>Категория мероприятия</div>
-                      <div style={{ color: A.textPrimary }}>{eventTypePath}</div>
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
-                      <div className="text-xs" style={{ color: A.textMuted }}>Договор с площадкой</div>
-                      <div style={{ color: A.textPrimary }}>{contractStatus}</div>
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
-                      <div className="text-xs" style={{ color: A.textMuted }}>Оплата</div>
-                      <div style={{ color: paymentStatus === "Оплачено" ? A.statusOk : paymentStatus === "Недостаточно средств" ? A.statusWarn : A.statusInfo }}>{paymentStatus}</div>
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-sm md:col-span-2" style={{ borderColor: A.border, background: A.surfaceBg }}>
-                      <div className="text-xs" style={{ color: A.textMuted }}>Факт оплаты</div>
-                      <div style={{ color: A.textPrimary }}>{paymentStatus === "Оплачено" ? `Оплачено${paidReceipt ? `, квитанция ${paidReceipt.number}` : ""}` : "Ожидает оплаты обязательных пошлин"}</div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
-                      <div className="mb-1" style={{ color: A.textMuted }}>Особенности</div>
-                      {features.length ? features.join(", ") : "—"}
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
-                      <div className="mb-1" style={{ color: A.textMuted }}>Каналы продаж</div>
-                      {salesChannels.join(", ")}
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-xs md:col-span-2" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
-                      <div className="mb-2 inline-flex items-center gap-1" style={{ color: A.textMuted }}>
-                        Выбранные билетные операторы
-                        <HelpTooltip text="Центр Управления видит выбранные организатором каналы в режиме просмотра и не настраивает продажи вручную внутри заявки." />
-                      </div>
-                      {selectedOperatorRows.length === 0 ? (
-                        <div style={{ color: A.textPrimary }}>Выбран только собственный канал организатора.</div>
-                      ) : (
-                        <div className="grid gap-2">
-                          {selectedOperatorRows.map((reseller) => {
-                            const available = isResellerAuthorizedForSales(reseller);
-                            const warning = available ? "" : getResellerSalesBlockReason(reseller);
-                            return (
-                              <div key={reseller.resellerId} className="rounded-lg border px-3 py-2" style={{ borderColor: available ? "rgba(52,211,153,0.35)" : "rgba(251,191,36,0.45)", background: A.cardBg }}>
-                                <div className="font-semibold" style={{ color: A.textPrimary }}>{reseller.name}</div>
-                                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                                  <span>Допуск: {getResellerAdmissionStatus(reseller)}</span>
-                                  <span>Тип: {getResellerConnectionType(reseller)}</span>
-                                  <span>Соглашение: {getResellerAgreementStatus(reseller)}</span>
-                                  <span>Интеграция: {getResellerIntegrationStatus(reseller)}</span>
-                                </div>
-                                {!available && <div className="mt-1" style={{ color: A.statusWarn }}>{warning}</div>}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-xs md:col-span-2" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
-                      <div className="mb-2" style={{ color: A.textMuted }}>Документы заявки</div>
-                      <div className="grid gap-2 md:grid-cols-2">
-                        {(r.data.eventDocuments?.length ? r.data.eventDocuments : [{ attachmentId: "program", kind: "program", name: "program_outline_mock.pdf", uploadedAt: r.updatedAt, isSample: true }]).map((document) => (
-                          <button
-                            key={document.attachmentId}
-                            type="button"
-                            onClick={() => setPreviewDoc({ title: document.name, fileName: document.name, rows: [["Файл", document.name], ["Тип", document.kind], ["Статус", "mock-документ приложен"], ["Заявка", r.eventComplianceApplicationId]] })}
-                            className="rounded-lg border px-3 py-2 text-left"
-                            style={{ borderColor: A.border, background: A.cardBg, color: A.textPrimary }}
-                          >
-                            <span className="block font-medium">{document.name}</span>
-                            <span className="mt-1 block text-[11px]" style={{ color: A.textMuted }}>Просмотреть</span>
-                          </button>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => setPreviewDoc({ title: "Договор с площадкой", fileName: "venue_contract_mock.pdf", kind: "venueContract", rows: [["Площадка", r.data.venueName || "—"], ["Адрес", r.data.venueAddress || "—"], ["Статус", contractStatus], ["Регион", regionCity.region]] })}
-                          className="rounded-lg border px-3 py-2 text-left"
-                          style={{ borderColor: A.border, background: A.cardBg, color: A.textPrimary }}
-                        >
-                          <span className="block font-medium">Договор с площадкой</span>
-                          <span className="mt-1 block text-[11px]" style={{ color: A.textMuted }}>Просмотреть</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
-                      <div className="mb-1" style={{ color: A.textMuted }}>Участники и документы</div>
-                      {performers.length ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {performers.map((performer, index) => (
-                            <button
-                              key={`${performer.name}-${index}`}
-                              type="button"
-                              onClick={() => setPreviewDoc({
-                                title: performer.country === "Беларусь" ? "Документ участника" : "Въездной документ участника",
-                                fileName: performer.documentName || (performer.country === "Беларусь" ? "participant_id_mock.pdf" : "foreign_entry_permit_mock.pdf"),
-                                kind: performer.country === "Беларусь" ? "identity" : "permit",
-                                rows: [["Участник", performer.name || "—"], ["Гражданство", performer.country || "—"], ["Представитель", performer.representative || "—"], ["Статус", performer.documentStatus || "mock-документ приложен"]],
-                              })}
-                              className="rounded border px-2 py-1 text-left text-[11px]"
-                              style={{ borderColor: A.border, background: A.cardBg, color: A.textPrimary }}
-                            >
-                              {performer.name || "Участник"} · {performer.country || "—"}
-                            </button>
-                          ))}
-                        </div>
-                      ) : "—"}
-                    </div>
-                    <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: A.border, background: A.surfaceBg, color: A.textSecondary }}>
-                      <div className="mb-1" style={{ color: A.textMuted }}>Межведомственные проверки</div>
-                      {checks.length ? checks.map((check) => `${check.agency}: ${check.status}`).join("; ") : "—"}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3 rounded-lg border p-3" style={{ borderColor: A.border, background: A.surfaceBg }}>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="h-8 rounded px-2 flex items-center" style={{ background: A.cardBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
-                      №: {r.certificateNumber || "—"}
-                    </div>
-                    <div className="h-8 rounded px-2 flex items-center" style={{ background: A.cardBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
-                      Дата: {r.certificateDate || "—"}
-                    </div>
-                  </div>
-
-                  <div className="rounded border p-2 text-xs" style={{ borderColor: paymentStatus === "Оплачено" ? "rgba(52,211,153,0.35)" : "rgba(251,191,36,0.45)", background: A.cardBg, color: A.textPrimary }}>
-                    <div className="inline-flex items-center gap-1">
-                      Статус оплаты: <b>{paymentStatus}</b>
-                      <HelpTooltip text="Центр Управления видит статус оплаты, но не управляет балансом организатора." />
-                    </div>
-                    {paymentStatus !== "Оплачено" && (
-                      <div className="mt-2" style={{ color: A.statusWarn }}>Одобрение доступно после оплаты обязательных пошлин.</div>
-                    )}
-                    {paidReceipt && (
-                      <div className="mt-2" style={{ color: A.textSecondary }}>Квитанция: {paidReceipt.number}, {paidReceipt.amount.toFixed(2)} BYN</div>
-                    )}
-                  </div>
-
-                  <div className="relative">
-                    <textarea
-                      className="w-full min-h-14 rounded px-2 py-1 pr-9 text-xs"
-                      placeholder="Комментарий (обязателен при отклонении и возврате на доработку)"
-                      value={comment[r.eventComplianceApplicationId] || ""}
-                      onChange={(e) => setComment((p) => ({ ...p, [r.eventComplianceApplicationId]: e.target.value }))}
-                      style={{ background: A.cardBg, border: `1px solid ${A.border}`, color: A.textPrimary }}
-                    />
-                    <div className="absolute right-2 top-3">
-                      <HelpTooltip text="Комментарий обязателен при отклонении заявки или возврате на доработку." />
-                    </div>
-                  </div>
-
-                  <div className="rounded border p-2 text-xs space-y-1" style={{ borderColor: A.border, background: A.cardBg, color: A.textPrimary }}>
-                    <div style={{ color: A.textSecondary }}>Тарифы билетов</div>
-                    {(r.data.ticketTiers || []).map((tier, index) => (
-                      <div key={`${tier.name}-${index}`} className="flex items-center justify-between gap-2">
-                        <span>{tier.name || "—"}</span>
-                        <span>{tier.quantity || 0} × {tier.price || 0}</span>
-                      </div>
-                    ))}
-                    <div className="pt-1" style={{ color: A.textSecondary }}>Итого билетов: {totalTickets}</div>
-                  </div>
-
-                  {tariffConfigurationSummary.hasSeatMap && (
-                    <SeatTariffSummary
-                      summary={tariffConfigurationSummary}
-                      venueName={r.data.venueName}
-                      hallName={hall?.name}
-                      capacity={r.data.projectedCapacity}
-                      variant="admin"
-                      readOnly
-                    />
-                  )}
-
-                  <div className="flex gap-2 flex-wrap">
-                    <span className="inline-flex items-center gap-1">
-                      <button disabled={!canApprove} className="px-2 py-1 rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: A.statusOkBg, color: A.statusOk }} onClick={() => applyDecision(r.eventComplianceApplicationId, "approved")}>Одобрить заявку</button>
-                      <HelpTooltip text={canApprove ? "Одобрить мероприятие и автоматически присвоить удостоверение." : "Одобрение доступно после оплаты обязательных пошлин."} />
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <button disabled={r.status !== "submitted"} className="px-2 py-1 rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: A.statusWarnBg, color: A.statusWarn }} onClick={() => applyDecision(r.eventComplianceApplicationId, "needs_rework")}>Вернуть на доработку</button>
-                      <HelpTooltip text="Вернуть заявку организатору на доработку с комментарием." />
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <button disabled={r.status !== "submitted"} className="px-2 py-1 rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: A.statusErrorBg, color: A.statusError }} onClick={() => applyDecision(r.eventComplianceApplicationId, "rejected")}>Отклонить</button>
-                      <HelpTooltip text="Отклонить заявку на проведение мероприятия с указанием причины." />
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </article>
-          );
-        })}
+                  </td>
+                  <td className="px-4 py-3" style={{ color: paymentStatus === "Оплачено" ? A.statusOk : A.statusWarn }}>
+                    {paymentStatus}
+                    <div className="mt-1 text-xs" style={{ color: A.textMuted }}>{feeAmount.toFixed(2)} BYN</div>
+                  </td>
+                  <td className="px-4 py-3" style={{ color: A.textSecondary }}>{documentsCount}</td>
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openApplication(row.eventComplianceApplicationId);
+                      }}
+                      className="h-8 rounded-lg px-3 text-xs font-semibold"
+                      style={{ background: A.selectedBg, color: A.textPrimary }}
+                    >
+                      Открыть 9 этапов
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
         {rows.length === 0 && (
-          <div className="rounded-xl border py-6 px-3 text-center" style={{ background: A.cardBg, borderColor: A.border, color: A.textMuted }}>
-            Заявок с выбранным статусом нет.
+          <div className="py-8 text-center text-sm" style={{ color: A.textMuted }}>
+            Заявок с выбранными условиями нет.
           </div>
         )}
       </div>
-      <MockDocumentPreview preview={previewDoc} onClose={() => setPreviewDoc(null)} theme="admin" />
     </div>
   );
 }

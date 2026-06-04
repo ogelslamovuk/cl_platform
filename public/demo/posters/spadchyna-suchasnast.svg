@@ -14,6 +14,6 @@
   <text x="88" y="150" fill="#f8fafc" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700" letter-spacing="3">ВЫСТАВОЧНАЯ ПРОГРАММА</text>
   <text x="88" y="1032" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="74" font-weight="800"><tspan x="88" dy="0">Спадчына і</tspan><tspan x="88" dy="86">сучаснасць</tspan></text>
   <rect x="88" y="1158" width="180" height="10" rx="5" fill="#38bdf8"/>
-  <text x="88" y="1220" fill="#f8fafc" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="600">Белорусская культурная программа</text>
-  <text x="88" y="1262" fill="#ffffff" fill-opacity="0.70" font-family="Inter, Arial, sans-serif" font-size="24">афиша мероприятия</text>
+  <text x="88" y="1220" fill="#f8fafc" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="600">Брест · музейный зал</text>
+  <text x="88" y="1262" fill="#ffffff" fill-opacity="0.70" font-family="Inter, Arial, sans-serif" font-size="24">наследие, архив и современное искусство</text>
 </svg>

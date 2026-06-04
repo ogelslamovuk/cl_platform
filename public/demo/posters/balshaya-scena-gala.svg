@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1350" viewBox="0 0 900 1350" role="img" aria-labelledby="title desc">
+  <title id="title">Гала-концерт большой сцены</title>
+  <desc id="desc">Концерт со схемой мест</desc>
+  <defs>
+    <radialGradient id="spot" cx="50%" cy="20%" r="70%"><stop offset="0" stop-color="#fef3c7" stop-opacity="0.70"/><stop offset="1" stop-color="#020617" stop-opacity="0"/></radialGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#10172a"/><stop offset="1" stop-color="#020617"/></linearGradient>
+  </defs>
+  <rect width="900" height="1350" fill="url(#bg)"/>
+  <rect width="900" height="1350" fill="url(#spot)"/>
+  <g opacity="0.9">
+    <path d="M120 760 C260 620 640 620 780 760 L780 850 C620 730 280 730 120 850 Z" fill="#7c2d12"/>
+    <rect x="170" y="430" width="560" height="230" rx="28" fill="#111827" stroke="#fbbf24" stroke-width="8"/>
+    <g stroke="#fbbf24" stroke-width="10" stroke-linecap="round">
+      <path d="M260 378 L210 235"/>
+      <path d="M450 358 L450 190"/>
+      <path d="M640 378 L690 235"/>
+    </g>
+  </g>
+  <rect x="64" y="70" width="772" height="1210" rx="34" fill="none" stroke="#fbbf24" stroke-opacity="0.34" stroke-width="3"/>
+  <text x="86" y="146" fill="#fef3c7" font-family="Inter, Arial, sans-serif" font-size="31" font-weight="800" letter-spacing="3">БОЛЬШАЯ СЦЕНА</text>
+  <text x="86" y="1006" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="76" font-weight="850"><tspan x="86" dy="0">Гала-концерт</tspan><tspan x="86" dy="88">большой сцены</tspan></text>
+  <rect x="86" y="1162" width="210" height="10" rx="5" fill="#fbbf24"/>
+  <text x="86" y="1224" fill="#fef3c7" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="650">Партер · балкон · ложи</text>
+  <text x="86" y="1266" fill="#ffffff" fill-opacity="0.72" font-family="Inter, Arial, sans-serif" font-size="24">выбор мест на схеме зала</text>
+</svg>

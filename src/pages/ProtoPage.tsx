@@ -1,11 +1,11 @@
-import { ArrowRight, Building2, ClipboardCheck, Play, RefreshCcw, ShieldCheck, Store, Ticket } from "lucide-react";
+import { ArrowRight, Building2, ClipboardCheck, RefreshCcw, ShieldCheck, Store, Ticket } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { useStorageSync } from "@/hooks/useStorageSync";
-import { generateDemoData, resetDemoData, runDemoScenario } from "@/lib/demoEngine";
+import { generateDemoData, resetDemoData } from "@/lib/demoEngine";
 import { getPlatformCommissionPercent } from "@/lib/finance";
 import { setPlatformCommissionPercent } from "@/lib/store";
 import platformLogo from "../../logo.jpg";
@@ -109,7 +109,6 @@ export default function ProtoPage() {
   const tools: Tool[] = [
     { title: "Сбросить демо", description: "Очистить текущие данные и вернуть систему к базовому состоянию", icon: RefreshCcw, accent: accents.violet, action: () => { setState({ ...resetDemoData() }); toast.success("Демо сброшено"); } },
     { title: "Загрузить mock-данные", description: "Загрузить типовые данные по мероприятиям, билетам и пользователям", icon: ClipboardCheck, accent: accents.blue, action: () => { setState({ ...generateDemoData() }); toast.success("Mock-данные загружены"); } },
-    { title: "Запустить demo-сценарий", description: "Запустить готовый сценарий работы системы с типовыми данными", icon: Play, accent: accents.emerald, action: () => { setState({ ...runDemoScenario() }); toast.success("Demo-сценарий запущен"); } },
   ];
 
   return (
@@ -153,7 +152,7 @@ export default function ProtoPage() {
         <section className="mt-5 rounded-[28px] px-5 py-5 md:px-6 md:py-6" style={panelBase}>
           <h2 className="text-[28px] font-semibold tracking-[-0.04em] md:text-[34px]">Демо-инструменты</h2>
           <p className="mt-2 text-[15px] leading-6 text-[rgba(203,213,225,0.74)]">Инструменты для управления демо-средой и загрузки типовых данных</p>
-          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
             {tools.map((tool) => (
               <ToolCard key={tool.title} tool={tool} />
             ))}

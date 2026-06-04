@@ -43,9 +43,15 @@ function toEventSeats(baseSeats: SeatMapSeat[], eventSeats: EventSeat[], tiers: 
     baseColor: seat.baseColor || seat.color,
     isIndividualOverride: Boolean(seat.isIndividualOverride),
   }));
+  const rowValues = baseSeats.map((seat) => Number.isFinite(Number(seat.y)) ? Number(seat.y) : 0);
+  const minRow = Math.min(...rowValues, 0);
+  const maxRow = Math.max(...rowValues, 0);
+  const rowSpan = Math.max(1, maxRow - minRow + 1);
   return baseSeats.map((seat, index) => {
-    const tier = tiers[index % Math.max(1, tiers.length)] || tiers[0];
-    const color = tier?.color || SEAT_TARIFF_COLORS[index % SEAT_TARIFF_COLORS.length];
+    const rowRatio = (Number(seat.y || 0) - minRow) / rowSpan;
+    const rowTierIndex = Math.min(Math.max(0, tiers.length - 1), Math.floor(rowRatio * Math.max(1, tiers.length)));
+    const tier = tiers[rowTierIndex] || tiers[index % Math.max(1, tiers.length)] || tiers[0];
+    const color = tier?.color || SEAT_TARIFF_COLORS[rowTierIndex % SEAT_TARIFF_COLORS.length];
     return {
       ...seat,
       tariffId: tier?.name,
