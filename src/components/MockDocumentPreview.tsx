@@ -32,23 +32,83 @@ function inferKind(preview: Exclude<MockDocumentPreviewData, null>): MockDocumen
   return "identity";
 }
 
-function DocumentArt({ kind }: { kind: MockDocumentKind }) {
+type ConcretePreview = Exclude<MockDocumentPreviewData, null>;
+
+function rowValue(preview: ConcretePreview, hints: string[]): string {
+  const normalizedHints = hints.map((hint) => hint.toLowerCase());
+  return preview.rows.find(([label]) => normalizedHints.some((hint) => label.toLowerCase().includes(hint)))?.[1] || "";
+}
+
+function isLikelyFemale(preview: ConcretePreview): boolean {
+  const subject = rowValue(preview, ["фио", "участник", "исполнитель", "представитель", "организация"]).toLowerCase();
+  return /(ова|ева|ина|ая|на)(\s|$)/.test(subject);
+}
+
+function PixelPortrait({ female = false }: { female?: boolean }) {
+  const palette = female
+    ? { paper: "#FDE7D6", hair: "#5B2A1F", face: "#F6C7A9", accent: "#C2410C", shade: "#9A3412" }
+    : { paper: "#DBEAFE", hair: "#1E293B", face: "#E7B98D", accent: "#2563EB", shade: "#475569" };
+  const colorAt = (row: number, col: number) => {
+    if (row < 2) return palette.paper;
+    if (row === 2 && col > 1 && col < 6) return palette.hair;
+    if (row >= 3 && row <= 5 && col > 1 && col < 6) return palette.face;
+    if (row === 4 && (col === 2 || col === 5)) return "#0F172A";
+    if (row === 6 && col > 2 && col < 5) return palette.shade;
+    if (row >= 7 && row <= 9 && col > 0 && col < 7) return palette.accent;
+    return palette.paper;
+  };
+
+  return (
+    <div className="grid h-24 w-20 grid-cols-8 gap-px rounded-lg border border-slate-300 bg-white p-1 shadow-inner">
+      {Array.from({ length: 80 }).map((_, index) => {
+        const row = Math.floor(index / 8);
+        const col = index % 8;
+        return <span key={index} className="rounded-[1px]" style={{ background: colorAt(row, col) }} />;
+      })}
+    </div>
+  );
+}
+
+function BureauStamp({ label, tone = "blue" }: { label: string; tone?: "blue" | "green" | "violet" }) {
+  const color = tone === "green" ? "#047857" : tone === "violet" ? "#6D28D9" : "#1D4ED8";
+  return (
+    <div className="inline-flex rotate-[-6deg] items-center justify-center rounded-full border-2 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em]" style={{ borderColor: color, color }}>
+      {label}
+    </div>
+  );
+}
+
+function PaperField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border border-slate-300 bg-white/70 px-2 py-1">
+      <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">{label}</div>
+      <div className="mt-0.5 truncate font-mono text-[11px] font-semibold text-slate-900">{value || "DEMO-RECORD"}</div>
+    </div>
+  );
+}
+
+function DocumentArt({ kind, preview }: { kind: MockDocumentKind; preview: ConcretePreview }) {
   if (kind === "identity") {
+    const subject = rowValue(preview, ["фио", "участник", "исполнитель", "представитель"]) || "Demo Participant";
+    const documentNumber = rowValue(preview, ["номер", "документ", "паспорт"]) || "ID-DEMO-0426";
+    const country = rowValue(preview, ["страна", "гражданство"]) || "Беларусь";
     return (
-      <div className="rounded-xl border bg-slate-50 p-3 text-slate-900">
-        <div className="flex items-center gap-3">
-          <div className="h-24 w-20 rounded-lg bg-gradient-to-br from-slate-300 to-slate-100 shadow-inner">
-            <div className="mx-auto mt-5 h-9 w-9 rounded-full bg-slate-400" />
-            <div className="mx-auto mt-2 h-7 w-12 rounded-t-full bg-slate-400" />
-          </div>
+      <div className="relative overflow-hidden rounded-xl border border-slate-300 bg-[#F8F1DC] p-3 text-slate-900">
+        <div className="absolute right-4 top-4 font-mono text-[10px] font-bold tracking-[0.2em] text-slate-400">DEMO-ID</div>
+        <div className="mb-3 border-b border-slate-300 pb-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-600">Рэспубліка Беларусь · mock record</div>
+        <div className="flex items-start gap-3">
+          <PixelPortrait female={isLikelyFemale(preview)} />
           <div className="flex-1 space-y-2">
-            <div className="h-3 w-32 rounded bg-slate-300" />
-            <div className="h-3 w-44 rounded bg-slate-200" />
             <div className="grid grid-cols-2 gap-2">
-              <div className="h-8 rounded border border-slate-200 bg-white" />
-              <div className="h-8 rounded border border-slate-200 bg-white" />
+              <PaperField label="ФИО" value={subject} />
+              <PaperField label="Гражданство" value={country} />
+              <PaperField label="Номер" value={documentNumber} />
+              <PaperField label="Статус" value="mock-проверка" />
             </div>
-            <div className="h-8 rounded border border-dashed border-slate-300 bg-white" />
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <div className="h-7 flex-1 rounded border border-dashed border-slate-400 bg-white/70" />
+              <BureauStamp label="Проверено" />
+            </div>
           </div>
         </div>
       </div>
@@ -56,23 +116,26 @@ function DocumentArt({ kind }: { kind: MockDocumentKind }) {
   }
 
   if (kind === "permit") {
+    const subject = rowValue(preview, ["фио", "участник", "исполнитель"]) || "Foreign Demo Performer";
+    const country = rowValue(preview, ["страна", "гражданство"]) || "Demo country";
     return (
-      <div className="rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50 to-white p-3 text-slate-900">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="h-8 w-28 rounded-full bg-sky-200" />
-          <div className="font-mono text-xs text-sky-700">BY-PERMIT-0426</div>
-        </div>
-        <div className="grid grid-cols-[1fr_72px] gap-3">
-          <div className="space-y-2">
-            <div className="h-3 w-40 rounded bg-sky-200" />
-            <div className="h-3 w-52 rounded bg-slate-200" />
-            <div className="h-14 rounded-lg border border-sky-100 bg-white" />
+      <div className="rounded-xl border border-sky-300 bg-gradient-to-br from-sky-50 via-white to-cyan-50 p-3 text-slate-900">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-sky-800">Border permit · demo</div>
+            <div className="mt-1 font-mono text-xs text-sky-700">BY-PERMIT-0426</div>
           </div>
-          <div className="rounded-lg border border-sky-200 bg-white p-2">
-            <div className="grid grid-cols-3 gap-1">
-              {Array.from({ length: 18 }).map((_, index) => <span key={index} className="h-2 rounded bg-sky-200" />)}
+          <BureauStamp label="Demo visa" tone="green" />
+        </div>
+        <div className="grid grid-cols-[1fr_84px] gap-3">
+          <div className="space-y-2">
+            <PaperField label="Участник" value={subject} />
+            <PaperField label="Страна" value={country} />
+            <div className="grid grid-cols-8 gap-px rounded-lg border border-sky-200 bg-white p-2">
+              {Array.from({ length: 32 }).map((_, index) => <span key={index} className="h-2 rounded-sm bg-sky-200" />)}
             </div>
           </div>
+          <PixelPortrait female={isLikelyFemale(preview)} />
         </div>
       </div>
     );
@@ -180,7 +243,7 @@ export default function MockDocumentPreview({ preview, onClose, theme = "dark" }
               </div>
               <div className="rounded-full border border-slate-200 px-3 py-1 font-mono text-xs text-slate-500">CL-DEMO</div>
             </div>
-            <DocumentArt kind={kind} />
+            <DocumentArt kind={kind} preview={preview} />
             <div className="mt-4 grid gap-2">
               {preview.rows.map(([label, value]) => (
                 <div key={label} className="grid grid-cols-[150px_minmax(0,1fr)] gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm">

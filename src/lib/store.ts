@@ -783,6 +783,7 @@ const DEFAULT_SEAT_MAP_LAYOUTS: SeatMapLayout[] = [
   defaultLayout("layout_slutsk_crafts", "venue_slutsk_crafts", "hall_slutsk_crafts", "Слуцк · зал ремёсел 12x12", 12, 12),
   defaultLayout("layout_nesvizh_castle", "venue_nesvizh_castle", "hall_nesvizh_castle", "Несвиж · камерный зал 8x14", 8, 14),
   defaultLayout("layout_grodno_drama", "venue_grodno_drama", "hall_grodno_drama", "Гродно · драмтеатр 14x18", 14, 18),
+  defaultLayout("layout_mogilev_culture_palace", "venue_mogilev_culture_palace", "hall_mogilev_culture_palace", "Могилёв · дворец культуры 12x16", 12, 16),
   defaultLayout("layout_brest_museum", "venue_brest_museum", "hall_brest_museum", "Брест · музейный зал 10x12", 10, 12),
   defaultLayout("layout_vitebsk_concert_hall", "venue_vitebsk_concert_hall", "hall_vitebsk_concert_hall", "Витебск · концертный зал 12x16", 12, 16),
   defaultLayout("layout_ncca_minsk", "venue_ncca_minsk", "hall_ncca_minsk", "НЦСИ · зал 15x20", 15, 20),
@@ -957,6 +958,18 @@ const DEFAULT_VENUE_REGISTRY: VenueRegistryRecord[] = [
     capacity: 20,
     status: "approved",
     halls: [{ hallId: "hall_grodno_main", venueId: "venue_grodno_culture", name: "Малый зал", capacity: 20, hasSeatMap: true, layoutId: "layout_grodno_culture" }],
+  },
+  {
+    venueId: "venue_mogilev_culture_palace",
+    name: "Могилёвский областной дворец культуры",
+    city: "Могилёв",
+    region: "Могилёвская область",
+    type: "концертный зал",
+    address: "пр-т Мира, 12",
+    description: "Региональная концертная площадка со схемой мест до 500 зрителей.",
+    capacity: 192,
+    status: "approved",
+    halls: [{ hallId: "hall_mogilev_culture_palace", venueId: "venue_mogilev_culture_palace", name: "Камерный зал", capacity: 192, hasSeatMap: true, layoutId: "layout_mogilev_culture_palace" }],
   },
   {
     venueId: "venue_grand_theatre_v2",
@@ -1404,10 +1417,16 @@ export function getVenueRegistryRecord(state: AppState, venueId?: string): Venue
 export function buildEventSeatsFromLayout(layout: SeatMapLayout, tiers: PriceTier[] = []): EventSeat[] {
   const normalized = normalizeTierRows(tiers, 0);
   const v2SeatById = new Map((layout.layoutV2 ? flattenSeatMapLayoutV2(layout.layoutV2) : []).map((seat) => [seat.seatId, seat]));
+  const rowValues = layout.seats.map((seat) => Number.isFinite(Number(seat.y)) ? Number(seat.y) : 0);
+  const minRow = Math.min(...rowValues, 0);
+  const maxRow = Math.max(...rowValues, 0);
+  const rowSpan = Math.max(1, maxRow - minRow + 1);
   return layout.seats.map((seat, index) => {
     const v2Seat = v2SeatById.get(seat.seatId);
     const presetTier = normalized.find((item) => item.name === v2Seat?.tariffName);
-    const tier = presetTier || normalized[index % Math.max(1, normalized.length)] || normalized[0];
+    const rowRatio = (Number(seat.y || 0) - minRow) / rowSpan;
+    const rowTierIndex = Math.min(Math.max(0, normalized.length - 1), Math.floor(rowRatio * normalized.length));
+    const tier = presetTier || normalized[rowTierIndex] || normalized[index % Math.max(1, normalized.length)] || normalized[0];
     return {
       ...copySeat(seat),
       tariffId: tier?.name,

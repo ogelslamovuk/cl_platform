@@ -36,13 +36,13 @@ const MAX_SCALE = 2.1;
 const FIELD_CLASS = "mt-1 h-9 w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 text-sm text-slate-100 outline-none focus:border-blue-400";
 type ConstructorTemplateKey = "theatre" | "amphitheatre" | "circus" | "sports" | "ice" | "palace";
 
-const CONSTRUCTOR_TEMPLATES: { key: ConstructorTemplateKey; title: string; caption: string }[] = [
-  { key: "theatre", title: "Театр", caption: "партер, балкон, ложи" },
-  { key: "amphitheatre", title: "Амфитеатр", caption: "сектора вокруг сцены" },
-  { key: "circus", title: "Цирк", caption: "арена и круговые сектора" },
-  { key: "sports", title: "Малая арена", caption: "спортзал до 500 мест" },
-  { key: "ice", title: "Ледовая арена", caption: "лед и трибуны" },
-  { key: "palace", title: "Дворец спорта", caption: "концертная арена" },
+const CONSTRUCTOR_TEMPLATES: { key: ConstructorTemplateKey; title: string }[] = [
+  { key: "theatre", title: "Театр" },
+  { key: "amphitheatre", title: "Амфитеатр" },
+  { key: "circus", title: "Цирк" },
+  { key: "sports", title: "Малая арена" },
+  { key: "ice", title: "Ледовая арена" },
+  { key: "palace", title: "Дворец спорта" },
 ];
 
 function blockBounds(block: SeatMapBlockV2) {
@@ -74,6 +74,19 @@ function nextObject(layout: SeatMapLayoutV2, type: Extract<SeatMapObjectV2Type, 
   };
 }
 
+function createSceneObject(layoutId: string, type: Extract<SeatMapObjectV2Type, "stage" | "pit" | "arena">, number: number): SeatMapObjectV2 {
+  const presets = {
+    stage: { label: "СЦЕНА", x: 388, y: 48, width: 444, height: 84, radius: 40, fill: "#172554", stroke: "#60A5FA" },
+    pit: { label: "ОРКЕСТРОВАЯ ЯМА", x: 422, y: 154, width: 376, height: 42, radius: 20, fill: "#1E293B", stroke: "#94A3B8" },
+    arena: { label: "АРЕНА", x: 386, y: 252, width: 448, height: 214, radius: 48, fill: "#082F49", stroke: "#38BDF8" },
+  };
+  return {
+    id: `${layoutId}-object-${type}-${number}`,
+    type,
+    ...presets[type],
+  };
+}
+
 function objectTypeLabel(type: SeatMapObjectV2Type): string {
   if (type === "arena") return "Арена";
   if (type === "pit") return "Оркестровая яма";
@@ -88,6 +101,28 @@ function addTemplateBlock(
   const added = addConstructorBlockV2(source, type);
   const block = added.sectors.flatMap((sector) => sector.blocks).filter((item) => item.type === type).at(-1);
   return block ? updateConstructorBlockV2(added, block.id, patch) : added;
+}
+
+function TemplatePictogram({ type }: { type: ConstructorTemplateKey }) {
+  const dots = (count: number, className = "") => Array.from({ length: count }).map((_, index) => (
+    <span key={index} className={`h-1.5 w-1.5 rounded-full bg-current ${className}`} />
+  ));
+  if (type === "circus") {
+    return <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 bg-slate-950 text-cyan-300"><span className="h-5 w-5 rounded-full border-2 border-current" /></span>;
+  }
+  if (type === "ice") {
+    return <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 bg-slate-950 text-sky-300"><span className="h-4 w-7 rounded-full border-2 border-current" /></span>;
+  }
+  if (type === "sports") {
+    return <span className="grid h-9 w-9 grid-cols-3 gap-0.5 rounded-lg border border-slate-700 bg-slate-950 p-1.5 text-emerald-300"><span className="col-span-3 h-2 rounded-sm border border-current" />{dots(6)}</span>;
+  }
+  if (type === "amphitheatre") {
+    return <span className="flex h-9 w-9 flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-700 bg-slate-950 text-blue-300"><span className="h-2 w-5 rounded-t-full border-t-2 border-current" /><span className="h-2 w-7 rounded-t-full border-t-2 border-current" /><span className="h-2 w-8 rounded-t-full border-t-2 border-current" /></span>;
+  }
+  if (type === "palace") {
+    return <span className="grid h-9 w-9 grid-cols-4 gap-0.5 rounded-lg border border-slate-700 bg-slate-950 p-1.5 text-amber-300"><span className="col-span-4 h-1.5 rounded bg-current" />{dots(8)}</span>;
+  }
+  return <span className="grid h-9 w-9 grid-cols-4 gap-0.5 rounded-lg border border-slate-700 bg-slate-950 p-1.5 text-violet-300">{dots(12)}</span>;
 }
 
 function buildTemplateLayout(layoutId: string, layoutName: string, key: ConstructorTemplateKey): SeatMapLayoutV2 {
@@ -325,10 +360,10 @@ export default function SeatMapConstructorCanvas({ layoutId, layoutName, onClose
                     key={template.key}
                     type="button"
                     onClick={() => applyTemplate(template.key)}
-                    className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-left hover:border-blue-500"
+                    className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-left hover:border-blue-500"
                   >
-                    <span className="block text-xs font-semibold text-slate-100">{template.title}</span>
-                    <span className="mt-1 block text-[10px] leading-4 text-slate-400">{template.caption}</span>
+                    <TemplatePictogram type={template.key} />
+                    <span className="block text-xs font-semibold leading-4 text-slate-100">{template.title}</span>
                   </button>
                 ))}
               </div>

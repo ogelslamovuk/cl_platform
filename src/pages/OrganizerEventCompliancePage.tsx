@@ -29,6 +29,7 @@ import {
   isResellerAuthorizedForSales,
   payComplianceFeeFromBalance,
   SEAT_TARIFF_COLORS,
+  setEventComplianceReview,
   topUpOrganizerBalance,
   updateEventComplianceApplication,
 } from "@/lib/store";
@@ -204,6 +205,7 @@ export default function OrganizerEventCompliancePage() {
   const organizer = useMemo(() => selectCurrentOrganizer(state), [state]);
   const approved = useMemo(() => selectIsCurrentOrganizerApproved(state), [state]);
   const myApps = useMemo(() => selectMyEventComplianceApplications(state), [state]);
+  const isAdminMode = searchParams.get("mode") === "admin";
   const makeDefaultForm = () => ({
     ...defaultEventComplianceData(),
     ticketTiers: DEFAULT_COMPLIANCE_TICKET_TIERS.map((tier) => ({ ...tier })),
@@ -217,6 +219,7 @@ export default function OrganizerEventCompliancePage() {
   const [seatMapOpen, setSeatMapOpen] = useState(false);
   const [documentPreview, setDocumentPreview] = useState<DocumentPreview>(null);
   const [performerDraft, setPerformerDraft] = useState({ name: "", country: "Беларусь" });
+  const [adminReviewComment, setAdminReviewComment] = useState("");
   const salesOperators = useMemo(() => state.resellers, [state.resellers]);
   const approvedVenues = useMemo(() => state.venueRegistry.filter((venue) => venue.status === "approved"), [state.venueRegistry]);
   const selectedVenue = getVenueRegistryRecord(state, form.venueId);
@@ -243,25 +246,46 @@ export default function OrganizerEventCompliancePage() {
   };
 
   const editId = searchParams.get("edit");
+  const adminApplication = isAdminMode && editId ? state.eventComplianceApplications.find((app) => app.eventComplianceApplicationId === editId) || null : null;
   const editingApplication = editId ? myApps.find((app) => app.eventComplianceApplicationId === editId) : null;
+  const currentApplication = isAdminMode ? adminApplication : editingApplication;
+  const isReadOnlyMode = isAdminMode || Boolean(editingApplication && !["draft", "needs_rework"].includes(editingApplication.status));
+  const currentOrganizerId = organizer?.organizerId || currentApplication?.organizerId || "";
   useEffect(() => {
-    if (!organizer || !approved || !editId || !editingApplication) return;
+    if (!editId || !currentApplication) return;
+    if (!isAdminMode && (!organizer || !approved)) return;
     setEditingId(editId);
     setForm({
-      ...editingApplication.data,
-      eventTypePath: editingApplication.data.eventTypePath || [],
-      salesChannels: editingApplication.data.salesChannels?.length ? editingApplication.data.salesChannels : buildDefaultSalesChannels(state),
-      ticketTiers: editingApplication.data.ticketTiers?.length ? editingApplication.data.ticketTiers : DEFAULT_COMPLIANCE_TICKET_TIERS.map((tier) => ({ ...tier })),
-      dateSlots: editingApplication.data.dateSlots?.length ? editingApplication.data.dateSlots : [""],
-      performers: editingApplication.data.performers || [],
-      venueContractStatus: editingApplication.data.venueContractStatus || "требуется",
-      interagencyChecks: ensureChecks(editingApplication.data.interagencyChecks),
+      ...currentApplication.data,
+      eventTypePath: currentApplication.data.eventTypePath || [],
+      salesChannels: currentApplication.data.salesChannels?.length ? currentApplication.data.salesChannels : buildDefaultSalesChannels(state),
+      ticketTiers: currentApplication.data.ticketTiers?.length ? currentApplication.data.ticketTiers : DEFAULT_COMPLIANCE_TICKET_TIERS.map((tier) => ({ ...tier })),
+      dateSlots: currentApplication.data.dateSlots?.length ? currentApplication.data.dateSlots : [""],
+      performers: currentApplication.data.performers || [],
+      venueContractStatus: currentApplication.data.venueContractStatus || "требуется",
+      interagencyChecks: ensureChecks(currentApplication.data.interagencyChecks),
     });
-    setActiveStep(Math.min(Math.max(editingApplication.data.wizardLastStep || 0, 0), WIZARD_STEPS.length - 1));
-  }, [approved, editId, editingApplication, organizer, state]);
+    setActiveStep(Math.min(Math.max(currentApplication.data.wizardLastStep || 0, 0), WIZARD_STEPS.length - 1));
+    setTierErrors([]);
+    setAdminReviewComment(currentApplication.adminComment || "");
+  }, [approved, currentApplication, editId, isAdminMode, organizer, state]);
 
-  if (!organizer) return <Navigate to="/organizer" replace />;
-  if (!approved) {
+  if (isAdminMode && editId && !adminApplication) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#0B0F14", color: "#F5F7FA" }}>
+        <div className="w-full max-w-xl rounded-2xl border p-6" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+          <h1 className="text-2xl font-bold">Заявка не найдена</h1>
+          <p className="mt-3 text-sm opacity-75">Центр Управления не нашёл заявку с указанным ID.</p>
+          <Link to="/admin" className="mt-6 inline-flex h-10 items-center rounded-xl px-4 text-sm font-semibold" style={{ background: "#F2C94C", color: "#111" }}>
+            Вернуться в Центр Управления
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdminMode && !organizer) return <Navigate to="/organizer" replace />;
+  if (!isAdminMode && !approved) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#0B0F14", color: "#F5F7FA" }}>
         <div className="w-full max-w-2xl rounded-2xl border p-6" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
@@ -294,15 +318,15 @@ export default function OrganizerEventCompliancePage() {
   const totalPlannedTickets = hasSeatMap ? tariffConfigurationSummary.assignedSeats : form.ticketTiers.reduce((acc, tier) => acc + (Number.isFinite(tier.quantity) ? Math.max(0, Math.floor(tier.quantity)) : 0), 0);
   const fee = calculateComplianceFee(form.projectedCapacity, totalPlannedTickets, form.ticketTiers);
   const feeAmount = calculateComplianceFeeAmount({ ...form, plannedTicketsForSale: totalPlannedTickets, ticketTiers: form.ticketTiers });
-  const organizerFinancialAccount = getOrganizerFinancialAccount(state, organizer.organizerId);
+  const organizerFinancialAccount = getOrganizerFinancialAccount(state, currentOrganizerId);
   const editingPaymentApplication = editingId ? state.eventComplianceApplications.find((app) => app.eventComplianceApplicationId === editingId) || null : null;
   const paymentStatus = editingPaymentApplication ? getCompliancePaymentStatus(editingPaymentApplication) : form.feePaid || form.feeExempt || form.approvalMode !== "certificate_required" ? "Оплачено" : form.paymentComment === "Недостаточно средств" ? "Недостаточно средств" : "Ожидает оплаты";
   const paymentOperations = state.finance.organizerOperations
-    .filter((operation) => operation.organizerId === organizer.organizerId && (!editingId || operation.eventComplianceApplicationId === editingId))
+    .filter((operation) => operation.organizerId === currentOrganizerId && (!editingId || operation.eventComplianceApplicationId === editingId))
     .slice()
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const paymentReceipts = state.finance.organizerReceipts
-    .filter((receipt) => receipt.organizerId === organizer.organizerId && (!editingId || receipt.eventComplianceApplicationId === editingId))
+    .filter((receipt) => receipt.organizerId === currentOrganizerId && (!editingId || receipt.eventComplianceApplicationId === editingId))
     .slice()
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
@@ -330,6 +354,7 @@ export default function OrganizerEventCompliancePage() {
   ];
 
   function updateForm(patch: Partial<typeof form>) {
+    if (isReadOnlyMode) return;
     setForm((prev) => ({ ...prev, ...patch }));
   }
 
@@ -391,6 +416,7 @@ export default function OrganizerEventCompliancePage() {
   }
 
   function selectVenue(venueId: string) {
+    if (isReadOnlyMode) return;
     const venue = getVenueRegistryRecord(state, venueId);
     const hall = venue?.halls[0];
     const layout = hall?.layoutId ? getSeatMapLayout(state, hall.layoutId) : null;
@@ -409,6 +435,7 @@ export default function OrganizerEventCompliancePage() {
   }
 
   function addMockAttachment(kind: string, target: "eventDocuments" | "paymentAttachments" | "notificationsAttachment", name: string, sample = false) {
+    if (isReadOnlyMode) return;
     const file = mockAttachment(kind, name, sample);
     setForm((prev) => ({ ...prev, [target]: [...prev[target], file] }));
   }
@@ -427,16 +454,18 @@ export default function OrganizerEventCompliancePage() {
   }
 
   function ensureEditableApplicationForPayment(): string | null {
+    if (isReadOnlyMode || !currentOrganizerId) return null;
     if (editingId) return editingId;
     const payload = normalizeFormPayload();
-    const record = createEventComplianceApplication(state, organizer.organizerId, payload, false);
+    const record = createEventComplianceApplication(state, currentOrganizerId, payload, false);
     setEditingId(record.eventComplianceApplicationId);
     setForm(record.data);
     return record.eventComplianceApplicationId;
   }
 
   function handleTopUpBalance() {
-    topUpOrganizerBalance(state, organizer.organizerId);
+    if (isReadOnlyMode || !currentOrganizerId) return;
+    topUpOrganizerBalance(state, currentOrganizerId);
     update({ ...state });
     toast.success(`Счёт пополнен на ${formatMoney(DEMO_TOP_UP_AMOUNT)}.`);
   }
@@ -447,7 +476,7 @@ export default function OrganizerEventCompliancePage() {
       toast.error("Сначала сохраните заявку.");
       return;
     }
-    const receipt = generateComplianceFeeReceipt(state, organizer.organizerId, applicationId);
+    const receipt = generateComplianceFeeReceipt(state, currentOrganizerId, applicationId);
     update({ ...state });
     if (!receipt) {
       toast.error("Не удалось сформировать квитанцию.");
@@ -462,7 +491,7 @@ export default function OrganizerEventCompliancePage() {
       toast.error("Сначала сохраните заявку.");
       return;
     }
-    const result = payComplianceFeeFromBalance(state, organizer.organizerId, applicationId);
+    const result = payComplianceFeeFromBalance(state, currentOrganizerId, applicationId);
     const updatedApplication = state.eventComplianceApplications.find((app) => app.eventComplianceApplicationId === applicationId);
     if (updatedApplication) setForm(updatedApplication.data);
     update({ ...state });
@@ -474,6 +503,7 @@ export default function OrganizerEventCompliancePage() {
   }
 
   function addPerformer() {
+    if (isReadOnlyMode) return;
     const name = performerDraft.name.trim();
     if (!name) {
       toast.error("Укажите имя участника или исполнителя.");
@@ -493,6 +523,7 @@ export default function OrganizerEventCompliancePage() {
   }
 
   function toggleSalesChannel(code: string, checked: boolean) {
+    if (isReadOnlyMode) return;
     if (code === "OWN") return;
     const reseller = state.resellers.find((item) => item.code === code);
     if (checked && (!reseller || !isResellerAuthorizedForSales(reseller))) return;
@@ -505,6 +536,7 @@ export default function OrganizerEventCompliancePage() {
   }
 
   function handlePosterUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    if (isReadOnlyMode) return;
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -531,6 +563,7 @@ export default function OrganizerEventCompliancePage() {
   }
 
   function setCheckStatus(checkId: string, status: EventInteragencyCheck["status"]) {
+    if (isReadOnlyMode) return;
     setForm((prev) => ({
       ...prev,
       interagencyChecks: ensureChecks(prev.interagencyChecks).map((row) => row.checkId === checkId ? { ...row, status, updatedAt: new Date().toISOString() } : row),
@@ -538,6 +571,7 @@ export default function OrganizerEventCompliancePage() {
   }
 
   function batchSetChecks(status: EventInteragencyCheck["status"]) {
+    if (isReadOnlyMode) return;
     setForm((prev) => ({
       ...prev,
       interagencyChecks: ensureChecks(prev.interagencyChecks).map((row) => ({ ...row, status, updatedAt: new Date().toISOString() })),
@@ -545,6 +579,7 @@ export default function OrganizerEventCompliancePage() {
   }
 
   function fillWithDemoData() {
+    if (isReadOnlyMode) return;
     const eventDate = new Date();
     eventDate.setDate(eventDate.getDate() + 14);
     eventDate.setHours(19, 0, 0, 0);
@@ -629,6 +664,10 @@ export default function OrganizerEventCompliancePage() {
   }
 
   function save(submit: boolean) {
+    if (isReadOnlyMode || !currentOrganizerId) {
+      toast.error("Заявка открыта в режиме просмотра.");
+      return;
+    }
     if (submit && !canSubmit) {
       toast.error(`Заполните обязательный минимум: ${requiredMissing.join(", ")}.`);
       setActiveStep(8);
@@ -641,7 +680,7 @@ export default function OrganizerEventCompliancePage() {
     const payload = normalizeFormPayload();
     const ok = editingId
       ? updateEventComplianceApplication(state, editingId, payload, submit)
-      : !!createEventComplianceApplication(state, organizer.organizerId, payload, submit);
+      : !!createEventComplianceApplication(state, currentOrganizerId, payload, submit);
 
     if (!ok) {
       toast.error("Не удалось сохранить заявку.");
@@ -662,6 +701,27 @@ export default function OrganizerEventCompliancePage() {
     toast.success("Данные сохранены. Можно продолжить позже из списка заявок.");
   }
 
+  function applyAdminDecision(decision: "approved" | "needs_rework" | "rejected") {
+    if (!currentApplication) return;
+    const comment = adminReviewComment.trim();
+    if ((decision === "needs_rework" || decision === "rejected") && !comment) {
+      toast.error("Укажите комментарий для возврата или отклонения заявки.");
+      return;
+    }
+    const ok = setEventComplianceReview(state, currentApplication.eventComplianceApplicationId, {
+      decision,
+      comment,
+    });
+    if (!ok) {
+      toast.error("Недопустимый переход статуса или заявка ещё не готова к решению.");
+      return;
+    }
+    update({ ...state });
+    if (decision === "approved") toast.success("Заявка одобрена. Мероприятие создано в реестре.");
+    if (decision === "needs_rework") toast.success("Заявка возвращена на доработку.");
+    if (decision === "rejected") toast.success("Заявка отклонена.");
+  }
+
   function nextStep() {
     setActiveStep((step) => Math.min(step + 1, WIZARD_STEPS.length - 1));
   }
@@ -676,22 +736,79 @@ export default function OrganizerEventCompliancePage() {
       <div className="mx-auto max-w-6xl rounded-2xl border p-6 space-y-6" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold mb-2">Заявка на проведение мероприятия</h1>
-            <p className="text-sm" style={{ color: "rgba(245,247,250,0.72)" }}>Заполните этапы, сохраните черновик или подайте заявку в Центр Управления.</p>
-            {editingApplication?.adminComment && (
+            <h1 className="text-2xl font-bold mb-2">{isAdminMode ? "Центр Управления · заявка мероприятия" : "Заявка на проведение мероприятия"}</h1>
+            <p className="text-sm" style={{ color: "rgba(245,247,250,0.72)" }}>
+              {isReadOnlyMode ? "Единый 9-этапный интерфейс открыт в режиме просмотра." : "Заполните этапы, сохраните черновик или подайте заявку в Центр Управления."}
+            </p>
+            {currentApplication?.adminComment && (
               <div className="mt-3 rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(251,191,36,0.35)", background: "rgba(251,191,36,0.12)", color: "#FBBF24" }}>
-                Замечание Центра Управления: {editingApplication.adminComment}
+                Замечание Центра Управления: {currentApplication.adminComment}
               </div>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link to="/organizer" className="px-3 h-9 inline-flex items-center rounded border">Назад в кабинет</Link>
-            <span className="inline-flex items-center gap-1">
-              <button type="button" className="px-3 h-9 inline-flex items-center rounded border bg-[#1d2a3b]" onClick={fillWithDemoData}>Заполнить демо-данными</button>
-              <HelpTooltip text="Автоматически заполнить этапы безопасными демонстрационными данными без реальных паспортных сведений." />
-            </span>
+            <Link to={isAdminMode ? "/admin" : "/organizer"} className="px-3 h-9 inline-flex items-center rounded border">{isAdminMode ? "Назад в Центр Управления" : "Назад в кабинет"}</Link>
+            {!isReadOnlyMode && (
+              <span className="inline-flex items-center gap-1">
+                <button type="button" className="px-3 h-9 inline-flex items-center rounded border bg-[#1d2a3b]" onClick={fillWithDemoData}>Заполнить демо-данными</button>
+                <HelpTooltip text="Автоматически заполнить этапы безопасными демонстрационными данными без реальных паспортных сведений." />
+              </span>
+            )}
           </div>
         </div>
+
+        {isAdminMode && currentApplication && (
+          <section className="rounded-2xl border p-4" style={{ borderColor: "rgba(96,165,250,0.28)", background: "rgba(15,22,32,0.92)" }}>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-wide" style={{ color: "rgba(147,197,253,0.88)" }}>Admin-mode</div>
+                <h2 className="mt-1 text-lg font-semibold">Решение по заявке {currentApplication.eventComplianceApplicationId}</h2>
+                <p className="mt-1 text-sm" style={{ color: "rgba(245,247,250,0.70)" }}>
+                  Статус: {complianceStatusLabel[currentApplication.status] || currentApplication.status} · оплата: {paymentStatus}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={currentApplication.status !== "submitted" || paymentStatus !== "Оплачено"}
+                  onClick={() => applyAdminDecision("approved")}
+                  className="h-9 rounded px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ background: "rgba(52,211,153,0.18)", color: "#A7F3D0" }}
+                >
+                  Одобрить
+                </button>
+                <button
+                  type="button"
+                  disabled={currentApplication.status !== "submitted"}
+                  onClick={() => applyAdminDecision("needs_rework")}
+                  className="h-9 rounded px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ background: "rgba(251,191,36,0.18)", color: "#FDE68A" }}
+                >
+                  Вернуть на доработку
+                </button>
+                <button
+                  type="button"
+                  disabled={currentApplication.status !== "submitted"}
+                  onClick={() => applyAdminDecision("rejected")}
+                  className="h-9 rounded px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ background: "rgba(248,113,113,0.18)", color: "#FCA5A5" }}
+                >
+                  Отклонить
+                </button>
+              </div>
+            </div>
+            <label className="mt-3 block text-sm">
+              <span className="mb-1 block" style={{ color: "rgba(245,247,250,0.72)" }}>Комментарий администратора</span>
+              <textarea
+                className="min-h-20 w-full rounded-xl border px-3 py-2"
+                value={adminReviewComment}
+                onChange={(event) => setAdminReviewComment(event.target.value)}
+                placeholder="Комментарий обязателен при возврате на доработку или отклонении"
+                style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24", color: "#F5F7FA" }}
+              />
+            </label>
+          </section>
+        )}
 
         <section className="grid gap-3 rounded-2xl border p-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]" style={{ borderColor: "rgba(96,165,250,0.24)", background: "rgba(15,22,32,0.92)" }}>
           <div>
@@ -923,7 +1040,7 @@ export default function OrganizerEventCompliancePage() {
             <div className="space-y-4">
               <div className="grid md:grid-cols-2 gap-3">
                 <FieldHelp text="Выберите только утверждённую площадку из реестра Центра Управления. Добавление площадки из заявки недоступно.">
-                  <select className="h-10 w-full rounded px-3 pr-9 bg-[#111A24] border" value={form.venueId || ""} onChange={(e) => selectVenue(e.target.value)}>
+                  <select disabled={isReadOnlyMode} className="h-10 w-full rounded px-3 pr-9 bg-[#111A24] border disabled:opacity-70" value={form.venueId || ""} onChange={(e) => selectVenue(e.target.value)}>
                     <option value="">Выберите площадку из реестра</option>
                     {approvedVenues.map((venue) => (
                       <option key={venue.venueId} value={venue.venueId}>{venue.city} · {venue.type} · {venue.name}</option>
@@ -931,7 +1048,8 @@ export default function OrganizerEventCompliancePage() {
                   </select>
                 </FieldHelp>
                 <FieldHelp text="Зал или пространство берётся из карточки выбранной площадки.">
-                  <select className="h-10 w-full rounded px-3 pr-9 bg-[#111A24] border" value={form.hallId || ""} onChange={(e) => {
+                  <select disabled={isReadOnlyMode} className="h-10 w-full rounded px-3 pr-9 bg-[#111A24] border disabled:opacity-70" value={form.hallId || ""} onChange={(e) => {
+                    if (isReadOnlyMode) return;
                     const hall = selectedVenue?.halls.find((item) => item.hallId === e.target.value);
                     const layout = hall?.layoutId ? getSeatMapLayout(state, hall.layoutId) : null;
                     setForm((p) => ({
@@ -967,6 +1085,7 @@ export default function OrganizerEventCompliancePage() {
                     <button
                       key={status}
                       type="button"
+                      disabled={isReadOnlyMode}
                       onClick={() => {
                         updateForm({
                           venueContractStatus: status,
@@ -975,7 +1094,7 @@ export default function OrganizerEventCompliancePage() {
                             : form.eventDocuments,
                         });
                       }}
-                      className="rounded-lg border px-3 py-2 text-left text-sm"
+                      className="rounded-lg border px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-70"
                       style={{
                         borderColor: (form.venueContractStatus || "требуется") === status ? "rgba(242,201,76,0.65)" : "rgba(255,255,255,0.12)",
                         background: (form.venueContractStatus || "требуется") === status ? "rgba(242,201,76,0.10)" : "#0F1620",
@@ -996,11 +1115,12 @@ export default function OrganizerEventCompliancePage() {
                   ) : (
                     <button
                       type="button"
+                      disabled={isReadOnlyMode}
                       onClick={() => updateForm({
                         venueContractStatus: "приложен",
                         eventDocuments: [...form.eventDocuments, mockAttachment("venue-contract", "Договор с площадкой", true)],
                       })}
-                      className="flex w-full flex-col items-center justify-center rounded-xl border border-dashed px-4 py-6 text-sm"
+                      className="flex w-full flex-col items-center justify-center rounded-xl border border-dashed px-4 py-6 text-sm disabled:cursor-not-allowed disabled:opacity-70"
                       style={{ borderColor: "rgba(96,165,250,0.35)", background: "rgba(59,130,246,0.08)", color: "rgba(219,234,254,0.96)" }}
                     >
                       Приложить mock-договор с площадкой
@@ -1064,7 +1184,7 @@ export default function OrganizerEventCompliancePage() {
                         <div className="text-xs opacity-70">Назначено: {seatCounts.assigned}; без тарифа: {seatCounts.unassigned}; блок: {seatCounts.blocked}</div>
                       </div>
                       <span className="inline-flex items-center gap-1">
-                        <button type="button" onClick={() => setSeatMapOpen(true)} className="rounded bg-[#1d2a3b] px-3 py-2 text-sm font-semibold">Назначить тарифы на схеме</button>
+                        <button type="button" disabled={isReadOnlyMode} onClick={() => setSeatMapOpen(true)} className="rounded bg-[#1d2a3b] px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50">Назначить тарифы на схеме</button>
                         <HelpTooltip text="Открыть текущий конструктор схемы зала и тарифов для группового назначения и индивидуальных исключений." />
                       </span>
                     </div>
@@ -1116,7 +1236,7 @@ export default function OrganizerEventCompliancePage() {
                         className="mt-1"
                         type="checkbox"
                         checked={checked}
-                        disabled={!available}
+                        disabled={!available || isReadOnlyMode}
                         onChange={(event) => toggleSalesChannel(reseller.code, event.target.checked)}
                       />
                       <span>
@@ -1253,20 +1373,22 @@ export default function OrganizerEventCompliancePage() {
                     Недостаточно средств. Пополните счёт и повторите оплату.
                   </div>
                 )}
-                <div className="flex flex-wrap gap-3">
-                  <span className="inline-flex items-center gap-1">
-                    <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={handleTopUpBalance}>Пополнить счёт</button>
-                    <HelpTooltip text={`Добавить на финансовый счёт демонстрационную сумму ${formatMoney(DEMO_TOP_UP_AMOUNT)} без внешнего платёжного шлюза.`} />
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={handleGenerateFeeReceipt}>Сформировать квитанцию</button>
-                    <HelpTooltip text="Создать демонстрационную квитанцию по текущей заявке." />
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <button className="px-3 py-2 rounded font-semibold disabled:opacity-50" style={{ background: "#F2C94C", color: "#111" }} onClick={handlePayFromBalance} disabled={paymentStatus === "Оплачено"}>Оплатить с баланса</button>
-                    <HelpTooltip text="Списать демонстрационную сумму пошлины с финансового счёта организатора." />
-                  </span>
-                </div>
+                {!isReadOnlyMode && (
+                  <div className="flex flex-wrap gap-3">
+                    <span className="inline-flex items-center gap-1">
+                      <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={handleTopUpBalance}>Пополнить счёт</button>
+                      <HelpTooltip text={`Добавить на финансовый счёт демонстрационную сумму ${formatMoney(DEMO_TOP_UP_AMOUNT)} без внешнего платёжного шлюза.`} />
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={handleGenerateFeeReceipt}>Сформировать квитанцию</button>
+                      <HelpTooltip text="Создать демонстрационную квитанцию по текущей заявке." />
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <button className="px-3 py-2 rounded font-semibold disabled:opacity-50" style={{ background: "#F2C94C", color: "#111" }} onClick={handlePayFromBalance} disabled={paymentStatus === "Оплачено"}>Оплатить с баланса</button>
+                      <HelpTooltip text="Списать демонстрационную сумму пошлины с финансового счёта организатора." />
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="grid gap-3 lg:grid-cols-2">
                 <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
@@ -1327,19 +1449,23 @@ export default function OrganizerEventCompliancePage() {
         </section>
 
         <div className="flex flex-wrap gap-3">
-          <span className="inline-flex items-center gap-1">
-            <button className="px-4 h-10 rounded bg-[#2b3f57]" onClick={() => save(false)}>Сохранить</button>
-            <HelpTooltip text="Сохранить текущие данные в черновик без отправки в Центр Управления." />
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <button className="px-4 h-10 rounded bg-[#2b3f57]" onClick={saveAndReturnLater}>Сохранить и продолжить позже</button>
-            <HelpTooltip text="Сохранить черновик, чтобы продолжить заполнение из кабинета организатора позже." />
-          </span>
+          {!isReadOnlyMode && (
+            <>
+              <span className="inline-flex items-center gap-1">
+                <button className="px-4 h-10 rounded bg-[#2b3f57]" onClick={() => save(false)}>Сохранить</button>
+                <HelpTooltip text="Сохранить текущие данные в черновик без отправки в Центр Управления." />
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <button className="px-4 h-10 rounded bg-[#2b3f57]" onClick={saveAndReturnLater}>Сохранить и продолжить позже</button>
+                <HelpTooltip text="Сохранить черновик, чтобы продолжить заполнение из кабинета организатора позже." />
+              </span>
+            </>
+          )}
           <span className="inline-flex items-center gap-1">
             <button className="px-4 h-10 rounded bg-[#1d2a3b]" onClick={nextStep} disabled={activeStep === WIZARD_STEPS.length - 1}>Далее</button>
             <HelpTooltip text="Перейти к следующему этапу. Заполнение можно вести в любом порядке." />
           </span>
-          {activeStep === WIZARD_STEPS.length - 1 && (
+          {!isReadOnlyMode && activeStep === WIZARD_STEPS.length - 1 && (
             <span className="inline-flex items-center gap-1">
               <button className="px-4 h-10 rounded font-semibold disabled:opacity-50" style={{ background: "#F2C94C", color: "#111" }} onClick={() => save(true)} disabled={!canSubmit}>Подать на рассмотрение</button>
               <HelpTooltip text="Отправить заполненную заявку в Центр Управления. Черновики там не отображаются." />
@@ -1347,6 +1473,7 @@ export default function OrganizerEventCompliancePage() {
           )}
         </div>
 
+        {!isAdminMode && (
         <section className="space-y-2">
           <h2 className="font-semibold">Мои заявки</h2>
           {myApps.length === 0 ? <div className="text-sm opacity-70">Пока нет заявок.</div> : (
@@ -1387,6 +1514,7 @@ export default function OrganizerEventCompliancePage() {
             </div>
           )}
         </section>
+        )}
       </div>
       <MockDocumentPreview preview={documentPreview} onClose={() => setDocumentPreview(null)} />
       <SeatMapModal
@@ -1400,6 +1528,10 @@ export default function OrganizerEventCompliancePage() {
         tiers={normalizedTiersWithColors}
         onClose={() => setSeatMapOpen(false)}
         onSaveEventSeats={(seats) => {
+          if (isReadOnlyMode) {
+            setSeatMapOpen(false);
+            return;
+          }
           setForm((prev) => ({
             ...prev,
             eventSeats: seats,

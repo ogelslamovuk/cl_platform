@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1350" viewBox="0 0 900 1350" role="img" aria-labelledby="title desc">
+  <title id="title">Дняпроўскія галасы</title>
+  <desc id="desc">Могилёвский камерный концерт</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12304a"/><stop offset="1" stop-color="#07111f"/></linearGradient>
+    <linearGradient id="river" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#a7f3d0"/></linearGradient>
+  </defs>
+  <rect width="900" height="1350" fill="url(#bg)"/>
+  <path d="M0 830 C190 700 330 940 520 790 C690 656 790 760 900 690 L900 1350 L0 1350 Z" fill="url(#river)" opacity="0.35"/>
+  <g fill="none" stroke="#e0f2fe" stroke-width="12" stroke-linecap="round" opacity="0.92">
+    <path d="M300 420 C310 300 408 250 450 246 C492 250 590 300 600 420"/>
+    <path d="M330 420 L330 690"/>
+    <path d="M570 420 L570 690"/>
+    <path d="M310 690 C370 750 530 750 590 690"/>
+  </g>
+  <g fill="#fbbf24" opacity="0.88">
+    <circle cx="308" cy="380" r="16"/>
+    <circle cx="452" cy="250" r="16"/>
+    <circle cx="596" cy="380" r="16"/>
+  </g>
+  <rect x="64" y="70" width="772" height="1210" rx="34" fill="none" stroke="#e0f2fe" stroke-opacity="0.32" stroke-width="3"/>
+  <text x="86" y="146" fill="#bae6fd" font-family="Inter, Arial, sans-serif" font-size="31" font-weight="800" letter-spacing="3">МОГИЛЁВ · КАМЕРНЫЙ КОНЦЕРТ</text>
+  <text x="86" y="1006" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="76" font-weight="850"><tspan x="86" dy="0">Дняпроўскія</tspan><tspan x="86" dy="88">галасы</tspan></text>
+  <rect x="86" y="1162" width="210" height="10" rx="5" fill="#38bdf8"/>
+  <text x="86" y="1224" fill="#e0f2fe" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="650">Дворец культуры · камерный зал</text>
+  <text x="86" y="1266" fill="#ffffff" fill-opacity="0.72" font-family="Inter, Arial, sans-serif" font-size="24">голоса, река и вечерний свет</text>
+</svg>

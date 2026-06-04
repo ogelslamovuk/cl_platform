@@ -577,7 +577,7 @@ export default function OrganizerPage() {
                 setAppFilter={setAppFilter}
                 sort={appSort}
                 setSort={setAppSort}
-                onOpen={setDrawerApp}
+                onOpen={(app) => navigate(`/organizer/compliance?edit=${app.eventComplianceApplicationId}`)}
                 onCreateNew={() => navigate("/organizer/compliance")}
                 onEdit={(id) => navigate(`/organizer/compliance?edit=${id}`)}
               />
@@ -822,7 +822,7 @@ function ApplicationsTable({
                   <td className="py-2.5 px-3 space-x-2 whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                     <span className="inline-flex items-center gap-1">
                       <button onClick={() => onOpen(a)} className="h-7 px-3 rounded-lg border text-[12px]" style={{ borderColor: T.btnSecondaryBorder, color: T.textSecondary }}>Просмотр</button>
-                      <HelpTooltip text="Открыть карточку заявки для просмотра подробностей." />
+                      <HelpTooltip text="Открыть заявку в едином 9-этапном интерфейсе." />
                     </span>
                     {(a.status === "draft" || a.status === "needs_rework") && (
                       <span className="inline-flex items-center gap-1">
