@@ -1,1 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Звоны Нясвіжа"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#20324d"/><stop offset="1" stop-color="#ead7b4"/></linearGradient><pattern id="orn" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M24 4 L44 24 L24 44 L4 24 Z" fill="none" stroke="#d9a441" stroke-width="2" opacity="0.22"/></pattern></defs><rect width="1200" height="750" fill="url(#bg)"/><rect width="1200" height="750" fill="url(#orn)" opacity="0.55"/><rect x="54" y="54" width="1092" height="642" rx="34" fill="rgba(0,0,0,0.16)" stroke="rgba(255,255,255,0.35)" stroke-width="2"/><path d="M0 650 C190 585 380 720 600 650 C820 580 970 610 1200 520 V750 H0 Z" fill="#20324d" opacity="0.28"/><path d="M700 600 h390 V330 h-70 V220 h-80 v110 h-90 V250 h-80 v80 h-70z" fill="#d9a441" opacity="0.9"/><path d="M760 600 v-95 c0-55 80-55 80 0v95" fill="#20324d"/><path d="M720 330 h350" stroke="#6c91bd" stroke-width="12"/><circle cx="920" cy="190" r="48" fill="#6c91bd" opacity="0.85"/><path d="M900 185 h40 M920 165 v40" stroke="#20324d" stroke-width="8"/><text x="92" y="138" font-family="Arial, sans-serif" font-size="23" font-weight="700" letter-spacing="3" fill="#6c91bd">ЦЕНТР УПРАВЛЕНИЯ · DEMO</text><text x="92" y="285" font-family="Arial, sans-serif" font-size="64" font-weight="800" fill="#fffaf0">Звоны</text><text x="92" y="363" font-family="Arial, sans-serif" font-size="64" font-weight="800" fill="#fffaf0">Нясвіжа</text><text x="94" y="520" font-family="Arial, sans-serif" font-size="29" font-weight="600" fill="#fff3d8">музыкальный вечер</text><rect x="92" y="574" width="330" height="2" fill="#6c91bd"/><text x="92" y="625" font-family="Arial, sans-serif" font-size="24" fill="#fffaf0">Белорусская культурная программа</text></svg>
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1350" viewBox="0 0 900 1350" role="img" aria-labelledby="title desc">
+  <title id="title">Звоны Нясвіжа</title>
+  <desc id="desc">Камерный вечер</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#172554"/><stop offset="1" stop-color="#020617"/></linearGradient>
+    <radialGradient id="glow" cx="50%" cy="38%" r="58%"><stop offset="0" stop-color="#facc15" stop-opacity="0.42"/><stop offset="1" stop-color="#facc15" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="900" height="1350" fill="url(#bg)"/>
+  <rect width="900" height="1350" fill="url(#glow)"/>
+  <circle cx="780" cy="145" r="180" fill="#facc15" opacity="0.16"/>
+  <circle cx="120" cy="1110" r="220" fill="#eff6ff" opacity="0.08"/>
+  <g fill='#eff6ff' opacity='0.88'><rect x='260' y='600' width='380' height='210' rx='18'/><rect x='300' y='520' width='70' height='110'/><rect x='530' y='520' width='70' height='110'/><path d='M300 520 l35 -58 l35 58 zM530 520 l35 -58 l35 58 z' fill='#facc15'/><path d='M390 600 l60 -90 l60 90 z' fill='#facc15' opacity='0.75'/></g>
+  <rect x="70" y="80" width="760" height="1190" rx="42" fill="none" stroke="#eff6ff" stroke-opacity="0.34" stroke-width="3"/>
+  <text x="88" y="150" fill="#eff6ff" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700" letter-spacing="3">КАМЕРНЫЙ ВЕЧЕР</text>
+  <text x="88" y="1032" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="74" font-weight="800"><tspan x="88" dy="0">Звоны Нясвіжа</tspan><tspan x="88" dy="86"></tspan></text>
+  <rect x="88" y="1158" width="180" height="10" rx="5" fill="#facc15"/>
+  <text x="88" y="1220" fill="#eff6ff" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="600">Белорусская культурная программа</text>
+  <text x="88" y="1262" fill="#ffffff" fill-opacity="0.70" font-family="Inter, Arial, sans-serif" font-size="24">афиша мероприятия</text>
+</svg>

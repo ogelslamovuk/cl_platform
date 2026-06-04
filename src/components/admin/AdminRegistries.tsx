@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { AppState, CreateVenueRegistryInput, VenueRegistryRecord } from "@/lib/store";
 import { createVenueRegistryRecord, getSeatMapLayout, saveSeatMapLayout } from "@/lib/store";
 import { A, statusChip } from "./adminStyles";
@@ -8,7 +8,7 @@ import SeatMapConstructorCanvas from "@/components/seatmap/SeatMapConstructorCan
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import type { SeatMapLayoutV2 } from "@/lib/seatMapV2";
 import { toast } from "sonner";
-import { getRegionFilterOptions, isInAdminScope, normalizeRegion, type AdminRegionScope } from "./adminScope";
+import { getScopedRegionFilterOptions, isInAdminScope, normalizeRegion, type AdminRegionScope } from "./adminScope";
 
 function CardHelp({ text }: { text: string }) {
   return (
@@ -57,7 +57,10 @@ export function AdminOrgRegistry({ state, regionScope = "all" }: { state: AppSta
     },
   };
 
-  const regionOptions = useMemo(() => getRegionFilterOptions(state), [state]);
+  const regionOptions = useMemo(() => getScopedRegionFilterOptions(state, regionScope), [regionScope, state]);
+  useEffect(() => {
+    if (regionFilter && !regionOptions.includes(regionFilter)) setRegionFilter("");
+  }, [regionFilter, regionOptions]);
   const orgs = useMemo(() => {
     const approvedOrganizerIds = new Set(state.organizerRegistry.map((record) => record.organizerId));
     return state.organizers
@@ -93,6 +96,14 @@ export function AdminOrgRegistry({ state, regionScope = "all" }: { state: AppSta
   }, [regionFilter, regionScope, state]);
 
   const riskChip = (r: string) => r === 'high' ? statusChip('error') : r === 'medium' ? statusChip('warn') : statusChip('ok');
+  useEffect(() => {
+    if (!drawer) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDrawer(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [drawer]);
 
   return (
     <div className="space-y-5">
@@ -102,7 +113,7 @@ export function AdminOrgRegistry({ state, regionScope = "all" }: { state: AppSta
       </div>
       <div className="max-w-xs">
         <select value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)} className="h-9 w-full rounded-lg border px-3 text-sm outline-none" style={{ background: A.surfaceBg, borderColor: A.border, color: A.textPrimary }}>
-          <option value="">Все регионы</option>
+          <option value="">{regionScope === "all" ? "Все регионы" : "Регион сотрудника"}</option>
           {regionOptions.map((region) => <option key={region} value={region}>{region}</option>)}
         </select>
       </div>
@@ -198,7 +209,23 @@ export function AdminVenueRegistry({ state, onUpdate, regionScope = "all" }: { s
       .filter((venue) => !cityFilter || venue.city === cityFilter);
   }, [cityFilter, regionFilter, regionScope, state.venueRegistry]);
   const cityOptions = useMemo(() => Array.from(new Set(state.venueRegistry.map((venue) => venue.city))).sort(), [state.venueRegistry]);
-  const regionOptions = useMemo(() => getRegionFilterOptions(state), [state]);
+  const regionOptions = useMemo(() => getScopedRegionFilterOptions(state, regionScope), [regionScope, state]);
+  useEffect(() => {
+    if (regionFilter && !regionOptions.includes(regionFilter)) setRegionFilter("");
+  }, [regionFilter, regionOptions]);
+  useEffect(() => {
+    if (!drawer && !createOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (createOpen) {
+        setCreateOpen(false);
+        return;
+      }
+      setDrawer(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [createOpen, drawer]);
   const activeHall = schemeVenue?.halls.find((hall) => hall.layoutId) || null;
   const activeLayout = getSeatMapLayout(state, activeHall?.layoutId);
   const inputStyle = { background: A.surfaceBg, borderColor: A.border, color: A.textPrimary };
@@ -248,7 +275,7 @@ export function AdminVenueRegistry({ state, onUpdate, regionScope = "all" }: { s
       </div>
       <div className="flex max-w-2xl flex-wrap gap-2">
         <select value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)} className="h-9 rounded-lg border px-3 text-sm outline-none" style={inputStyle}>
-          <option value="">Все регионы</option>
+          <option value="">{regionScope === "all" ? "Все регионы" : "Регион сотрудника"}</option>
           {regionOptions.map((region) => <option key={region} value={region}>{region}</option>)}
         </select>
         <select value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} className="h-9 w-full rounded-lg border px-3 text-sm outline-none" style={inputStyle}>

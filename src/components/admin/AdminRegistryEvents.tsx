@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { AppState, EventRecord } from "@/lib/store";
 import { getEventSalesChannels, getEventSeatsWithSalesState, getSalesChannelLabel, getEventSeatSummary, getSeatMapLayout, issueMarks, publishEvent } from "@/lib/store";
 import { formatDisplayId, getEventStatusLabel, getTicketStatusLabel } from "@/lib/display";
@@ -8,7 +8,7 @@ import HelpTooltip from "@/components/ui/help-tooltip";
 import { toast } from "sonner";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import SeatMapPreview from "@/components/seatmap/SeatMapPreview";
-import { getEventRegionCity, getRegionFilterOptions, isInAdminScope, type AdminRegionScope } from "./adminScope";
+import { getEventRegionCity, getScopedRegionFilterOptions, isInAdminScope, type AdminRegionScope } from "./adminScope";
 
 interface Props {
   state: AppState;
@@ -61,14 +61,37 @@ export default function AdminRegistryEvents({ state, onUpdate, regionScope = "al
     });
   }, [cityFilter, regionFilter, regionScope, schemeFilter, search, state, statusFilter, typeFilter]);
 
-  const regionOptions = useMemo(() => getRegionFilterOptions(state), [state]);
-  const cityOptions = useMemo(() => Array.from(new Set(state.events.map((event) => getEventRegionCity(state, event).city))).sort((a, b) => a.localeCompare(b, "ru")), [state]);
+  const regionOptions = useMemo(() => getScopedRegionFilterOptions(state, regionScope), [regionScope, state]);
+  const cityOptions = useMemo(() => Array.from(new Set(
+    state.events
+      .filter((event) => isInAdminScope(getEventRegionCity(state, event).region, regionScope))
+      .map((event) => getEventRegionCity(state, event).city)
+  )).sort((a, b) => a.localeCompare(b, "ru")), [regionScope, state]);
   const typeOptions = useMemo(() => Array.from(new Set(state.events.map((event) => event.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ru")), [state.events]);
 
   const organizerNameById = useMemo(
     () => new Map(state.organizers.map((organizer) => [organizer.organizerId, organizer.name])),
     [state.organizers]
   );
+  useEffect(() => {
+    if (!drawer && !confirmIssue) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (confirmIssue) {
+        setConfirmIssue(null);
+        return;
+      }
+      setDrawer(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [confirmIssue, drawer]);
+  useEffect(() => {
+    if (regionFilter && !regionOptions.includes(regionFilter)) setRegionFilter("");
+  }, [regionFilter, regionOptions]);
+  useEffect(() => {
+    if (cityFilter && !cityOptions.includes(cityFilter)) setCityFilter("");
+  }, [cityFilter, cityOptions]);
 
   const complianceByEventId = useMemo(
     () =>
@@ -123,7 +146,7 @@ export default function AdminRegistryEvents({ state, onUpdate, regionScope = "al
           </div>
         </div>
         <select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
-          <option value="">Все регионы</option>
+          <option value="">{regionScope === "all" ? "Все регионы" : "Регион сотрудника"}</option>
           {regionOptions.map((region) => <option key={region} value={region}>{region}</option>)}
         </select>
         <select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>

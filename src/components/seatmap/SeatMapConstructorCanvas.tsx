@@ -92,35 +92,54 @@ function addTemplateBlock(
 
 function buildTemplateLayout(layoutId: string, layoutName: string, key: ConstructorTemplateKey): SeatMapLayoutV2 {
   let next = createConstructorLayoutV2(layoutId, layoutName);
-  next = updateConstructorBlockV2(next, "straight-1", { name: "Центральный сектор", rows: 8, seatsPerRow: 12, x: 438, y: 254, rowSpacing: 29, seatSpacing: 27 });
   if (key === "theatre") {
-    next = addTemplateBlock(next, "diagonal", { name: "Левый боковой сектор", rows: 7, seatsPerRow: 6, x: 210, y: 292, rotation: -11 });
-    next = addTemplateBlock(next, "diagonal", { name: "Правый боковой сектор", rows: 7, seatsPerRow: 6, x: 858, y: 268, rotation: 11 });
-    next = addTemplateBlock(next, "balcony", { name: "Балкон", rows: 4, seatsPerRow: 18, x: 328, y: 608 });
-    next = addTemplateBlock(next, "box", { name: "Ложа L", rows: 2, seatsPerRow: 4, x: 92, y: 255, rotation: -5 });
-    next = addTemplateBlock(next, "box", { name: "Ложа R", rows: 2, seatsPerRow: 4, x: 1030, y: 255, rotation: 5 });
+    next = updateConstructorBlockV2(next, "straight-1", { name: "Партер", rows: 8, seatsPerRow: 14, x: 395, y: 250, rowSpacing: 29, seatSpacing: 27 });
+    next = addTemplateBlock(next, "diagonal", { name: "Левый боковой сектор", rows: 7, seatsPerRow: 6, x: 202, y: 300, rotation: -12 });
+    next = addTemplateBlock(next, "diagonal", { name: "Правый боковой сектор", rows: 7, seatsPerRow: 6, x: 858, y: 270, rotation: 12 });
+    next = addTemplateBlock(next, "balcony", { name: "Балкон", rows: 4, seatsPerRow: 20, x: 290, y: 606 });
+    next = addTemplateBlock(next, "box", { name: "Ложа L", rows: 2, seatsPerRow: 5, x: 92, y: 245, rotation: -5 });
+    next = addTemplateBlock(next, "box", { name: "Ложа R", rows: 2, seatsPerRow: 5, x: 1030, y: 245, rotation: 5 });
+    next = { ...next, style: "theatre", objects: [createSceneObject(layoutId, "stage", 1), createSceneObject(layoutId, "pit", 2)] };
   }
   if (key === "amphitheatre") {
-    next = updateConstructorBlockV2(next, "straight-1", { name: "Нижний сектор", rows: 6, seatsPerRow: 18, x: 360, y: 390 });
-    next = addTemplateBlock(next, "diagonal", { name: "Левый амфитеатр", rows: 8, seatsPerRow: 8, x: 184, y: 280, rotation: -18 });
-    next = addTemplateBlock(next, "diagonal", { name: "Правый амфитеатр", rows: 8, seatsPerRow: 8, x: 850, y: 246, rotation: 18 });
-    next = addTemplateBlock(next, "balcony", { name: "Верхний ярус", rows: 5, seatsPerRow: 20, x: 300, y: 610 });
+    next = updateConstructorBlockV2(next, "straight-1", { name: "Нижний полукруг", rows: 5, seatsPerRow: 18, x: 360, y: 430, rotation: 0, rowSpacing: 30 });
+    next = addTemplateBlock(next, "diagonal", { name: "Левое крыло", rows: 8, seatsPerRow: 8, x: 165, y: 300, rotation: -28 });
+    next = addTemplateBlock(next, "diagonal", { name: "Правое крыло", rows: 8, seatsPerRow: 8, x: 890, y: 244, rotation: 28 });
+    next = addTemplateBlock(next, "balcony", { name: "Верхний полукруг", rows: 5, seatsPerRow: 22, x: 270, y: 625 });
+    next = { ...next, style: "theatre", objects: [{ ...createSceneObject(layoutId, "stage", 1), x: 415, y: 168, width: 420, label: "ОТКРЫТАЯ СЦЕНА" }] };
   }
   if (key === "circus") {
-    next = updateConstructorBlockV2(next, "straight-1", { name: "Южная трибуна", rows: 6, seatsPerRow: 16, x: 380, y: 542 });
-    next = addTemplateBlock(next, "straight", { name: "Северная трибуна", rows: 5, seatsPerRow: 16, x: 385, y: 122 });
-    next = addTemplateBlock(next, "diagonal", { name: "Западная трибуна", rows: 7, seatsPerRow: 7, x: 195, y: 292, rotation: -34 });
-    next = addTemplateBlock(next, "diagonal", { name: "Восточная трибуна", rows: 7, seatsPerRow: 7, x: 886, y: 240, rotation: 34 });
-    next = { ...next, style: "arena", objects: [{ id: `${layoutId}-object-arena`, type: "arena", x: 405, y: 285, width: 410, height: 180, radius: 90, label: "МАНЕЖ", fill: "#083344", stroke: "#22D3EE" }] };
+    next = updateConstructorBlockV2(next, "straight-1", { name: "Южная трибуна", rows: 5, seatsPerRow: 16, x: 382, y: 580 });
+    next = addTemplateBlock(next, "straight", { name: "Северная трибуна", rows: 5, seatsPerRow: 16, x: 382, y: 96 });
+    next = addTemplateBlock(next, "diagonal", { name: "Северо-запад", rows: 5, seatsPerRow: 8, x: 206, y: 215, rotation: -38 });
+    next = addTemplateBlock(next, "diagonal", { name: "Северо-восток", rows: 5, seatsPerRow: 8, x: 880, y: 170, rotation: 38 });
+    next = addTemplateBlock(next, "diagonal", { name: "Юго-запад", rows: 5, seatsPerRow: 8, x: 190, y: 452, rotation: 38 });
+    next = addTemplateBlock(next, "diagonal", { name: "Юго-восток", rows: 5, seatsPerRow: 8, x: 895, y: 492, rotation: -38 });
+    next = { ...next, style: "arena", objects: [{ id: `${layoutId}-object-arena`, type: "arena", x: 440, y: 270, width: 330, height: 250, radius: 125, label: "МАНЕЖ", fill: "#083344", stroke: "#22D3EE" }] };
   }
-  if (key === "sports" || key === "ice" || key === "palace") {
-    const arenaLabel = key === "ice" ? "ЛЕДОВАЯ ЗОНА" : key === "palace" ? "АРЕНА / СЦЕНА" : "ИГРОВАЯ ЗОНА";
-    next = updateConstructorBlockV2(next, "straight-1", { name: "Трибуна A", rows: 6, seatsPerRow: 18, x: 350, y: 106 });
-    next = addTemplateBlock(next, "straight", { name: "Трибуна B", rows: 6, seatsPerRow: 18, x: 350, y: 560 });
-    next = addTemplateBlock(next, "diagonal", { name: "Трибуна C", rows: 7, seatsPerRow: 8, x: 160, y: 300, rotation: -18 });
-    next = addTemplateBlock(next, "diagonal", { name: "Трибуна D", rows: 7, seatsPerRow: 8, x: 900, y: 265, rotation: 18 });
-    if (key === "palace") next = addTemplateBlock(next, "box", { name: "VIP-ложи", rows: 2, seatsPerRow: 10, x: 450, y: 470 });
-    next = { ...next, style: "arena", objects: [{ id: `${layoutId}-object-arena`, type: "arena", x: 365, y: 285, width: 500, height: 190, radius: 34, label: arenaLabel, fill: "#082F49", stroke: "#38BDF8" }] };
+  if (key === "sports") {
+    next = updateConstructorBlockV2(next, "straight-1", { name: "Трибуна Север", rows: 6, seatsPerRow: 18, x: 350, y: 105 });
+    next = addTemplateBlock(next, "straight", { name: "Трибуна Юг", rows: 6, seatsPerRow: 18, x: 350, y: 588 });
+    next = addTemplateBlock(next, "diagonal", { name: "Трибуна Запад", rows: 7, seatsPerRow: 8, x: 148, y: 325, rotation: -8 });
+    next = addTemplateBlock(next, "diagonal", { name: "Трибуна Восток", rows: 7, seatsPerRow: 8, x: 905, y: 304, rotation: 8 });
+    next = { ...next, style: "arena", objects: [{ id: `${layoutId}-object-arena`, type: "arena", x: 358, y: 300, width: 520, height: 210, radius: 26, label: "ИГРОВАЯ ЗОНА", fill: "#064E3B", stroke: "#34D399" }] };
+  }
+  if (key === "ice") {
+    next = updateConstructorBlockV2(next, "straight-1", { name: "Сектор A", rows: 5, seatsPerRow: 20, x: 320, y: 92 });
+    next = addTemplateBlock(next, "straight", { name: "Сектор B", rows: 5, seatsPerRow: 20, x: 320, y: 610 });
+    next = addTemplateBlock(next, "diagonal", { name: "Сектор C", rows: 6, seatsPerRow: 8, x: 154, y: 320, rotation: -12 });
+    next = addTemplateBlock(next, "diagonal", { name: "Сектор D", rows: 6, seatsPerRow: 8, x: 906, y: 288, rotation: 12 });
+    next = addTemplateBlock(next, "box", { name: "Пресс-ложа", rows: 2, seatsPerRow: 8, x: 500, y: 530 });
+    next = { ...next, style: "arena", objects: [{ id: `${layoutId}-object-arena`, type: "arena", x: 330, y: 285, width: 565, height: 235, radius: 112, label: "ЛЕДОВАЯ АРЕНА", fill: "#DFF6FF", stroke: "#38BDF8" }] };
+  }
+  if (key === "palace") {
+    next = updateConstructorBlockV2(next, "straight-1", { name: "Партер перед сценой", rows: 7, seatsPerRow: 16, x: 355, y: 330 });
+    next = addTemplateBlock(next, "balcony", { name: "Балкон дворца", rows: 5, seatsPerRow: 22, x: 260, y: 610 });
+    next = addTemplateBlock(next, "box", { name: "VIP-ложи L", rows: 2, seatsPerRow: 8, x: 120, y: 300, rotation: -10 });
+    next = addTemplateBlock(next, "box", { name: "VIP-ложи R", rows: 2, seatsPerRow: 8, x: 970, y: 288, rotation: 10 });
+    next = addTemplateBlock(next, "diagonal", { name: "Боковой амфитеатр L", rows: 5, seatsPerRow: 7, x: 215, y: 455, rotation: -24 });
+    next = addTemplateBlock(next, "diagonal", { name: "Боковой амфитеатр R", rows: 5, seatsPerRow: 7, x: 895, y: 410, rotation: 24 });
+    next = { ...next, style: "theatre", objects: [{ ...createSceneObject(layoutId, "stage", 1), x: 350, y: 120, width: 520, label: "ДВОРЦОВАЯ СЦЕНА" }, createSceneObject(layoutId, "pit", 2)] };
   }
   return next;
 }
@@ -144,6 +163,14 @@ export default function SeatMapConstructorCanvas({ layoutId, layoutName, onClose
     setSelection({ kind: "block", id: "straight-1" });
     setWarning("");
   }, [layoutId, layoutName]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     const node = wrapperRef.current;

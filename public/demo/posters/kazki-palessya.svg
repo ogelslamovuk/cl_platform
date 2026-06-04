@@ -1,1 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Казкі Палесся"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#17372f"/><stop offset="1" stop-color="#d9f0d2"/></linearGradient><pattern id="orn" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M24 4 L44 24 L24 44 L4 24 Z" fill="none" stroke="#6abf69" stroke-width="2" opacity="0.22"/></pattern></defs><rect width="1200" height="750" fill="url(#bg)"/><rect width="1200" height="750" fill="url(#orn)" opacity="0.55"/><rect x="54" y="54" width="1092" height="642" rx="34" fill="rgba(0,0,0,0.16)" stroke="rgba(255,255,255,0.35)" stroke-width="2"/><path d="M0 650 C190 585 380 720 600 650 C820 580 970 610 1200 520 V750 H0 Z" fill="#17372f" opacity="0.28"/><path d="M760 580 C830 480 900 470 990 590 L1110 590 L1110 660 L710 660 Z" fill="#6abf69" opacity="0.75"/><path d="M790 200 l-70 150 h55 l-85 175 h230 l-85-175 h55z" fill="#6abf69"/><path d="M975 180 l-60 130 h48 l-75 160 h205 l-75-160 h48z" fill="#e8c14a" opacity="0.9"/><path d="M710 610 C820 560 920 650 1100 585" fill="none" stroke="#8bd1df" stroke-width="16" opacity="0.7"/><text x="92" y="138" font-family="Arial, sans-serif" font-size="23" font-weight="700" letter-spacing="3" fill="#e8c14a">ЦЕНТР УПРАВЛЕНИЯ · DEMO</text><text x="92" y="285" font-family="Arial, sans-serif" font-size="64" font-weight="800" fill="#fffaf0">Казкі</text><text x="92" y="363" font-family="Arial, sans-serif" font-size="64" font-weight="800" fill="#fffaf0">Палесся</text><text x="94" y="520" font-family="Arial, sans-serif" font-size="29" font-weight="600" fill="#fff3d8">детская культурная программа</text><rect x="92" y="574" width="330" height="2" fill="#e8c14a"/><text x="92" y="625" font-family="Arial, sans-serif" font-size="24" fill="#fffaf0">Белорусская культурная программа</text></svg>
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1350" viewBox="0 0 900 1350" role="img" aria-labelledby="title desc">
+  <title id="title">Казкі Палесся</title>
+  <desc id="desc">Детская программа</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#184e2f"/><stop offset="1" stop-color="#020617"/></linearGradient>
+    <radialGradient id="glow" cx="50%" cy="38%" r="58%"><stop offset="0" stop-color="#a3e635" stop-opacity="0.42"/><stop offset="1" stop-color="#a3e635" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="900" height="1350" fill="url(#bg)"/>
+  <rect width="900" height="1350" fill="url(#glow)"/>
+  <circle cx="780" cy="145" r="180" fill="#a3e635" opacity="0.16"/>
+  <circle cx="120" cy="1110" r="220" fill="#f7fee7" opacity="0.08"/>
+  <g><path d='M230 720 l70 -160 l70 160 z' fill='#f7fee7' opacity='0.28'/><path d='M340 696 l70 -160 l70 160 z' fill='#a3e635' opacity='0.85'/><path d='M450 672 l70 -160 l70 160 z' fill='#f7fee7' opacity='0.28'/><path d='M560 648 l70 -160 l70 160 z' fill='#a3e635' opacity='0.85'/><path d='M670 624 l70 -160 l70 160 z' fill='#f7fee7' opacity='0.28'/><rect x='190' y='770' width='520' height='44' rx='22' fill='#a3e635' opacity='0.45'/></g>
+  <rect x="70" y="80" width="760" height="1190" rx="42" fill="none" stroke="#f7fee7" stroke-opacity="0.34" stroke-width="3"/>
+  <text x="88" y="150" fill="#f7fee7" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700" letter-spacing="3">ДЕТСКАЯ ПРОГРАММА</text>
+  <text x="88" y="1032" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="74" font-weight="800"><tspan x="88" dy="0">Казкі Палесся</tspan><tspan x="88" dy="86"></tspan></text>
+  <rect x="88" y="1158" width="180" height="10" rx="5" fill="#a3e635"/>
+  <text x="88" y="1220" fill="#f7fee7" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="600">Белорусская культурная программа</text>
+  <text x="88" y="1262" fill="#ffffff" fill-opacity="0.70" font-family="Inter, Arial, sans-serif" font-size="24">афиша мероприятия</text>
+</svg>

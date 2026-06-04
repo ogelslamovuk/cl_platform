@@ -893,7 +893,7 @@ function EventsSection({ rows, state, sort, setSort, onOpen }: {
                   onMouseLeave={(event) => (event.currentTarget.style.background = "transparent")}
                 >
                   <td className="py-2.5 px-3">
-                    <img src={resolvePublicAsset(e.poster)} alt={e.title} className="h-12 w-20 rounded-lg object-cover" />
+                    <img src={resolvePublicAsset(e.poster)} alt={e.title} className="h-16 w-11 rounded-lg object-cover" />
                   </td>
                   <td className="py-2.5 px-3 font-mono text-xs" style={{ color: T.textSecondary }}>{formatDisplayId(e.eventId)}</td>
                   <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>{e.title}</td>
@@ -939,7 +939,7 @@ function EventsTable({ rows, state, compact = false }: { rows: EventRecord[]; st
           {rows.map((e) => (
             <tr key={e.eventId} className="border-b" style={{ borderColor: T.border }}>
               <td className="py-2.5 px-3">
-                <img src={resolvePublicAsset(e.poster)} alt={e.title} className="h-11 w-16 rounded-lg object-cover" />
+                <img src={resolvePublicAsset(e.poster)} alt={e.title} className="h-14 w-10 rounded-lg object-cover" />
               </td>
               <td className="py-2.5 px-3 font-mono text-xs" style={{ color: T.textSecondary }}>{formatDisplayId(e.eventId)}</td>
               <td className="py-2.5 px-3" style={{ color: T.textPrimary }}>{e.title}</td>
@@ -1514,9 +1514,9 @@ function ApplicationDetailsDrawer({ app, state, onClose }: { app: EventComplianc
           <section className="rounded-xl border p-3" style={{ borderColor: T.border, background: T.sidebarBg }}>
             <div className="mb-2 text-xs" style={{ color: T.textSecondary }}>Постер</div>
             {app.data.posterPath ? (
-              <img src={resolvePublicAsset(app.data.posterPath)} alt={app.data.title || "Постер заявки"} className="aspect-[16/10] w-full rounded-lg object-cover" />
+              <img src={resolvePublicAsset(app.data.posterPath)} alt={app.data.title || "Постер заявки"} className="mx-auto aspect-[2/3] w-full max-w-[220px] rounded-lg object-cover" />
             ) : (
-              <div className="flex aspect-[16/10] items-center justify-center rounded-lg border text-sm" style={{ borderColor: T.border, color: T.textMuted }}>
+              <div className="mx-auto flex aspect-[2/3] w-full max-w-[220px] items-center justify-center rounded-lg border text-sm" style={{ borderColor: T.border, color: T.textMuted }}>
                 Постер не выбран
               </div>
             )}

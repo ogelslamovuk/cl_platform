@@ -136,6 +136,17 @@ function posterPalette(category: string) {
 function PosterArtwork({ event, large = false }: { event: DemoEvent; large?: boolean }) {
   const palette = posterPalette(event.category);
   const dt = formatDateTime(event.dateTime);
+  const posterSrc = resolvePublicAsset(event.poster);
+  if (posterSrc) {
+    return (
+      <img
+        src={posterSrc}
+        alt={`Постер: ${event.title}`}
+        className="h-full w-full rounded-lg object-cover"
+        loading={large ? "eager" : "lazy"}
+      />
+    );
+  }
   return (
     <div
       className="relative flex h-full w-full flex-col overflow-hidden rounded-lg p-5 text-white"
@@ -156,6 +167,11 @@ function PosterArtwork({ event, large = false }: { event: DemoEvent; large?: boo
       </div>
     </div>
   );
+}
+
+function isSeededShowcasePurchase(purchase: { buyerName?: string }): boolean {
+  const buyer = (purchase.buyerName || "").trim();
+  return buyer === "Демо покупатель витрины" || buyer.startsWith("Посетитель культуры ");
 }
 
 export default function B2CView({ state, onUpdate }: Props) {
@@ -209,7 +225,7 @@ export default function B2CView({ state, onUpdate }: Props) {
   }, [publishedEvents, state]);
 
   const myTickets = useMemo(() => {
-    return [...state.demoPurchases].reverse();
+    return state.demoPurchases.filter((purchase) => !isSeededShowcasePurchase(purchase)).slice().reverse();
   }, [state.demoPurchases]);
 
   useEffect(() => {
@@ -222,6 +238,24 @@ export default function B2CView({ state, onUpdate }: Props) {
     }
     if (currentSeat !== selectedSeat) setSelectedSeat(currentSeat);
   }, [detailsEvent, selectedSeat]);
+
+  useEffect(() => {
+    if (!detailsEventId && !ticketsOpen && !checkoutOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (checkoutOpen) {
+        setCheckoutOpen(false);
+        return;
+      }
+      if (ticketsOpen) {
+        setTicketsOpen(false);
+        return;
+      }
+      setDetailsEventId(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [checkoutOpen, detailsEventId, ticketsOpen]);
 
   const resetFilters = () => {
     setSearch("");
@@ -458,7 +492,6 @@ export default function B2CView({ state, onUpdate }: Props) {
           {[
             { label: "Опубликовано", value: String(publishedEvents.length), note: "событий в афише", icon: Calendar },
             { label: "Доступно", value: String(availableTicketCount), note: formatTicketWord(availableTicketCount), icon: TrendingUp },
-            { label: "Покупки", value: String(myTickets.length), note: "билетов", icon: CheckCircle2 },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-3 rounded-lg px-2 py-1.5">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: D.accentSoft, color: D.accent }}>

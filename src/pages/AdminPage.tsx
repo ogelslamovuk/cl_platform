@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { A } from "@/components/admin/adminStyles";
@@ -90,6 +90,15 @@ export default function AdminPage() {
     { id: "checks-ready", title: "Проверки завершены", text: `${state.eventComplianceApplications.filter((app) => app.data.interagencyChecks?.some((check) => check.status === "Проверено")).length} заявок с обновлёнными проверками`, tab: "control" as AdminTab },
   ], [state.eventComplianceApplications, state.events, state.resellers]);
 
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setNotificationsOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [notificationsOpen]);
+
   return (
     <div className="min-h-screen flex" style={{ background: A.pageBg, color: A.textPrimary }}>
       <Sonner
@@ -180,6 +189,7 @@ export default function AdminPage() {
               >
                 <option value="all">Республиканский уровень / Супер-админ</option>
                 <option value="Могилёвская область">Региональный сотрудник · Могилёвская область</option>
+                <option value="Гродненская область">Региональный сотрудник · Гродненская область</option>
               </select>
             </div>
             <div className="relative">

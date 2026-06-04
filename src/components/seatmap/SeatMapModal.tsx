@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Minus, Plus, Save, Trash2, X } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
@@ -108,13 +108,22 @@ export default function SeatMapModal({
   const [cols, setCols] = useState(8);
   const [zoom, setZoom] = useState(1);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!open) return;
     setLayoutSeats(baseSeats);
     setWorkingSeats(toEventSeats(baseSeats, eventSeats, tiers));
     setSelectedIds([]);
     setActiveTier(tiers[0]?.name || "");
   }, [baseSeats, eventSeats, open, tiers]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, open]);
 
   const seats = mode === "layout" ? layoutSeats : workingSeats;
   const maxX = Math.max(1, ...seats.map((seat) => seat.x + seat.w));

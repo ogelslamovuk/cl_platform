@@ -44,11 +44,18 @@ function AccentIcon({ icon: Icon, accent }: { icon: LucideIcon; accent: Accent }
   );
 }
 
+function routeHref(route: string): string {
+  const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+  return `${base || ""}/#${route}`;
+}
+
 function QuickCard({ card }: { card: Card }) {
   const Icon = card.icon;
   return (
-    <Link
-      to={card.route}
+    <a
+      href={routeHref(card.route)}
+      target="_blank"
+      rel="noopener noreferrer"
       className="group rounded-[22px] border p-5 transition-all duration-200 hover:-translate-y-[1px]"
       style={{ background: `linear-gradient(180deg, rgba(9,17,31,0.96) 0%, rgba(6,12,25,0.94) 100%), radial-gradient(circle at 50% 0%, ${card.accent.glow}, transparent 50%)`, borderColor: "rgba(255,255,255,0.08)", boxShadow: "0 18px 44px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.04)" }}
     >
@@ -58,7 +65,7 @@ function QuickCard({ card }: { card: Card }) {
       <div className="mt-4 inline-flex h-9 w-9 items-center justify-center rounded-full border group-hover:translate-x-0.5" style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>
         <ArrowRight size={16} className="text-[rgba(233,238,255,0.9)]" />
       </div>
-    </Link>
+    </a>
   );
 }
 
