@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { AppState } from "@/lib/store";
 import { A, statusChip } from "./adminStyles";
 import { BookOpen } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
-import { getRegionFilterOptions, isInAdminScope, normalizeRegion, resolveRegionCity, type AdminRegionScope } from "./adminScope";
+import { getScopedRegionFilterOptions, isInAdminScope, normalizeRegion, resolveRegionCity, type AdminRegionScope } from "./adminScope";
 
 interface Decision {
   ts: string;
@@ -85,7 +85,10 @@ export default function AdminDecisionLog({ state, regionScope = "all" }: Props) 
     });
     return result.sort((a, b) => b.ts.localeCompare(a.ts));
   }, [state]);
-  const regionOptions = useMemo(() => getRegionFilterOptions(state), [state]);
+  const regionOptions = useMemo(() => getScopedRegionFilterOptions(state, regionScope), [regionScope, state]);
+  useEffect(() => {
+    if (regionFilter && !regionOptions.includes(regionFilter)) setRegionFilter("");
+  }, [regionFilter, regionOptions]);
   const filteredDecisions = useMemo(() => {
     const query = objectSearch.trim().toLowerCase();
     return decisions.filter((decision) => {
@@ -122,7 +125,7 @@ export default function AdminDecisionLog({ state, regionScope = "all" }: Props) 
           <option value="На доработке">На доработке</option>
         </select>
         <select value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.cardBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
-          <option value="">Все регионы</option>
+          <option value="">{regionScope === "all" ? "Республиканский уровень / все регионы" : "Регион сотрудника"}</option>
           {regionOptions.map((region) => <option key={region} value={region}>{region}</option>)}
         </select>
         <input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.cardBg, border: `1px solid ${A.border}`, color: A.textPrimary }} />

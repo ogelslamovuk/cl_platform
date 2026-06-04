@@ -1,6 +1,6 @@
 import type { AppState, EventRecord } from "@/lib/store";
 
-export type AdminRegionScope = "all" | "Могилёвская область";
+export type AdminRegionScope = "all" | "Могилёвская область" | "Гродненская область";
 
 export const ADMIN_REGION_OPTIONS = [
   "Минск",
@@ -28,6 +28,7 @@ export function normalizeRegion(value?: string): string {
   const clean = (value || "").trim();
   if (!clean) return "Минск";
   if (clean === "Могилевская область") return "Могилёвская область";
+  if (clean === "Гродненская обл.") return "Гродненская область";
   if (clean === "г. Минск") return "Минск";
   return clean;
 }
@@ -69,6 +70,11 @@ export function getRegionFilterOptions(state: AppState): string[] {
     if (application.data.region) regions.add(normalizeRegion(application.data.region));
   });
   return Array.from(regions).sort((a, b) => a.localeCompare(b, "ru"));
+}
+
+export function getScopedRegionFilterOptions(state: AppState, scope: AdminRegionScope = "all"): string[] {
+  if (scope !== "all") return [scope];
+  return getRegionFilterOptions(state);
 }
 
 function cityFromAddress(address?: string): string {

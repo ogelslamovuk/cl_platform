@@ -3,6 +3,7 @@ import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import MockDocumentPreview, { type MockDocumentPreviewData } from "@/components/MockDocumentPreview";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import {
   calculateComplianceFee,
@@ -57,6 +58,18 @@ const WIZARD_STEPS = [
   "Проверка и подача",
 ] as const;
 
+const WIZARD_STEP_TOOLTIPS = [
+  "Укажите название, формат, категорию, возрастной рейтинг и базовые параметры мероприятия.",
+  "Опишите программу, исполнителей, гражданство участников и приложите документы физических лиц.",
+  "Укажите даты, время проведения, дату начала реализации билетов и отдельные показы мероприятия.",
+  "Выберите площадку, подтвердите право её использования, укажите вместимость и наличие схемы мест.",
+  "Задайте тарифы и базовые цены мероприятия. Назначение тарифов на конкретные места выполняется на схеме зала.",
+  "Выберите каналы и операторов, через которых будут продаваться билеты после одобрения события.",
+  "Проверьте готовность документов, участников, программы, площадки и ведомственных mock-подтверждений.",
+  "Проверьте расчёт пошлины, основание начисления, статус оплаты или освобождение от оплаты.",
+  "Финально проверьте заявку, вернитесь к незаполненным этапам или подайте её в Центр Управления.",
+] as const;
+
 const EVENT_TYPE_TREE: Record<string, Record<string, string[]>> = {
   Культура: {
     Концерт: ["Эстрадный концерт"],
@@ -79,7 +92,7 @@ const DEFAULT_CHECKS: EventInteragencyCheck[] = [
 ];
 
 type StepStatus = "Не заполнено" | "Черновик" | "Заполнено" | "Требует внимания";
-type DocumentPreview = { title: string; fileName: string; rows: [string, string][] } | null;
+type DocumentPreview = MockDocumentPreviewData;
 type ParticipantRow = {
   id: string;
   name: string;
@@ -720,7 +733,7 @@ export default function OrganizerEventCompliancePage() {
                 key={label}
                 type="button"
                 onClick={() => setActiveStep(index)}
-                className="rounded-xl border p-3 text-left transition"
+                className="min-w-0 overflow-hidden rounded-xl border p-3 text-left transition"
                 style={{
                   borderColor: active ? "rgba(242,201,76,0.65)" : "rgba(255,255,255,0.12)",
                   background: active ? "rgba(242,201,76,0.12)" : "#0F1620",
@@ -728,8 +741,8 @@ export default function OrganizerEventCompliancePage() {
                 }}
               >
                 <div className="text-xs opacity-70">Этап {index + 1}</div>
-                <div className="mt-1 text-sm font-semibold leading-5">{label}</div>
-                <div className="mt-2 text-[11px]" style={{ color: status === "Требует внимания" ? "#FBBF24" : "rgba(245,247,250,0.62)" }}>{status}</div>
+                <div className="mt-1 break-words text-sm font-semibold leading-5">{label}</div>
+                <div className="mt-2 break-words text-[11px]" style={{ color: status === "Требует внимания" ? "#FBBF24" : "rgba(245,247,250,0.62)" }}>{status}</div>
               </button>
             );
           })}
@@ -741,7 +754,7 @@ export default function OrganizerEventCompliancePage() {
               <h2 className="text-lg font-semibold">{WIZARD_STEPS[activeStep]}</h2>
               <p className="mt-1 text-xs" style={{ color: "rgba(245,247,250,0.65)" }}>Свободный переход между этапами доступен через верхний список.</p>
             </div>
-            <HelpTooltip text="Этапы помогают сохранить черновик и вернуться к заявке позже. Жёсткого порядка заполнения нет." />
+            <HelpTooltip text={WIZARD_STEP_TOOLTIPS[activeStep]} />
           </div>
 
           {activeStep === 0 && (
@@ -781,9 +794,9 @@ export default function OrganizerEventCompliancePage() {
                 <div className="rounded-xl border p-4" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
                   <div className="mb-2 text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>Предпросмотр постера</div>
                   {form.posterPath ? (
-                    <img src={resolvePublicAsset(form.posterPath)} alt="Выбранный постер" className="aspect-[16/10] w-full rounded-lg object-cover" />
+                    <img src={resolvePublicAsset(form.posterPath)} alt="Выбранный постер" className="mx-auto aspect-[2/3] w-full max-w-[220px] rounded-lg object-cover" />
                   ) : (
-                    <div className="flex aspect-[16/10] items-center justify-center rounded-lg border text-sm" style={{ borderColor: "rgba(255,255,255,0.12)", color: "rgba(245,247,250,0.55)" }}>Постер не выбран</div>
+                    <div className="mx-auto flex aspect-[2/3] w-full max-w-[220px] items-center justify-center rounded-lg border text-sm" style={{ borderColor: "rgba(255,255,255,0.12)", color: "rgba(245,247,250,0.55)" }}>Постер не выбран</div>
                   )}
                 </div>
                 <div className="rounded-xl border p-4" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
@@ -1375,7 +1388,7 @@ export default function OrganizerEventCompliancePage() {
           )}
         </section>
       </div>
-      <DocumentPreviewModal preview={documentPreview} onClose={() => setDocumentPreview(null)} />
+      <MockDocumentPreview preview={documentPreview} onClose={() => setDocumentPreview(null)} />
       <SeatMapModal
         open={seatMapOpen}
         title="Назначение тарифов на схеме"
@@ -1461,30 +1474,6 @@ function CheckScenarioCard({ title, status, rows, actionLabel, onAction }: { tit
       </div>
       <div className="mt-3 space-y-1">
         {rows.map(([label, value]) => <InfoLine key={label} label={label} value={value} />)}
-      </div>
-    </div>
-  );
-}
-
-function DocumentPreviewModal({ preview, onClose }: { preview: DocumentPreview; onClose: () => void }) {
-  if (!preview) return null;
-  return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" />
-      <div className="relative w-full max-w-xl rounded-2xl border p-5" style={{ borderColor: "rgba(255,255,255,0.14)", background: "#111A24", color: "#F5F7FA" }} onClick={(event) => event.stopPropagation()}>
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold">{preview.title}</h3>
-            <div className="mt-1 font-mono text-xs" style={{ color: "rgba(191,219,254,0.96)" }}>{preview.fileName}</div>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-lg border px-3 py-1 text-sm" style={{ borderColor: "rgba(255,255,255,0.14)" }}>Закрыть</button>
-        </div>
-        <div className="rounded-xl border p-4" style={{ borderColor: "rgba(96,165,250,0.28)", background: "rgba(59,130,246,0.08)" }}>
-          <div className="mb-3 text-xs uppercase tracking-wide" style={{ color: "rgba(147,197,253,0.88)" }}>Предпросмотр mock-документа</div>
-          <div className="space-y-2">
-            {preview.rows.map(([label, value]) => <InfoLine key={label} label={label} value={value} />)}
-          </div>
-        </div>
       </div>
     </div>
   );

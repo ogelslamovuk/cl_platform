@@ -1,1 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Новыя імёны"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b2746"/><stop offset="1" stop-color="#e8edf7"/></linearGradient><pattern id="orn" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M24 4 L44 24 L24 44 L4 24 Z" fill="none" stroke="#4f7bd9" stroke-width="2" opacity="0.22"/></pattern></defs><rect width="1200" height="750" fill="url(#bg)"/><rect width="1200" height="750" fill="url(#orn)" opacity="0.55"/><rect x="54" y="54" width="1092" height="642" rx="34" fill="rgba(0,0,0,0.16)" stroke="rgba(255,255,255,0.35)" stroke-width="2"/><path d="M0 650 C190 585 380 720 600 650 C820 580 970 610 1200 520 V750 H0 Z" fill="#1b2746" opacity="0.28"/><path d="M865 180 h90 v290 h-90z" fill="#4f7bd9"/><circle cx="910" cy="145" r="58" fill="#f0c45a"/><path d="M820 475 h180 l45 120 H775z" fill="#4f7bd9" opacity="0.85"/><path d="M720 205 l32 65 72 10-52 50 12 71-64-34-64 34 12-71-52-50 72-10z" fill="#f0c45a" opacity="0.75"/><path d="M1030 265 l22 45 50 7-36 35 8 50-44-23-44 23 8-50-36-35 50-7z" fill="#f0c45a" opacity="0.75"/><text x="92" y="138" font-family="Arial, sans-serif" font-size="23" font-weight="700" letter-spacing="3" fill="#f0c45a">ЦЕНТР УПРАВЛЕНИЯ · DEMO</text><text x="92" y="285" font-family="Arial, sans-serif" font-size="64" font-weight="800" fill="#fffaf0">Новыя</text><text x="92" y="363" font-family="Arial, sans-serif" font-size="64" font-weight="800" fill="#fffaf0">імёны</text><text x="94" y="520" font-family="Arial, sans-serif" font-size="29" font-weight="600" fill="#fff3d8">конкурс молодых исполнителей</text><rect x="92" y="574" width="330" height="2" fill="#f0c45a"/><text x="92" y="625" font-family="Arial, sans-serif" font-size="24" fill="#fffaf0">Белорусская культурная программа</text></svg>
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1350" viewBox="0 0 900 1350" role="img" aria-labelledby="title desc">
+  <title id="title">Новыя імёны</title>
+  <desc id="desc">Конкурс исполнителей</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0c4a6e"/><stop offset="1" stop-color="#020617"/></linearGradient>
+    <radialGradient id="glow" cx="50%" cy="38%" r="58%"><stop offset="0" stop-color="#22d3ee" stop-opacity="0.42"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="900" height="1350" fill="url(#bg)"/>
+  <rect width="900" height="1350" fill="url(#glow)"/>
+  <circle cx="780" cy="145" r="180" fill="#22d3ee" opacity="0.16"/>
+  <circle cx="120" cy="1110" r="220" fill="#f0f9ff" opacity="0.08"/>
+  <g><path d='M240 820 L390 430 H510 L660 820 Z' fill='#f0f9ff' opacity='0.22'/><circle cx='450' cy='620' r='115' fill='#22d3ee' opacity='0.82'/><circle cx='450' cy='620' r='58' fill='#f0f9ff' opacity='0.9'/></g>
+  <rect x="70" y="80" width="760" height="1190" rx="42" fill="none" stroke="#f0f9ff" stroke-opacity="0.34" stroke-width="3"/>
+  <text x="88" y="150" fill="#f0f9ff" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700" letter-spacing="3">КОНКУРС ИСПОЛНИТЕЛЕЙ</text>
+  <text x="88" y="1032" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="74" font-weight="800"><tspan x="88" dy="0">Новыя імёны</tspan><tspan x="88" dy="86"></tspan></text>
+  <rect x="88" y="1158" width="180" height="10" rx="5" fill="#22d3ee"/>
+  <text x="88" y="1220" fill="#f0f9ff" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="600">Белорусская культурная программа</text>
+  <text x="88" y="1262" fill="#ffffff" fill-opacity="0.70" font-family="Inter, Arial, sans-serif" font-size="24">афиша мероприятия</text>
+</svg>

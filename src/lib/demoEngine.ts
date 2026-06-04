@@ -1,5 +1,6 @@
 import type {
   AppState,
+  EventRecord,
   EventComplianceData,
   EventComplianceApplicationRecord,
   OrganizerAccount,
@@ -12,7 +13,6 @@ import {
   approveApplication,
   buildEventSeatsFromLayout,
   createApplication,
-  createDemoPurchaseTicket,
   ensureSeatMapState,
   ensureDefaultResellers,
   ensureOrganizerFinanceState,
@@ -103,6 +103,10 @@ type DemoAppSeed = {
   poster: string;
   tiers: PriceTier[];
   salesChannels: string[];
+  venueId: string;
+  hallId: string;
+  layoutId?: string;
+  capacityOnly?: boolean;
 };
 
 const DEMO_POSTERS = {
@@ -120,7 +124,7 @@ const DEMO_POSTERS = {
   siabroustvaKultur: "/demo/posters/siabroustva-kultur.svg",
 } as const;
 
-const ALL_ACTIVE_RESELLER_CHANNELS = ["OWN", "ByCard", "TicketPro", "KvitkiBY"];
+const ALL_ACTIVE_RESELLER_CHANNELS = ["OWN", "ByCard", "TicketPro", "Bezkassira"];
 
 const DEMO_APPS: DemoAppSeed[] = [
   {
@@ -128,12 +132,15 @@ const DEMO_APPS: DemoAppSeed[] = [
     title: "Фестиваль «Васільковы край»",
     venue: "Верхний город",
     city: "Минск",
+    venueId: "venue_upper_city_open",
+    hallId: "hall_upper_city_open",
+    capacityOnly: true,
     category: "Фестивали",
     description: "Городской фестиваль народного творчества с ремесленными рядами, музыкальными площадками и семейной программой.",
     daysOffset: 7,
     time: "18:00",
     poster: DEMO_POSTERS.vasilkovyKraj,
-    tiers: [{ name: "Вход по приглашению", price: 0, quantity: 200 }, { name: "Основная зона", price: 35, quantity: 2100 }, { name: "Партнёрская трибуна", price: 55, quantity: 900 }],
+    tiers: [{ name: "Вход по приглашению", price: 0, quantity: 120 }, { name: "Основная зона", price: 35, quantity: 880 }, { name: "Партнёрская зона", price: 55, quantity: 200 }],
     salesChannels: ALL_ACTIVE_RESELLER_CHANNELS,
   },
   {
@@ -141,12 +148,15 @@ const DEMO_APPS: DemoAppSeed[] = [
     title: "Концерт «Песня роднай зямлі»",
     venue: "Белорусская государственная филармония",
     city: "Минск",
+    venueId: "venue_demo_philharmonic",
+    hallId: "hall_demo_philharmonic",
+    layoutId: "layout_demo_philharmonic",
     category: "Концерты",
     description: "Торжественная программа белорусской академической и народной музыки с участием солистов и хора.",
     daysOffset: 10,
     time: "19:00",
     poster: DEMO_POSTERS.rodnayaZyamlya,
-    tiers: [{ name: "Партер", price: 75, quantity: 620 }, { name: "Балкон", price: 55, quantity: 430 }, { name: "Ложа", price: 95, quantity: 200 }],
+    tiers: [{ name: "Партер", price: 75, quantity: 120 }, { name: "Балкон", price: 55, quantity: 80 }, { name: "Ложа", price: 95, quantity: 40 }],
     salesChannels: ["OWN", "ByCard", "TicketPro"],
   },
   {
@@ -154,19 +164,25 @@ const DEMO_APPS: DemoAppSeed[] = [
     title: "Театральный форум «Сцэна Беларусі»",
     venue: "Национальный академический драматический театр имени Якуба Коласа",
     city: "Витебск",
+    venueId: "venue_vitebsk_kolas",
+    hallId: "hall_vitebsk_kolas",
+    layoutId: "layout_vitebsk_kolas",
     category: "Театр",
     description: "Форум региональных театральных постановок и творческих встреч с профессиональными коллективами.",
     daysOffset: 12,
     time: "18:30",
     poster: DEMO_POSTERS.scenaBelarusi,
-    tiers: [{ name: "Партер", price: 48, quantity: 320 }, { name: "Амфитеатр", price: 38, quantity: 220 }, { name: "Балкон", price: 28, quantity: 110 }],
-    salesChannels: ["OWN", "TicketPro", "KvitkiBY"],
+    tiers: [{ name: "Партер", price: 48, quantity: 110 }, { name: "Амфитеатр", price: 38, quantity: 70 }, { name: "Балкон", price: 28, quantity: 36 }],
+    salesChannels: ["OWN", "TicketPro", "Bezkassira"],
   },
   {
     organizerId: "demo_org_fest_scene",
     title: "Детская программа «Казкі Палесся»",
     venue: "Гомельский городской центр культуры",
     city: "Гомель",
+    venueId: "venue_gomel_culture_demo",
+    hallId: "hall_gomel_culture_demo",
+    layoutId: "layout_gomel_culture_demo",
     category: "Детям",
     description: "Познавательная детская программа по мотивам белорусских сказок, музыки и народных игр.",
     daysOffset: 14,
@@ -180,12 +196,15 @@ const DEMO_APPS: DemoAppSeed[] = [
     title: "Концерт мастеров искусств «Беларусь у сэрцы»",
     venue: "Дворец Республики",
     city: "Минск",
+    venueId: "venue_palace_demo_chamber",
+    hallId: "hall_palace_demo_chamber",
+    layoutId: "layout_palace_demo_chamber",
     category: "Концерты",
     description: "Большой концерт мастеров искусств с симфоническим оркестром, хором и сценической программой.",
     daysOffset: 17,
     time: "19:30",
     poster: DEMO_POSTERS.belarusUSertsy,
-    tiers: [{ name: "Партер", price: 95, quantity: 1400 }, { name: "Балкон", price: 70, quantity: 1300 }, { name: "Галерея", price: 45, quantity: 800 }],
+    tiers: [{ name: "Партер", price: 95, quantity: 160 }, { name: "Балкон", price: 70, quantity: 110 }, { name: "Галерея", price: 45, quantity: 50 }],
     salesChannels: ALL_ACTIVE_RESELLER_CHANNELS,
   },
   {
@@ -193,6 +212,9 @@ const DEMO_APPS: DemoAppSeed[] = [
     title: "Фестиваль ремёсел «Слуцкие пояса»",
     venue: "Дом культуры",
     city: "Слуцк",
+    venueId: "venue_slutsk_crafts",
+    hallId: "hall_slutsk_crafts",
+    layoutId: "layout_slutsk_crafts",
     category: "Фестивали",
     description: "Фестиваль традиционных ремёсел с мастер-классами, демонстрацией тканых мотивов и выставкой работ.",
     daysOffset: 19,
@@ -212,19 +234,25 @@ const DEMO_APPS: DemoAppSeed[] = [
     time: "20:00",
     poster: DEMO_POSTERS.zvonyNesvizha,
     tiers: [{ name: "Камерный зал", price: 68, quantity: 90 }, { name: "Гостевой сектор", price: 84, quantity: 50 }],
-    salesChannels: ["OWN", "KvitkiBY"],
+    venueId: "venue_nesvizh_castle",
+    hallId: "hall_nesvizh_castle",
+    layoutId: "layout_nesvizh_castle",
+    salesChannels: ["OWN", "Bezkassira"],
   },
   {
     organizerId: "demo_org_fest_scene",
     title: "Хореографическая программа «Кола традыцый»",
     venue: "Гродненский областной драматический театр",
     city: "Гродно",
+    venueId: "venue_grodno_drama",
+    hallId: "hall_grodno_drama",
+    layoutId: "layout_grodno_drama",
     category: "Шоу",
     description: "Сценическая хореографическая программа с народными танцами, современным светом и живой музыкой.",
     daysOffset: 24,
     time: "18:00",
     poster: DEMO_POSTERS.kolaTradycyj,
-    tiers: [{ name: "Партер", price: 52, quantity: 420 }, { name: "Амфитеатр", price: 42, quantity: 300 }, { name: "Балкон", price: 30, quantity: 180 }],
+    tiers: [{ name: "Партер", price: 52, quantity: 120 }, { name: "Амфитеатр", price: 42, quantity: 84 }, { name: "Балкон", price: 30, quantity: 48 }],
     salesChannels: ["OWN", "TicketPro"],
   },
   {
@@ -232,19 +260,25 @@ const DEMO_APPS: DemoAppSeed[] = [
     title: "Выставочная программа «Спадчына і сучаснасць»",
     venue: "Брестский областной краеведческий музей",
     city: "Брест",
+    venueId: "venue_brest_museum",
+    hallId: "hall_brest_museum",
+    layoutId: "layout_brest_museum",
     category: "Выставки",
     description: "Музейная программа о преемственности культурного наследия, архивных материалах и современном искусстве.",
     daysOffset: 26,
     time: "11:00",
     poster: DEMO_POSTERS.spadchynaSuchasnast,
     tiers: [{ name: "Взрослый", price: 16, quantity: 180 }, { name: "Льготный", price: 8, quantity: 120 }],
-    salesChannels: ["OWN", "ByCard", "KvitkiBY"],
+    salesChannels: ["OWN", "ByCard", "Bezkassira"],
   },
   {
     organizerId: "demo_org_fest_scene",
     title: "Областной праздник «Купальскі вянок»",
     venue: "Парк Подниколье",
     city: "Могилёв",
+    venueId: "venue_podnikolie_park",
+    hallId: "hall_podnikolie_open",
+    capacityOnly: true,
     category: "Фестивали",
     description: "Областной праздник с фольклорной сценой, ремесленными подворьями и вечерней купальской программой.",
     daysOffset: 30,
@@ -258,25 +292,31 @@ const DEMO_APPS: DemoAppSeed[] = [
     title: "Конкурс молодых исполнителей «Новыя імёны»",
     venue: "Концертный зал «Витебск»",
     city: "Витебск",
+    venueId: "venue_vitebsk_concert_hall",
+    hallId: "hall_vitebsk_concert_hall",
+    layoutId: "layout_vitebsk_concert_hall",
     category: "Конкурсы",
     description: "Конкурсная программа молодых исполнителей с открытыми прослушиваниями и гала-концертом лауреатов.",
     daysOffset: 33,
     time: "16:30",
     poster: DEMO_POSTERS.novyyaImiony,
     tiers: [{ name: "Основной зал", price: 26, quantity: 300 }, { name: "Балкон", price: 18, quantity: 120 }],
-    salesChannels: ["OWN", "TicketPro", "KvitkiBY"],
+    salesChannels: ["OWN", "TicketPro", "Bezkassira"],
   },
   {
     organizerId: "demo_org_minskconcert",
     title: "Международная программа «Сяброўства культур»",
     venue: "Национальный центр современных искусств",
     city: "Минск",
+    venueId: "venue_ncca_minsk",
+    hallId: "hall_ncca_minsk",
+    layoutId: "layout_ncca_minsk",
     category: "Концерты",
     description: "Международная культурная программа с белорусскими коллективами и приглашённым demo-ансамблем.",
     daysOffset: 36,
     time: "19:00",
     poster: DEMO_POSTERS.siabroustvaKultur,
-    tiers: [{ name: "Партер", price: 64, quantity: 900 }, { name: "Балкон", price: 48, quantity: 600 }, { name: "Галерея", price: 32, quantity: 300 }],
+    tiers: [{ name: "Партер", price: 64, quantity: 150 }, { name: "Балкон", price: 48, quantity: 100 }, { name: "Галерея", price: 32, quantity: 50 }],
     salesChannels: ["OWN", "ByCard", "TicketPro"],
   },
 ];
@@ -325,16 +365,18 @@ function hasOldDemoPhrase(value: string | null | undefined): boolean {
 function cleanupLegacyDemoData(state: AppState): void {
   const legacyEventIds = new Set(state.events.filter((event) => hasOldDemoPhrase(event.title)).map((event) => event.eventId));
   const legacyAppIds = new Set(state.applications.filter((app) => hasOldDemoPhrase(app.title)).map((app) => app.appId));
+  const legacyResellerCodes = new Set([["Kv", "itkiBY"].join("")]);
 
   state.events = state.events.filter((event) => !legacyEventIds.has(event.eventId));
   state.applications = state.applications.filter((app) => !legacyAppIds.has(app.appId) && !legacyEventIds.has(app.eventId || ""));
-  state.tickets = state.tickets.filter((ticket) => !legacyEventIds.has(ticket.eventId));
-  state.ops = state.ops.filter((op) => !legacyEventIds.has(op.eventId) && op.ticketId !== "DEMO-MISSING-TICKET");
+  state.tickets = state.tickets.filter((ticket) => !legacyEventIds.has(ticket.eventId) && !legacyResellerCodes.has(ticket.soldByChannel || ""));
+  state.ops = state.ops.filter((op) => !legacyEventIds.has(op.eventId) && !legacyResellerCodes.has(op.channel) && op.ticketId !== "DEMO-MISSING-TICKET");
   state.demoPurchases = state.demoPurchases.filter((purchase) => !legacyEventIds.has(purchase.eventId) && !hasOldDemoPhrase(purchase.eventTitle));
   state.eventComplianceApplications = state.eventComplianceApplications.filter((app) => !hasOldDemoPhrase(app.data.title));
   state.organizerRegistry = state.organizerRegistry.filter((row) => !OLD_DEMO_ORGANIZER_IDS.has(row.organizerId));
   state.organizerDocuments = state.organizerDocuments.filter((doc) => !OLD_DEMO_ORGANIZER_IDS.has(doc.organizerId));
   state.organizers = state.organizers.filter((organizer) => !OLD_DEMO_ORGANIZER_IDS.has(organizer.organizerId) && !hasOldDemoPhrase(organizer.name) && !hasOldDemoPhrase(organizer.fullName));
+  state.resellers = state.resellers.filter((reseller) => !legacyResellerCodes.has(reseller.code));
 }
 
 function ensureDemoOrganizerDocuments(state: AppState): void {
@@ -360,6 +402,81 @@ function toDateTime(daysOffset: number, time: string): string {
   const month = String(base.getMonth() + 1).padStart(2, "0");
   const day = String(base.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}T${time}`;
+}
+
+function cloneDemoTiers(tiers: PriceTier[]): PriceTier[] {
+  return tiers.map((tier) => ({ ...tier }));
+}
+
+function summarizeEventSeatTiers(eventSeats: NonNullable<EventRecord["eventSeats"]>, fallbackTiers: PriceTier[]): PriceTier[] {
+  const fallbackByName = new Map(fallbackTiers.map((tier) => [tier.name, tier]));
+  const counts = new Map<string, PriceTier>();
+  for (const seat of eventSeats) {
+    if (seat.status === "blocked") continue;
+    const name = seat.tariffName || fallbackTiers[0]?.name || "Стандарт";
+    const source = fallbackByName.get(name) || fallbackTiers[0] || { name, price: 0, quantity: 0 };
+    const existing = counts.get(name);
+    if (existing) existing.quantity += 1;
+    else counts.set(name, { ...source, name, price: Number(seat.price ?? source.price ?? 0), quantity: 1, color: seat.color || source.color });
+  }
+  return counts.size ? Array.from(counts.values()) : cloneDemoTiers(fallbackTiers);
+}
+
+function resolveSeedInventory(state: AppState, seed: DemoAppSeed): { capacity: number; tiers: PriceTier[]; eventSeats: NonNullable<EventRecord["eventSeats"]> } {
+  if (seed.capacityOnly || !seed.layoutId) {
+    const tiers = cloneDemoTiers(seed.tiers);
+    return { capacity: tiers.reduce((acc, tier) => acc + tier.quantity, 0), tiers, eventSeats: [] };
+  }
+  const layout = getSeatMapLayout(state, seed.layoutId);
+  if (!layout) {
+    const tiers = cloneDemoTiers(seed.tiers);
+    return { capacity: tiers.reduce((acc, tier) => acc + tier.quantity, 0), tiers, eventSeats: [] };
+  }
+  const eventSeats = buildEventSeatsFromLayout(layout, seed.tiers).map((seat) => ({ ...seat, status: "available" as const }));
+  const tiers = summarizeEventSeatTiers(eventSeats, seed.tiers);
+  return {
+    capacity: eventSeats.filter((seat) => seat.status !== "blocked").length,
+    tiers,
+    eventSeats,
+  };
+}
+
+function clearSeedEventTickets(state: AppState, eventId: string): void {
+  state.tickets = state.tickets.filter((ticket) => ticket.eventId !== eventId);
+  state.ops = state.ops.filter((op) => op.eventId !== eventId);
+  state.demoPurchases = state.demoPurchases.filter((purchase) => purchase.eventId !== eventId);
+}
+
+function applySeedEventDetails(state: AppState, event: EventRecord, seed: DemoAppSeed): void {
+  const previousSeatCount = event.eventSeats?.length || 0;
+  const previousLayoutId = event.layoutId || "";
+  const previousCapacity = event.capacity || 0;
+  const inventory = resolveSeedInventory(state, seed);
+  const venue = state.venueRegistry.find((item) => item.venueId === seed.venueId);
+  const hall = venue?.halls.find((item) => item.hallId === seed.hallId);
+  const shouldRefreshTickets =
+    previousLayoutId !== (seed.layoutId || "") ||
+    previousSeatCount !== inventory.eventSeats.length ||
+    previousCapacity !== inventory.capacity;
+
+  event.venue = venue?.name || seed.venue;
+  event.city = venue?.city || seed.city;
+  event.category = seed.category;
+  event.description = seed.description;
+  event.poster = seed.poster;
+  event.tiers = inventory.tiers;
+  event.capacity = inventory.capacity;
+  event.venueId = seed.venueId;
+  event.hallId = seed.hallId;
+  event.layoutId = seed.capacityOnly ? undefined : seed.layoutId;
+  event.eventSeats = seed.capacityOnly ? [] : inventory.eventSeats;
+  event.salesChannels = [...seed.salesChannels];
+  event.remaining = state.tickets.filter((ticket) => ticket.eventId === event.eventId && ticket.status === "issued").length;
+  if (hall && !seed.capacityOnly && event.eventSeats.length > hall.capacity) hall.capacity = event.eventSeats.length;
+  if (shouldRefreshTickets) {
+    clearSeedEventTickets(state, event.eventId);
+    event.remaining = 0;
+  }
 }
 
 function buildBaselineState(): AppState {
@@ -646,14 +763,15 @@ function seedDemoCatalog(state: AppState): AppState {
   state.currentOrganizerId = null;
 
   for (const seed of DEMO_APPS) {
+    const inventory = resolveSeedInventory(state, seed);
     const app = createApplication(
       state,
       {
         title: seed.title,
         venue: seed.venue,
         dateTime: toDateTime(seed.daysOffset, seed.time),
-        capacity: seed.tiers.reduce((acc, tier) => acc + tier.quantity, 0),
-        tiers: seed.tiers,
+        capacity: inventory.capacity,
+        tiers: inventory.tiers,
         city: seed.city,
         category: seed.category,
         description: seed.description,
@@ -665,7 +783,7 @@ function seedDemoCatalog(state: AppState): AppState {
     const approved = approveApplication(state, app.appId);
     if (!approved) continue;
     const event = state.events.find((item) => item.eventId === approved.eventId);
-    if (event) event.salesChannels = [...seed.salesChannels];
+    if (event) applySeedEventDetails(state, event, seed);
     publishEvent(state, approved.eventId);
     issueMarks(state, approved.eventId);
   }
@@ -763,27 +881,21 @@ function ensureSeedPublishedEvents(state: AppState): void {
   for (const seed of DEMO_APPS) {
     const existingEvent = state.events.find((event) => event.organizerId === seed.organizerId && event.title === seed.title);
     if (existingEvent) {
-      existingEvent.venue = seed.venue;
-      existingEvent.city = seed.city;
-      existingEvent.category = seed.category;
-      existingEvent.description = seed.description;
-      existingEvent.poster = seed.poster;
       existingEvent.dateTime ||= toDateTime(seed.daysOffset, seed.time);
-      existingEvent.tiers = seed.tiers.map((tier) => ({ ...tier }));
-      existingEvent.capacity = seed.tiers.reduce((acc, tier) => acc + tier.quantity, 0);
-      existingEvent.salesChannels = [...seed.salesChannels];
+      applySeedEventDetails(state, existingEvent, seed);
       existingEvent.status = "published";
       if (!state.tickets.some((ticket) => ticket.eventId === existingEvent.eventId)) issueMarks(state, existingEvent.eventId);
       continue;
     }
+    const inventory = resolveSeedInventory(state, seed);
     const app = createApplication(
       state,
       {
         title: seed.title,
         venue: seed.venue,
         dateTime: toDateTime(seed.daysOffset, seed.time),
-        capacity: seed.tiers.reduce((acc, tier) => acc + tier.quantity, 0),
-        tiers: seed.tiers,
+        capacity: inventory.capacity,
+        tiers: inventory.tiers,
         city: seed.city,
         category: seed.category,
         description: seed.description,
@@ -795,7 +907,7 @@ function ensureSeedPublishedEvents(state: AppState): void {
     const approved = approveApplication(state, app.appId);
     if (!approved) continue;
     const event = state.events.find((item) => item.eventId === approved.eventId);
-    if (event) event.salesChannels = [...seed.salesChannels];
+    if (event) applySeedEventDetails(state, event, seed);
     publishEvent(state, approved.eventId);
     issueMarks(state, approved.eventId);
   }
@@ -1154,19 +1266,22 @@ function findDemoAppByTitle(title: string): DemoAppSeed | undefined {
   return DEMO_APPS.find((event) => event.title === title);
 }
 
-function buildComplianceData(seed: DemoComplianceSeed): EventComplianceData {
+function buildComplianceData(state: AppState, seed: DemoComplianceSeed): EventComplianceData {
   const eventSeed = findDemoAppByTitle(seed.title);
   const hasForeignPerformers = Boolean(seed.hasForeignPerformers);
   const submittedAt = seed.submittedAt;
-  const tiers = (eventSeed?.tiers || [{ name: "Стандарт", price: 30, quantity: 100 }]).map((tier) => ({ ...tier }));
-  const capacity = tiers.reduce((acc, tier) => acc + tier.quantity, 0);
+  const seedInventory = eventSeed ? resolveSeedInventory(state, eventSeed) : { tiers: [{ name: "Стандарт", price: 30, quantity: 100 }], capacity: 100, eventSeats: [] as NonNullable<EventRecord["eventSeats"]> };
+  const tiers = seedInventory.tiers.map((tier) => ({ ...tier }));
+  const capacity = seedInventory.capacity;
+  const venue = eventSeed ? state.venueRegistry.find((item) => item.venueId === eventSeed.venueId) : null;
+  const hall = eventSeed && venue ? venue.halls.find((item) => item.hallId === eventSeed.hallId) : null;
   const basePerformers: EventComplianceData["performers"] = [
-    { name: "Ансамбль «Спадчына»", performerType: "group", country: "Беларусь", representative: "Demo Culture Office", comment: "Белорусские исполнители, demo-сценарий" },
+    { name: "Ансамбль «Спадчына»", performerType: "group", country: "Беларусь", representative: "Demo Culture Office", comment: "Белорусские исполнители, demo-сценарий", documentName: "participant_id_mock.pdf", documentStatus: "mock-документ участника приложен" },
   ];
   const performers = hasForeignPerformers
     ? [
         ...basePerformers,
-        { name: "Ensemble Baltic Folk", performerType: "group" as const, country: "Литва", representative: "Demo Culture Agency", comment: "Иностранные исполнители, demo-сценарий" },
+        { name: "Ensemble Baltic Folk", performerType: "group" as const, country: "Литва", representative: "Demo Culture Agency", comment: "Иностранные исполнители, demo-сценарий", documentName: "foreign_entry_permit_mock.pdf", documentStatus: "mock-виза / разрешение приложены" },
       ]
     : basePerformers;
   const approvalMode = seed.approvalMode || "certificate_required";
@@ -1185,12 +1300,16 @@ function buildComplianceData(seed: DemoComplianceSeed): EventComplianceData {
     posterPath: eventSeed?.poster || DEMO_POSTERS.vasilkovyKraj,
     salesChannels: eventSeed?.salesChannels ? [...eventSeed.salesChannels] : ["OWN"],
     dateSlots: eventSeed ? [toDateTime(eventSeed.daysOffset, eventSeed.time)] : ["2026-06-01T19:00"],
-    venueName: eventSeed?.venue || "Demo venue",
-    venueAddress: eventSeed ? eventSeed.city + ", demo-адрес площадки" : "г. Минск, demo-адрес площадки",
+    venueName: venue?.name || eventSeed?.venue || "Demo venue",
+    venueAddress: venue?.address || (eventSeed ? eventSeed.city + ", demo-адрес площадки" : "г. Минск, demo-адрес площадки"),
+    venueId: eventSeed?.venueId,
+    hallId: eventSeed?.hallId,
+    layoutId: eventSeed?.capacityOnly ? undefined : eventSeed?.layoutId,
+    eventSeats: eventSeed?.capacityOnly ? [] : seedInventory.eventSeats.map((seat) => ({ ...seat })),
     performers,
     onlyBelarusianPerformers: !hasForeignPerformers,
     hasForeignPerformers,
-    venueType: capacity <= 300 ? "камерная площадка" : capacity > 3000 ? "крупная открытая площадка" : "зрительный зал",
+    venueType: venue?.type || (hall?.hasSeatMap ? "зрительный зал" : "open-air"),
     projectedCapacity: capacity,
     plannedTicketsForSale: capacity,
     ticketTiers: tiers,
@@ -1199,10 +1318,12 @@ function buildComplianceData(seed: DemoComplianceSeed): EventComplianceData {
     approvalMode,
     approvalBasis,
     eventDocuments: [
-      attachment(seed.id + "-program", "Программа мероприятия.pdf", "event-program", submittedAt),
-      attachment(seed.id + "-venue", "Подтверждение права использования площадки.pdf", "venue-rights", submittedAt),
-      attachment(seed.id + "-poster", "Макет афиши.pdf", "poster-layout", submittedAt),
+      attachment(seed.id + "-program", "program_outline_mock.pdf", "event-program", submittedAt),
+      attachment(seed.id + "-venue", "venue_contract_mock.pdf", "venue-contract", submittedAt),
+      attachment(seed.id + "-participation", "participation_confirmation_mock.pdf", "participation-confirmation", submittedAt),
+      attachment(seed.id + "-poster", "poster_layout_mock.pdf", "poster-layout", submittedAt),
     ],
+    venueContractStatus: "приложен",
     salesStartDate: "2026-05-12",
     feeExempt: Boolean(seed.feeExempt),
     feeExemptReason: seed.feeExempt ? "Мероприятие проводится в рамках государственной культурной demo-программы; применено освобождение от пошлины." : "Освобождение от пошлины не применяется.",
@@ -1358,12 +1479,27 @@ function ensureEventComplianceApplications(state: AppState): void {
       feePaid: true,
       executiveCommitteeNotified: true,
     },
+    {
+      id: "eventApplication011",
+      organizerId: "demo_org_fest_scene",
+      status: "approved",
+      submittedAt: "2026-04-28T11:00:00",
+      reviewedAt: "2026-04-29T10:20:00",
+      certificateNumber: "CERT-DEMO-BY-011",
+      certificateDate: "2026-04-29",
+      adminComment: "Могилёвская областная программа согласована, площадка и уведомления подтверждены.",
+      title: "Областной праздник «Купальскі вянок»",
+      age: "0+",
+      program: "Фольклорная сцена, ремесленные подворья, семейная зона и вечерний купальский блок в парке Подниколье.",
+      feeExempt: true,
+      executiveCommitteeNotified: true,
+    },
   ];
 
   for (const seed of seeds) {
     let row = state.eventComplianceApplications.find((r) => r.eventComplianceApplicationId === seed.id);
     if (!row) row = state.eventComplianceApplications.find((r) => r.organizerId === seed.organizerId && r.data.title === seed.title);
-    const data = buildComplianceData(seed);
+    const data = buildComplianceData(state, seed);
     const now = new Date().toISOString();
     const nextRecord: EventComplianceApplicationRecord = {
       eventComplianceApplicationId: seed.id,
@@ -1424,7 +1560,7 @@ function ensureCertificatesForPublishedEvents(state: AppState): void {
         certificateDate: seed.certificateDate || "",
         linkedLegacyAppId: event.appId,
         linkedEventId: event.eventId,
-        data: buildComplianceData(seed),
+        data: buildComplianceData(state, seed),
         createdAt: event.createdAt,
         updatedAt: event.updatedAt,
       };
@@ -1437,16 +1573,24 @@ function ensureCertificatesForPublishedEvents(state: AppState): void {
     compliance.linkedEventId = event.eventId;
     compliance.data.posterPath = event.poster || compliance.data.posterPath;
     compliance.data.salesChannels = event.salesChannels || compliance.data.salesChannels || ["OWN"];
-    compliance.data.venueName ||= event.venue;
-    compliance.data.venueAddress ||= event.city + ", demo-адрес площадки";
-    compliance.data.projectedCapacity ||= event.capacity;
-    compliance.data.plannedTicketsForSale ||= event.capacity;
-    compliance.data.ticketTiers = compliance.data.ticketTiers?.length ? compliance.data.ticketTiers : event.tiers;
+    compliance.data.venueName = event.venue || compliance.data.venueName;
+    compliance.data.venueAddress = state.venueRegistry.find((venue) => venue.venueId === event.venueId)?.address || compliance.data.venueAddress || event.city + ", demo-адрес площадки";
+    compliance.data.venueId = event.venueId;
+    compliance.data.hallId = event.hallId;
+    compliance.data.layoutId = event.layoutId;
+    compliance.data.eventSeats = event.eventSeats?.length ? event.eventSeats.map((seat) => ({ ...seat })) : [];
+    compliance.data.projectedCapacity = event.capacity;
+    compliance.data.plannedTicketsForSale = event.capacity;
+    compliance.data.ticketTiers = event.tiers.map((tier) => ({ ...tier }));
     compliance.data.program ||= "Основная культурная программа, сценический блок и заключительная часть.";
     compliance.data.salesStartDate ||= "2026-05-12";
     compliance.data.ageComment ||= "Возрастная категория подтверждена для demo-сценария.";
     compliance.data.approvalBasis ||= "Публичное культурно-зрелищное мероприятие с реализацией билетов.";
-    compliance.data.eventDocuments = compliance.data.eventDocuments?.length ? compliance.data.eventDocuments : [attachment(compliance.eventComplianceApplicationId + "-program", "Программа мероприятия.pdf", "event-program", compliance.submittedAt || event.createdAt)];
+    compliance.data.eventDocuments = compliance.data.eventDocuments?.length ? compliance.data.eventDocuments : [
+      attachment(compliance.eventComplianceApplicationId + "-program", "program_outline_mock.pdf", "event-program", compliance.submittedAt || event.createdAt),
+      attachment(compliance.eventComplianceApplicationId + "-venue", "venue_contract_mock.pdf", "venue-contract", compliance.submittedAt || event.createdAt),
+    ];
+    compliance.data.venueContractStatus ||= "приложен";
     compliance.data.paymentComment ||= compliance.data.feePaid ? "Пошлина оплачена по demo-платёжному поручению." : "Оплата не требуется или ожидает подтверждения.";
     compliance.data.notificationsAttachment = compliance.data.notificationsAttachment?.length ? compliance.data.notificationsAttachment : [attachment(compliance.eventComplianceApplicationId + "-notice", "Уведомление исполкома.pdf", "executive-notice", compliance.submittedAt || event.createdAt)];
     compliance.feePaymentConfirmedByAdmin = compliance.feePaymentConfirmedByAdmin || compliance.data.feePaid || compliance.data.feeExempt;
@@ -1480,7 +1624,7 @@ function ensureDemoTicketOperations(state: AppState): void {
   const sellTargets = [
     { resellerCode: "ByCard", eventIndex: 0, tierIndex: 1, target: 4, buyer: "Demo Buyer ByCard" },
     { resellerCode: "TicketPro", eventIndex: 2, tierIndex: 0, target: 3, buyer: "Demo Buyer TicketPro" },
-    { resellerCode: "KvitkiBY", eventIndex: 4, tierIndex: 1, target: 3, buyer: "Demo Buyer Kvitki.by" },
+    { resellerCode: "Bezkassira", eventIndex: 4, tierIndex: 1, target: 3, buyer: "Demo Buyer bezkassira.by" },
   ];
 
   for (const target of sellTargets) {
@@ -1514,17 +1658,6 @@ function ensureDemoTicketOperations(state: AppState): void {
     }
   }
 
-  const b2cEvent = findSeedEvent(state, 1);
-  const b2cTier = b2cEvent?.tiers[0];
-  if (b2cEvent && b2cTier && !state.demoPurchases.some((purchase) => purchase.eventId === b2cEvent.eventId)) {
-    createDemoPurchaseTicket(state, {
-      eventId: b2cEvent.eventId,
-      selectedPriceCategory: b2cTier.name,
-      quantity: 2,
-      buyerName: "Демо покупатель витрины",
-    });
-  }
-
   if (!state.tickets.some((ticket) => ticket.soldByChannel === "ByCard" && ticket.status === "refunded")) {
     const ticket = state.tickets.find((item) => item.soldByChannel === "ByCard" && item.status === "sold");
     if (ticket) refund(state, ticket.ticketId, "ByCard");
@@ -1535,29 +1668,15 @@ function ensureDemoTicketOperations(state: AppState): void {
     if (ticket) redeem(state, ticket.ticketId, "TicketPro");
   }
 
-  if (!state.tickets.some((ticket) => ticket.soldByChannel === "KvitkiBY" && ticket.status === "redeemed")) {
-    const ticket = state.tickets.find((item) => item.soldByChannel === "KvitkiBY" && item.status === "sold");
-    if (ticket) redeem(state, ticket.ticketId, "KvitkiBY");
+  if (!state.tickets.some((ticket) => ticket.soldByChannel === "Bezkassira" && ticket.status === "redeemed")) {
+    const ticket = state.tickets.find((item) => item.soldByChannel === "Bezkassira" && item.status === "sold");
+    if (ticket) redeem(state, ticket.ticketId, "Bezkassira");
   }
 
 }
 
 export function runDemoScenario(): AppState {
   const state = seedDemoCatalog(resetDemoData());
-  const published = state.events
-    .filter((event) => event.status === "published")
-    .slice(0, 3);
-
-  const buyers = ["Посетитель культуры А", "Посетитель культуры Б", "Посетитель культуры В"];
-  published.forEach((event, index) => {
-    createDemoPurchaseTicket(state, {
-      eventId: event.eventId,
-      selectedPriceCategory: event.tiers[0]?.name || "Стандарт",
-      quantity: 1,
-      buyerName: buyers[index] || "Посетитель культуры " + String(index + 1),
-    });
-  });
-
   saveState(state);
   return state;
 }

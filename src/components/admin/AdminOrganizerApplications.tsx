@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { AppState } from "@/lib/store";
 import { setOrganizerApplicationReview } from "@/lib/store";
 import { A } from "./adminStyles";
 import HelpTooltip from "@/components/ui/help-tooltip";
-import { getRegionFilterOptions, isInAdminScope, normalizeRegion, type AdminRegionScope } from "./adminScope";
+import MockDocumentPreview, { type MockDocumentPreviewData } from "@/components/MockDocumentPreview";
+import { getScopedRegionFilterOptions, isInAdminScope, normalizeRegion, type AdminRegionScope } from "./adminScope";
 
 interface Props { state: AppState; onUpdate: (s: AppState) => void; regionScope?: AdminRegionScope; }
 type StatusFilter = "submitted" | "approved" | "rejected" | "needs_rework" | "all";
@@ -29,8 +30,12 @@ export default function AdminOrganizerApplications({ state, onUpdate, regionScop
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("submitted");
   const [regionFilter, setRegionFilter] = useState("");
+  const [previewDoc, setPreviewDoc] = useState<MockDocumentPreviewData>(null);
 
-  const regionOptions = useMemo(() => getRegionFilterOptions(state), [state]);
+  const regionOptions = useMemo(() => getScopedRegionFilterOptions(state, regionScope), [regionScope, state]);
+  useEffect(() => {
+    if (regionFilter && !regionOptions.includes(regionFilter)) setRegionFilter("");
+  }, [regionFilter, regionOptions]);
   const rows = useMemo(() => state.organizerApplications
     .filter((application) => {
       const region = normalizeRegion(application.data.region);
@@ -75,7 +80,7 @@ export default function AdminOrganizerApplications({ state, onUpdate, regionScop
           <option value="all">Все статусы</option>
         </select>
         <select value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.cardBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
-          <option value="">Все регионы</option>
+          <option value="">{regionScope === "all" ? "Все регионы" : "Регион сотрудника"}</option>
           {regionOptions.map((region) => <option key={region} value={region}>{region}</option>)}
         </select>
       </div>
@@ -100,7 +105,9 @@ export default function AdminOrganizerApplications({ state, onUpdate, regionScop
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {rows.map((r) => {
+              const organizerDocs = [...r.data.documents, ...r.data.pastMaterials];
+              return (
               <tr key={r.organizerApplicationId} style={{ borderTop: `1px solid ${A.border}` }}>
                 <td className="py-2 px-3 font-mono text-xs">{r.organizerApplicationId}</td>
                 <td className="py-2 px-3">{r.submittedAt ? r.submittedAt.slice(0, 16).replace("T", " ") : "—"}</td>
@@ -108,7 +115,55 @@ export default function AdminOrganizerApplications({ state, onUpdate, regionScop
                 <td className="py-2 px-3">{normalizeRegion(r.data.region)}</td>
                 <td className="py-2 px-3">{r.data.registrationNumber}</td>
                 <td className="py-2 px-3">{r.data.director.fullName}</td>
-                <td className="py-2 px-3">{r.data.documents.length + r.data.pastMaterials.length}</td>
+                <td className="py-2 px-3">
+                  <div className="flex max-w-[240px] flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDoc({
+                        title: "Документ руководителя",
+                        fileName: "director_id_mock.pdf",
+                        kind: "identity",
+                        rows: [["ФИО", r.data.director.fullName], ["Тип", r.data.director.docType], ["Номер", r.data.director.docNumber], ["Организация", r.data.legalName]],
+                      })}
+                      className="rounded border px-2 py-1 text-[11px]"
+                      style={{ borderColor: A.border, background: A.surfaceBg, color: A.textPrimary }}
+                    >
+                      Руководитель
+                    </button>
+                    {r.data.workers.slice(0, 2).map((worker, index) => (
+                      <button
+                        key={`${worker.docNumber}-${index}`}
+                        type="button"
+                        onClick={() => setPreviewDoc({
+                          title: "Документ работника",
+                          fileName: "worker_id_mock.pdf",
+                          kind: "identity",
+                          rows: [["ФИО", worker.fullName], ["Тип", worker.docType], ["Номер", worker.docNumber], ["Организация", r.data.legalName]],
+                        })}
+                        className="rounded border px-2 py-1 text-[11px]"
+                        style={{ borderColor: A.border, background: A.surfaceBg, color: A.textPrimary }}
+                      >
+                        Работник {index + 1}
+                      </button>
+                    ))}
+                    {organizerDocs.slice(0, 3).map((document) => (
+                      <button
+                        key={document.attachmentId}
+                        type="button"
+                        onClick={() => setPreviewDoc({
+                          title: document.name,
+                          fileName: document.name,
+                          kind: "participation",
+                          rows: [["Файл", document.name], ["Тип", document.kind], ["Статус", document.isSample ? "mock-образец" : "приложен"], ["Заявка", r.organizerApplicationId]],
+                        })}
+                        className="rounded border px-2 py-1 text-[11px]"
+                        style={{ borderColor: A.border, background: A.surfaceBg, color: A.textPrimary }}
+                      >
+                        {document.kind}
+                      </button>
+                    ))}
+                  </div>
+                </td>
                 <td className="py-2 px-3">{statusLabel[r.status] || r.status}</td>
                 <td className="py-2 px-3 space-y-2">
                   <div className="relative">
@@ -147,7 +202,8 @@ export default function AdminOrganizerApplications({ state, onUpdate, regionScop
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {rows.length === 0 && (
               <tr>
                 <td className="py-6 px-3 text-center" colSpan={9} style={{ color: A.textMuted }}>Пока нет заявок организаторов</td>
@@ -156,6 +212,7 @@ export default function AdminOrganizerApplications({ state, onUpdate, regionScop
           </tbody>
         </table>
       </div>
+      <MockDocumentPreview preview={previewDoc} onClose={() => setPreviewDoc(null)} theme="admin" />
     </div>
   );
 }
