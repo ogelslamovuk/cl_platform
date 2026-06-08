@@ -82,20 +82,31 @@ function PaperField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded border border-slate-300 bg-white/70 px-2 py-1">
       <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">{label}</div>
-      <div className="mt-0.5 truncate font-mono text-[11px] font-semibold text-slate-900">{value || "DEMO-RECORD"}</div>
+      <div className="mt-0.5 truncate font-mono text-[11px] font-semibold text-slate-900">{value || "ЗАПИСЬ"}</div>
     </div>
   );
 }
 
+function displayPreviewFileName(fileName: string | undefined, kind: MockDocumentKind): string {
+  if (!fileName) return KIND_LABEL[kind];
+  const normalized = fileName.toLowerCase();
+  if (normalized.includes("program")) return "Программа мероприятия.pdf";
+  if (normalized.includes("venue") || normalized.includes("contract")) return "Договор с площадкой.pdf";
+  if (normalized.includes("roster")) return "Список участников коллектива.pdf";
+  if (normalized.includes("foreign") || normalized.includes("passport") || normalized.includes("permit")) return "Документ иностранного участника.pdf";
+  if (normalized.includes("participant") || normalized.includes("staff")) return "Документ участника.pdf";
+  return fileName.replace(/_mock/gi, "").replace(/mock/gi, "образец");
+}
+
 function DocumentArt({ kind, preview }: { kind: MockDocumentKind; preview: ConcretePreview }) {
   if (kind === "identity") {
-    const subject = rowValue(preview, ["фио", "участник", "исполнитель", "представитель"]) || "Demo Participant";
-    const documentNumber = rowValue(preview, ["номер", "документ", "паспорт"]) || "ID-DEMO-0426";
+    const subject = rowValue(preview, ["фио", "участник", "исполнитель", "представитель"]) || "Участник мероприятия";
+    const documentNumber = rowValue(preview, ["номер", "документ", "паспорт"]) || "BY-0426";
     const country = rowValue(preview, ["страна", "гражданство"]) || "Беларусь";
     return (
       <div className="relative overflow-hidden rounded-xl border border-slate-300 bg-[#F8F1DC] p-3 text-slate-900">
-        <div className="absolute right-4 top-4 font-mono text-[10px] font-bold tracking-[0.2em] text-slate-400">DEMO-ID</div>
-        <div className="mb-3 border-b border-slate-300 pb-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-600">Рэспубліка Беларусь · mock record</div>
+        <div className="absolute right-4 top-4 font-mono text-[10px] font-bold tracking-[0.2em] text-slate-400">DOC-ID</div>
+        <div className="mb-3 border-b border-slate-300 pb-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-600">Рэспубліка Беларусь · контрольная запись</div>
         <div className="flex items-start gap-3">
           <PixelPortrait female={isLikelyFemale(preview)} />
           <div className="flex-1 space-y-2">
@@ -103,7 +114,7 @@ function DocumentArt({ kind, preview }: { kind: MockDocumentKind; preview: Concr
               <PaperField label="ФИО" value={subject} />
               <PaperField label="Гражданство" value={country} />
               <PaperField label="Номер" value={documentNumber} />
-              <PaperField label="Статус" value="mock-проверка" />
+              <PaperField label="Статус" value="проверка пройдена" />
             </div>
             <div className="flex items-center justify-between gap-3 pt-1">
               <div className="h-7 flex-1 rounded border border-dashed border-slate-400 bg-white/70" />
@@ -116,16 +127,16 @@ function DocumentArt({ kind, preview }: { kind: MockDocumentKind; preview: Concr
   }
 
   if (kind === "permit") {
-    const subject = rowValue(preview, ["фио", "участник", "исполнитель"]) || "Foreign Demo Performer";
-    const country = rowValue(preview, ["страна", "гражданство"]) || "Demo country";
+    const subject = rowValue(preview, ["фио", "участник", "исполнитель"]) || "Иностранный участник";
+    const country = rowValue(preview, ["страна", "гражданство"]) || "страна участника";
     return (
       <div className="rounded-xl border border-sky-300 bg-gradient-to-br from-sky-50 via-white to-cyan-50 p-3 text-slate-900">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-sky-800">Border permit · demo</div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-sky-800">Разрешение на въезд</div>
             <div className="mt-1 font-mono text-xs text-sky-700">BY-PERMIT-0426</div>
           </div>
-          <BureauStamp label="Demo visa" tone="green" />
+          <BureauStamp label="Виза проверена" tone="green" />
         </div>
         <div className="grid grid-cols-[1fr_84px] gap-3">
           <div className="space-y-2">
@@ -191,7 +202,7 @@ function DocumentArt({ kind, preview }: { kind: MockDocumentKind; preview: Concr
           </div>
         </div>
         <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-violet-300 bg-white text-xs font-bold text-violet-700">
-          OK
+          Проверено
         </div>
       </div>
     </div>
@@ -224,7 +235,7 @@ export default function MockDocumentPreview({ preview, onClose, theme = "dark" }
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold">{preview.title}</h3>
-            <div className="mt-1 font-mono text-xs text-sky-200">{preview.fileName || KIND_LABEL[kind]}</div>
+            <div className="mt-1 text-xs text-sky-200">{displayPreviewFileName(preview.fileName, kind)}</div>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg border px-3 py-1 text-sm" style={{ borderColor: border }}>
             Закрыть
@@ -233,15 +244,15 @@ export default function MockDocumentPreview({ preview, onClose, theme = "dark" }
 
         <div className="relative overflow-hidden rounded-2xl bg-white p-4 text-slate-900 shadow-2xl">
           <div className="pointer-events-none absolute inset-0 flex rotate-[-18deg] items-center justify-center text-7xl font-black tracking-[0.2em] text-slate-200/70">
-            DEMO
+            ОБРАЗЕЦ
           </div>
           <div className="relative">
             <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Mock document</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Предпросмотр документа</div>
                 <div className="mt-1 text-lg font-bold text-slate-900">{KIND_LABEL[kind]}</div>
               </div>
-              <div className="rounded-full border border-slate-200 px-3 py-1 font-mono text-xs text-slate-500">CL-DEMO</div>
+              <div className="rounded-full border border-slate-200 px-3 py-1 font-mono text-xs text-slate-500">CL-ПРОТОТИП</div>
             </div>
             <DocumentArt kind={kind} preview={preview} />
             <div className="mt-4 grid gap-2">

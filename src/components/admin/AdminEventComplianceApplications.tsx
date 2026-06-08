@@ -5,6 +5,7 @@ import { calculateComplianceFeeAmount, getCompliancePaymentStatus } from "@/lib/
 import { A, appStatusChip } from "./adminStyles";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import { getScopedRegionFilterOptions, resolveRegionCity, isInAdminScope, type AdminRegionScope } from "./adminScope";
+import { formatPublicId } from "@/lib/display";
 
 interface Props { state: AppState; onUpdate: (s: AppState) => void; regionScope?: AdminRegionScope; }
 
@@ -12,18 +13,18 @@ type StatusFilter = "all" | "submitted" | "approved" | "needs_rework" | "rejecte
 
 const statusLabel: Record<string, string> = {
   draft: "Черновик",
-  submitted: "Новые / на рассмотрении",
-  approved: "Одобрена",
-  rejected: "Отклонена",
-  needs_rework: "Возвращена на доработку",
+  submitted: "На проверке",
+  approved: "Одобрено",
+  rejected: "Отклонено",
+  needs_rework: "Вернуть на доработку",
 };
 
 const statusFilterOptions: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "Все" },
-  { value: "submitted", label: "Новые / на рассмотрении" },
-  { value: "approved", label: "Одобрена" },
-  { value: "needs_rework", label: "Возвращена на доработку" },
-  { value: "rejected", label: "Отклонена" },
+  { value: "submitted", label: "На проверке" },
+  { value: "approved", label: "Одобрено" },
+  { value: "needs_rework", label: "Вернуть на доработку" },
+  { value: "rejected", label: "Отклонено" },
 ];
 
 function formatDate(value?: string): string {
@@ -114,7 +115,7 @@ export default function AdminEventComplianceApplications({ state, regionScope = 
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead style={{ background: A.surfaceBg, color: A.textSecondary }}>
             <tr>
-              <th className="px-4 py-3 font-semibold">ID</th>
+              <th className="px-4 py-3 font-semibold">Номер заявки</th>
               <th className="px-4 py-3 font-semibold">Мероприятие</th>
               <th className="px-4 py-3 font-semibold">Организатор</th>
               <th className="px-4 py-3 font-semibold">Регион / город</th>
@@ -134,7 +135,7 @@ export default function AdminEventComplianceApplications({ state, regionScope = 
                 venueAddress: row.data.venueAddress,
               });
               const paymentStatus = getCompliancePaymentStatus(row);
-              const feeAmount = calculateComplianceFeeAmount(row.data);
+              const feeAmount = calculateComplianceFeeAmount(row.data, state);
               const documentsCount =
                 (row.data.eventDocuments?.length || 0) +
                 (row.data.paymentAttachments?.length || 0) +
@@ -155,7 +156,7 @@ export default function AdminEventComplianceApplications({ state, regionScope = 
                   className="cursor-pointer border-t transition-colors hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40"
                   style={{ borderColor: A.border }}
                 >
-                  <td className="px-4 py-3 font-mono text-xs" style={{ color: A.textMuted }}>{row.eventComplianceApplicationId}</td>
+                  <td className="px-4 py-3 text-xs" style={{ color: A.textMuted }}>{formatPublicId(row.eventComplianceApplicationId)}</td>
                   <td className="px-4 py-3">
                     <div className="font-semibold" style={{ color: A.textPrimary }}>{row.data.title || "Без названия"}</div>
                     <div className="mt-1 text-xs" style={{ color: A.textSecondary }}>{row.data.venueName || "Площадка не указана"}</div>

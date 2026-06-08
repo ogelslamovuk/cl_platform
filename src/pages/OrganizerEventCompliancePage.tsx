@@ -6,8 +6,7 @@ import HelpTooltip from "@/components/ui/help-tooltip";
 import MockDocumentPreview, { type MockDocumentPreviewData } from "@/components/MockDocumentPreview";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import {
-  calculateComplianceFee,
-  calculateComplianceFeeAmount,
+  buildComplianceFeeBreakdown,
   buildDefaultSalesChannels,
   buildEventSeatsFromLayout,
   createEventComplianceApplication,
@@ -34,6 +33,7 @@ import {
   updateEventComplianceApplication,
 } from "@/lib/store";
 import type { EventInteragencyCheck, EventParticipantMember, EventPerformer, EventSeat, PriceTier } from "@/lib/store";
+import { formatPublicId } from "@/lib/display";
 import SeatMapModal from "@/components/seatmap/SeatMapModal";
 import SeatTariffSummary from "@/components/seatmap/SeatTariffSummary";
 import {
@@ -55,7 +55,7 @@ const WIZARD_STEPS = [
   "Билеты и тарифы",
   "Каналы продаж",
   "Проверки и подтверждения",
-  "Пошлины и платежи",
+  "Пошлинные платежи",
   "Проверка и подача",
 ] as const;
 
@@ -66,7 +66,7 @@ const WIZARD_STEP_TOOLTIPS = [
   "Выберите площадку, подтвердите право её использования, укажите вместимость и наличие схемы мест.",
   "Задайте тарифы и базовые цены мероприятия. Назначение тарифов на конкретные места выполняется на схеме зала.",
   "Выберите каналы и операторов, через которых будут продаваться билеты после одобрения события.",
-  "Проверьте готовность документов, участников, программы, площадки и ведомственных mock-подтверждений.",
+  "Проверьте готовность документов, участников, программы, площадки и ведомственных подтверждений.",
   "Проверьте расчёт пошлины, основание начисления, статус оплаты или освобождение от оплаты.",
   "Финально проверьте заявку, вернитесь к незаполненным этапам или подайте её в Центр Управления.",
 ] as const;
@@ -131,6 +131,30 @@ function formatMoney(value: number): string {
   return `${value.toFixed(2)} BYN`;
 }
 
+function displayDocumentFileName(fileName: string): string {
+  const normalized = fileName.toLowerCase();
+  if (normalized.includes("program")) return "Программа мероприятия.pdf";
+  if (normalized.includes("venue")) return "Договор с площадкой.pdf";
+  if (normalized.includes("roster")) return "Список участников коллектива.pdf";
+  if (normalized.includes("foreign") || normalized.includes("passport")) return "Документ иностранного участника.pdf";
+  if (normalized.includes("payment")) return "Платёжное поручение.pdf";
+  if (normalized.includes("participant") || normalized.includes("staff")) return "Документ участника.pdf";
+  return fileName.replace(/_mock/gi, "").replace(/mock/gi, "документ");
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("ru-BY", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function mockAttachment(kind: string, name: string, sample = false) {
   return {
     attachmentId: `${kind}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -153,8 +177,8 @@ function makePerformer(name = "", country = "Беларусь"): EventPerformer 
     participationType: "физическое лицо",
     documentName: foreign ? "passport_foreign_participant_mock.pdf" : "participant_id_mock.pdf",
     checkStatus: foreign ? "проверка миграционного статуса" : "проверка МВД",
-    documentStatus: foreign ? "макет документа иностранного участника приложен" : "макет документа участника приложен",
-    documentNote: foreign ? "Проверка через демо-контекст миграционных документов." : "Проверка по демо-пакету документов участника.",
+    documentStatus: foreign ? "документ иностранного участника приложен" : "документ участника приложен",
+    documentNote: foreign ? "Проверка по миграционным документам без реальных паспортных данных." : "Проверка по пакету документов участника.",
   };
 }
 
@@ -220,6 +244,7 @@ export default function OrganizerEventCompliancePage() {
   const [documentPreview, setDocumentPreview] = useState<DocumentPreview>(null);
   const [performerDraft, setPerformerDraft] = useState({ name: "", country: "Беларусь" });
   const [adminReviewComment, setAdminReviewComment] = useState("");
+  const [feeDetailsOpen, setFeeDetailsOpen] = useState(false);
   const salesOperators = useMemo(() => state.resellers, [state.resellers]);
   const approvedVenues = useMemo(() => state.venueRegistry.filter((venue) => venue.status === "approved"), [state.venueRegistry]);
   const selectedVenue = getVenueRegistryRecord(state, form.venueId);
@@ -239,10 +264,10 @@ export default function OrganizerEventCompliancePage() {
   );
   const complianceStatusLabel: Record<string, string> = {
     draft: "Черновик",
-    submitted: "На рассмотрении",
-    approved: "Одобрена",
-    rejected: "Отклонена",
-    needs_rework: "Требует доработки",
+    submitted: "На проверке",
+    approved: "Одобрено",
+    rejected: "Отклонено",
+    needs_rework: "Вернуть на доработку",
   };
 
   const editId = searchParams.get("edit");
@@ -251,6 +276,7 @@ export default function OrganizerEventCompliancePage() {
   const currentApplication = isAdminMode ? adminApplication : editingApplication;
   const isReadOnlyMode = isAdminMode || Boolean(editingApplication && !["draft", "needs_rework"].includes(editingApplication.status));
   const currentOrganizerId = organizer?.organizerId || currentApplication?.organizerId || "";
+  const applicationPublicId = formatPublicId(currentApplication?.eventComplianceApplicationId || editingId || "EVAPP-1");
   useEffect(() => {
     if (!editId || !currentApplication) return;
     if (!isAdminMode && (!organizer || !approved)) return;
@@ -316,11 +342,32 @@ export default function OrganizerEventCompliancePage() {
     return acc;
   }, { assigned: 0, blocked: 0, unassigned: 0 });
   const totalPlannedTickets = hasSeatMap ? tariffConfigurationSummary.assignedSeats : form.ticketTiers.reduce((acc, tier) => acc + (Number.isFinite(tier.quantity) ? Math.max(0, Math.floor(tier.quantity)) : 0), 0);
-  const fee = calculateComplianceFee(form.projectedCapacity, totalPlannedTickets, form.ticketTiers);
-  const feeAmount = calculateComplianceFeeAmount({ ...form, plannedTicketsForSale: totalPlannedTickets, ticketTiers: form.ticketTiers });
+  const feeBreakdown = buildComplianceFeeBreakdown(state, { ...form, plannedTicketsForSale: totalPlannedTickets, ticketTiers: form.ticketTiers });
+  const feeAmount = feeBreakdown.totalAmount;
   const organizerFinancialAccount = getOrganizerFinancialAccount(state, currentOrganizerId);
   const editingPaymentApplication = editingId ? state.eventComplianceApplications.find((app) => app.eventComplianceApplicationId === editingId) || null : null;
   const paymentStatus = editingPaymentApplication ? getCompliancePaymentStatus(editingPaymentApplication) : form.feePaid || form.feeExempt || form.approvalMode !== "certificate_required" ? "Оплачено" : form.paymentComment === "Недостаточно средств" ? "Недостаточно средств" : "Ожидает оплаты";
+  const applicationStatusText = currentApplication ? complianceStatusLabel[currentApplication.status] || currentApplication.status : "Черновик";
+  const nextAction = currentApplication?.status === "approved"
+    ? "Решение принято"
+    : currentApplication?.status === "rejected"
+      ? "Ознакомиться с решением"
+      : currentApplication?.status === "needs_rework"
+        ? "Внести правки и повторно отправить"
+        : paymentStatus === "Ожидает оплаты"
+          ? "Сформировать квитанцию или оплатить с баланса"
+          : currentApplication?.status === "submitted"
+            ? "Ожидает решения Центра Управления"
+            : "Проверить данные и подать заявку";
+  const applicationHistory = [
+    { label: "Черновик создан", value: formatDateTime(currentApplication?.createdAt), done: Boolean(currentApplication) },
+    { label: "Документы загружены", value: form.eventDocuments.length ? `${form.eventDocuments.length} документ(ов)` : "ожидаются", done: form.eventDocuments.length > 0 },
+    { label: "Заявка отправлена", value: formatDateTime(currentApplication?.submittedAt), done: Boolean(currentApplication?.submittedAt) },
+    { label: "Пошлина рассчитана", value: feeBreakdown.isExempt ? "Госпошлина не требуется" : feeBreakdown.formula, done: true },
+    { label: "Оплата подтверждена", value: paymentStatus, done: paymentStatus === "Оплачено" },
+    { label: "Межведомственная проверка завершена", value: ensureChecks(form.interagencyChecks).every((row) => row.status === "Проверено") ? "Проверено" : "в работе", done: ensureChecks(form.interagencyChecks).every((row) => row.status === "Проверено") },
+    { label: "Решение принято", value: currentApplication?.reviewedAt ? formatDateTime(currentApplication.reviewedAt) : applicationStatusText, done: Boolean(currentApplication?.reviewedAt) },
+  ];
   const paymentOperations = state.finance.organizerOperations
     .filter((operation) => operation.organizerId === currentOrganizerId && (!editingId || operation.eventComplianceApplicationId === editingId))
     .slice()
@@ -445,7 +492,7 @@ export default function OrganizerEventCompliancePage() {
       title,
       fileName,
       rows: [
-        ["Файл", fileName],
+        ["Файл", displayDocumentFileName(fileName)],
         ["Статус", "Демо-макет приложен"],
         ["Источник", "Локальный прототип, без персональных данных"],
         ...extraRows,
@@ -620,8 +667,8 @@ export default function OrganizerEventCompliancePage() {
           participationType: "коллектив",
           documentName: "group_roster_mock.pdf",
           checkStatus: "состав коллектива проверен",
-          documentStatus: "макет списка участников приложен",
-          documentNote: "Список коллектива содержит только демонстрационные ФИО.",
+          documentStatus: "список участников приложен",
+          documentNote: "Список коллектива содержит условные ФИО без реальных паспортных сведений.",
           members: [
             { memberId: "spadchyna-1", name: "Алексей Миронов", country: "Беларусь", role: "солист", documentName: "participant_mironov_mock.pdf", checkStatus: "проверка МВД пройдена" },
             { memberId: "spadchyna-2", name: "Наталья Орлова", country: "Беларусь", role: "вокал", documentName: "participant_orlova_mock.pdf", checkStatus: "проверка МВД пройдена" },
@@ -640,8 +687,8 @@ export default function OrganizerEventCompliancePage() {
       approvalMode: "certificate_required",
       approvalBasis: "Проведение культурно-зрелищного мероприятия с реализацией входных билетов.",
       eventDocuments: [
-        mockAttachment("registry-statement", "Образец: заявление на проведение мероприятия", true),
-        mockAttachment("registry-appendix", "Образец: приложение к заявлению", true),
+        mockAttachment("registry-statement", "Заявление на проведение мероприятия", true),
+        mockAttachment("registry-appendix", "Приложение к заявлению", true),
         mockAttachment("venue-contract", "Договор с площадкой", true),
       ],
       venueContractStatus: "приложен",
@@ -761,8 +808,8 @@ export default function OrganizerEventCompliancePage() {
           <section className="rounded-2xl border p-4" style={{ borderColor: "rgba(96,165,250,0.28)", background: "rgba(15,22,32,0.92)" }}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <div className="text-xs uppercase tracking-wide" style={{ color: "rgba(147,197,253,0.88)" }}>Admin-mode</div>
-                <h2 className="mt-1 text-lg font-semibold">Решение по заявке {currentApplication.eventComplianceApplicationId}</h2>
+                <div className="text-xs uppercase tracking-wide" style={{ color: "rgba(147,197,253,0.88)" }}>Режим Центра Управления</div>
+                <h2 className="mt-1 text-lg font-semibold">Решение по заявке {formatPublicId(currentApplication.eventComplianceApplicationId)}</h2>
                 <p className="mt-1 text-sm" style={{ color: "rgba(245,247,250,0.70)" }}>
                   Статус: {complianceStatusLabel[currentApplication.status] || currentApplication.status} · оплата: {paymentStatus}
                 </p>
@@ -810,33 +857,64 @@ export default function OrganizerEventCompliancePage() {
           </section>
         )}
 
-        <section className="grid gap-3 rounded-2xl border p-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]" style={{ borderColor: "rgba(96,165,250,0.24)", background: "rgba(15,22,32,0.92)" }}>
+        <section className="grid gap-4 rounded-2xl border p-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]" style={{ borderColor: "rgba(96,165,250,0.24)", background: "rgba(15,22,32,0.92)" }}>
           <div>
-            <div className="text-xs uppercase tracking-wide" style={{ color: "rgba(147,197,253,0.88)" }}>Текущая заявка мероприятия</div>
-            <h2 className="mt-2 text-xl font-semibold">{form.title || "Новое мероприятие"}</h2>
-            <div className="mt-2 grid gap-2 text-sm md:grid-cols-2" style={{ color: "rgba(245,247,250,0.72)" }}>
-              <span>{eventTypePath.length ? eventTypePath.join(" / ") : "Тип не выбран"}</span>
-              <span>{form.dateSlots.filter(Boolean)[0]?.replace("T", " ") || "Дата не указана"}</span>
-              <span>{form.venueName || "Площадка не выбрана"}</span>
-              <span>{selectedVenueRegionCity.region !== "—" ? `${selectedVenueRegionCity.region}, ${selectedVenueRegionCity.city}` : "Регион появится после выбора площадки"}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: "rgba(147,197,253,0.35)", background: "rgba(96,165,250,0.12)", color: "#BFDBFE" }}>
+                {applicationPublicId}
+              </div>
+              <div className="rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: "rgba(242,201,76,0.35)", background: "rgba(242,201,76,0.12)", color: "#FDE68A" }}>
+                {applicationStatusText}
+              </div>
+              <div className="rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: paymentStatus === "Оплачено" ? "rgba(52,211,153,0.35)" : "rgba(96,165,250,0.35)", background: paymentStatus === "Оплачено" ? "rgba(52,211,153,0.12)" : "rgba(96,165,250,0.12)", color: paymentStatus === "Оплачено" ? "#BBF7D0" : "#BFDBFE" }}>
+                {paymentStatus}
+              </div>
+            </div>
+            <div className="mt-3 text-xs uppercase tracking-wide" style={{ color: "rgba(147,197,253,0.88)" }}>Текущая заявка мероприятия</div>
+            <h2 className="mt-2 text-2xl font-semibold leading-8">{form.title || "Новое мероприятие"}</h2>
+            <div className="mt-3 grid gap-2 text-sm md:grid-cols-2" style={{ color: "rgba(245,247,250,0.72)" }}>
+              <span><b className="font-semibold text-[rgba(245,247,250,0.9)]">Тип:</b> {eventTypePath.length ? eventTypePath.join(" / ") : "не выбран"}</span>
+              <span><b className="font-semibold text-[rgba(245,247,250,0.9)]">Дата:</b> {form.dateSlots.filter(Boolean)[0]?.replace("T", " ") || "не указана"}</span>
+              <span><b className="font-semibold text-[rgba(245,247,250,0.9)]">Площадка:</b> {form.venueName || "не выбрана"}</span>
+              <span><b className="font-semibold text-[rgba(245,247,250,0.9)]">Регион:</b> {selectedVenueRegionCity.region !== "—" ? `${selectedVenueRegionCity.region}, ${selectedVenueRegionCity.city}` : "появится после выбора площадки"}</span>
+            </div>
+            <div className="mt-4 rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+              <div className="text-xs uppercase tracking-wide opacity-60">Следующее действие</div>
+              <div className="mt-1 font-semibold">{nextAction}</div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
-              <div style={{ color: "rgba(245,247,250,0.60)" }}>Участники</div>
-              <div className="mt-1 text-lg font-semibold">{participantRows.length}</div>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+                <div style={{ color: "rgba(245,247,250,0.60)" }}>Участники</div>
+                <div className="mt-1 text-lg font-semibold">{participantRows.length}</div>
+              </div>
+              <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+                <div style={{ color: "rgba(245,247,250,0.60)" }}>Билеты</div>
+                <div className="mt-1 text-lg font-semibold">{hasSeatMap ? seatCounts.assigned : totalPlannedTickets}</div>
+              </div>
+              <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+                <div style={{ color: "rgba(245,247,250,0.60)" }}>Пошлина</div>
+                <div className="mt-1 text-lg font-semibold">{formatMoney(feeAmount)}</div>
+              </div>
+              <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+                <div style={{ color: "rgba(245,247,250,0.60)" }}>Готовность</div>
+                <div className="mt-1 text-lg font-semibold">{canSubmit ? "готова" : `${requiredMissing.length}`}</div>
+              </div>
             </div>
             <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
-              <div style={{ color: "rgba(245,247,250,0.60)" }}>Билеты</div>
-              <div className="mt-1 text-lg font-semibold">{hasSeatMap ? seatCounts.assigned : totalPlannedTickets}</div>
-            </div>
-            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
-              <div style={{ color: "rgba(245,247,250,0.60)" }}>Пошлина</div>
-              <div className="mt-1 text-lg font-semibold">{formatMoney(feeAmount)}</div>
-            </div>
-            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
-              <div style={{ color: "rgba(245,247,250,0.60)" }}>Готовность</div>
-              <div className="mt-1 text-lg font-semibold">{canSubmit ? "готова" : `${requiredMissing.length}`}</div>
+              <div className="mb-2 text-sm font-semibold">История заявки</div>
+              <div className="space-y-2">
+                {applicationHistory.map((item) => (
+                  <div key={item.label} className="grid grid-cols-[12px_minmax(0,1fr)] gap-2 text-xs">
+                    <span className="mt-1 h-2.5 w-2.5 rounded-full" style={{ background: item.done ? "#34D399" : "rgba(148,163,184,0.55)" }} />
+                    <div>
+                      <div className="font-semibold">{item.label}</div>
+                      <div className="mt-0.5 opacity-65">{item.value}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -938,7 +1016,7 @@ export default function OrganizerEventCompliancePage() {
                     <FieldHelp text="Фамилия, имя или название коллектива участника.">
                       <input className="h-10 w-full rounded px-3 pr-9 bg-[#111A24] border" placeholder="Участник или исполнитель" value={performerDraft.name} onChange={(e) => setPerformerDraft((prev) => ({ ...prev, name: e.target.value }))} />
                     </FieldHelp>
-                    <FieldHelp text="Для иностранного участника показывается отдельный демо-контекст документов.">
+                    <FieldHelp text="Для иностранного участника показывается отдельный набор разрешительных документов.">
                       <select className="h-10 w-full rounded px-3 pr-9 bg-[#111A24] border" value={performerDraft.country} onChange={(e) => setPerformerDraft((prev) => ({ ...prev, country: e.target.value }))}>
                         <option value="Беларусь">Беларусь</option>
                         <option value="Польша">Польша</option>
@@ -957,7 +1035,7 @@ export default function OrganizerEventCompliancePage() {
                   <div className="mt-3 grid gap-2">
                     <InfoLine label="Тип" value={eventTypePath.join(" / ") || "не выбран"} />
                     <InfoLine label="Возраст" value={form.ageCategory} />
-                    <InfoLine label="Материалы" value={form.eventDocuments.length ? `${form.eventDocuments.length} файла` : "макеты будут приложены"} />
+                    <InfoLine label="Материалы" value={form.eventDocuments.length ? `${form.eventDocuments.length} файла` : "документы будут приложены"} />
                     <DocumentCard
                       title="Программа мероприятия"
                       fileName="program_outline_mock.pdf"
@@ -982,8 +1060,8 @@ export default function OrganizerEventCompliancePage() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="font-semibold">{performer.name || "Без имени"}</div>
-                          <div className="text-xs opacity-70">{performer.participationType || performer.performerType} · {performer.country} · {performer.documentStatus || "макет документа приложен"}</div>
-                          <div className="mt-1 text-xs opacity-70">{performer.documentNote || "Демо-проверка документов без реальных паспортных данных."}</div>
+                          <div className="text-xs opacity-70">{performer.participationType || performer.performerType} · {performer.country} · {performer.documentStatus || "документ приложен"}</div>
+                          <div className="mt-1 text-xs opacity-70">{performer.documentNote || "Проверка документов без реальных паспортных данных."}</div>
                         </div>
                         <button type="button" className="rounded bg-[#1d2a3b] px-2 py-1 text-xs" onClick={() => updateForm({ performers: form.performers.filter((_, rowIndex) => rowIndex !== index) })}>Удалить</button>
                       </div>
@@ -1123,7 +1201,7 @@ export default function OrganizerEventCompliancePage() {
                       className="flex w-full flex-col items-center justify-center rounded-xl border border-dashed px-4 py-6 text-sm disabled:cursor-not-allowed disabled:opacity-70"
                       style={{ borderColor: "rgba(96,165,250,0.35)", background: "rgba(59,130,246,0.08)", color: "rgba(219,234,254,0.96)" }}
                     >
-                      Приложить mock-договор с площадкой
+                      Приложить договор с площадкой
                       <span className="mt-1 text-xs opacity-70">Зона загрузки без генерации договора</span>
                     </button>
                   )}
@@ -1278,7 +1356,7 @@ export default function OrganizerEventCompliancePage() {
                   rows={[
                     ["Физические лица", String(participantRows.length)],
                     ["Коллективы", String(form.performers.filter((performer) => performer.performerType === "group").length)],
-                    ["Документы", participantRows.length ? "mock-пакет приложен" : "нет участников"],
+                    ["Документы", participantRows.length ? "пакет документов приложен" : "нет участников"],
                   ]}
                   actionLabel="Открыть участников"
                   onAction={() => setActiveStep(1)}
@@ -1337,22 +1415,93 @@ export default function OrganizerEventCompliancePage() {
           {activeStep === 7 && (
             <div className="space-y-4">
               <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
-                <div className="grid gap-3 md:grid-cols-3">
-                  <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
-                    <div className="inline-flex items-center gap-1 text-xs opacity-75">Начислено <HelpTooltip text={COMPLIANCE_FEE_TOOLTIP} /></div>
-                    <div className="mt-2 text-xl font-semibold">{formatMoney(feeAmount)}</div>
-                    <div className="mt-1 text-xs opacity-70">{fee} базовых величин</div>
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="inline-flex items-center gap-1 text-xs uppercase tracking-wide opacity-75">Пошлинные платежи <HelpTooltip text={COMPLIANCE_FEE_TOOLTIP} /></div>
+                    <h3 className="mt-2 text-xl font-semibold">Расчёт по заявке {applicationPublicId}</h3>
+                    <p className="mt-1 max-w-3xl text-sm leading-6 opacity-70">
+                      Начисление показано как часть демонстрационного процесса: без платёжного шлюза, с понятным основанием и формулой для проверки перед подачей.
+                    </p>
                   </div>
-                  <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
-                    <div className="inline-flex items-center gap-1 text-xs opacity-75">Текущий баланс <HelpTooltip text="Баланс финансового счёта организатора, доступный для оплаты обязательных пошлин." /></div>
-                    <div className="mt-2 text-xl font-semibold">{formatMoney(organizerFinancialAccount.balance)}</div>
-                    <div className="mt-1 text-xs opacity-70">Доступно: {formatMoney(organizerFinancialAccount.available)}</div>
+                  <button
+                    type="button"
+                    className="h-10 rounded-lg px-3 text-sm font-semibold"
+                    style={{ background: "#1d2a3b", color: "#F5F7FA" }}
+                    onClick={() => setFeeDetailsOpen((value) => !value)}
+                  >
+                    {feeDetailsOpen ? "Скрыть расчёт" : "Показать расчёт"}
+                  </button>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {[
+                    ["Статус", paymentStatus],
+                    ["Начислено", feeBreakdown.isExempt ? "Госпошлина не требуется" : formatMoney(feeAmount)],
+                    ["Основание", feeBreakdown.isExempt ? (feeBreakdown.exemptionReason || "заявлено освобождение") : feeBreakdown.rangeLabel],
+                    ["Ставка", feeBreakdown.isExempt ? "0 БВ" : `${feeBreakdown.rateBaseUnits} БВ`],
+                    ["Расчёт", feeBreakdown.formula],
+                    ["Следующее действие", nextAction],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
+                      <div className="text-xs opacity-65">{label}</div>
+                      <div className="mt-1 text-sm font-semibold leading-5">{value}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    ["Площадка", form.venueName || "не выбрана"],
+                    ["Формат", eventTypePath.join(" / ") || "тип не выбран"],
+                    ["Проектная вместимость", feeBreakdown.basisLabel],
+                    ["Категория мероприятия", form.approvalMode === "certificate_required" ? "требуется удостоверение" : "без удостоверения"],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#0F1620" }}>
+                      <div className="text-xs opacity-65">{label}</div>
+                      <div className="mt-1 font-semibold">{value}</div>
+                    </div>
+                  ))}
+                </div>
+                {feeDetailsOpen && (
+                  <div className="rounded-xl border p-3" style={{ borderColor: "rgba(96,165,250,0.24)", background: "#0F1620" }}>
+                    <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                      <div className="text-sm font-semibold">Детализация расчёта</div>
+                      <div className="text-xs opacity-65">Базовая величина: {feeBreakdown.baseUnitAmountBYN} BYN</div>
+                    </div>
+                    {feeBreakdown.isExempt ? (
+                      <div className="mt-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "rgba(52,211,153,0.35)", background: "rgba(52,211,153,0.10)", color: "#BBF7D0" }}>
+                        {feeBreakdown.exemptionReason || "По заявке указано основание освобождения от госпошлины."}
+                      </div>
+                    ) : (
+                      <div className="mt-3 overflow-hidden rounded-lg border" style={{ borderColor: "rgba(255,255,255,0.10)" }}>
+                        <div className="grid grid-cols-[1.1fr_1fr_0.7fr_0.7fr] bg-[#111A24] text-xs font-semibold">
+                          <div className="px-3 py-2">Позиция</div>
+                          <div className="px-3 py-2">Параметр</div>
+                          <div className="px-3 py-2">Ставка</div>
+                          <div className="px-3 py-2 text-right">Сумма</div>
+                        </div>
+                        {feeBreakdown.lineItems.map((item) => (
+                          <div key={`${item.label}-${item.parameter}`} className="grid grid-cols-[1.1fr_1fr_0.7fr_0.7fr] border-t text-xs" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                            <div className="px-3 py-2">{item.label}</div>
+                            <div className="px-3 py-2 opacity-75">{item.parameter}</div>
+                            <div className="px-3 py-2 opacity-75">{item.rate}</div>
+                            <div className="px-3 py-2 text-right font-semibold">{formatMoney(item.amount)}</div>
+                          </div>
+                        ))}
+                        <div className="border-t px-3 py-2 text-right text-sm font-semibold" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                          Итого: {feeBreakdown.formula}
+                        </div>
+                      </div>
+                    )}
+                    {feeBreakdown.mode === "expandedCalculation" && (
+                      <p className="mt-3 text-xs leading-5 opacity-65">
+                        Детализированные позиции используются только для демонстрации прозрачной структуры начислений в прототипе.
+                      </p>
+                    )}
                   </div>
-                  <div className="rounded-xl border p-3" style={{ borderColor: paymentStatus === "Оплачено" ? "rgba(52,211,153,0.35)" : paymentStatus === "Недостаточно средств" ? "rgba(251,191,36,0.45)" : "rgba(96,165,250,0.35)", background: "#0F1620" }}>
-                    <div className="inline-flex items-center gap-1 text-xs opacity-75">Статус оплаты <HelpTooltip text="Статус показывает, можно ли одобрить заявку в Центре Управления после подачи." /></div>
-                    <div className="mt-2 text-xl font-semibold">{paymentStatus}</div>
-                    <div className="mt-1 text-xs opacity-70">{paymentStatus === "Оплачено" ? "Одобрение будет доступно после подачи." : "Подать заявку можно, одобрение откроется после оплаты."}</div>
-                  </div>
+                )}
+                <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
+                  <div className="inline-flex items-center gap-1 text-xs opacity-75">Текущий баланс <HelpTooltip text="Баланс финансового счёта организатора, доступный для оплаты обязательных пошлин." /></div>
+                  <div className="mt-2 text-xl font-semibold">{formatMoney(organizerFinancialAccount.balance)}</div>
+                  <div className="mt-1 text-xs opacity-70">Доступно: {formatMoney(organizerFinancialAccount.available)}</div>
                 </div>
                 <label className="block text-xs" style={{ color: "rgba(245,247,250,0.72)" }}>
                   <span className="mb-1 inline-flex items-center gap-1">Дата начала реализации билетов <HelpTooltip text="Дата, с которой организатор планирует открыть продажу билетов после согласования." /></span>
@@ -1482,7 +1631,7 @@ export default function OrganizerEventCompliancePage() {
                 <div key={app.eventComplianceApplicationId} className="rounded border p-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between" style={{ borderColor: "rgba(255,255,255,0.12)" }}>
                   <div>
                     <div className="font-medium">{app.data.title || "Без названия"}</div>
-                    <div className="text-xs opacity-70">{app.eventComplianceApplicationId} · {complianceStatusLabel[app.status] || app.status}</div>
+                    <div className="text-xs opacity-70">{formatPublicId(app.eventComplianceApplicationId)} · {complianceStatusLabel[app.status] || app.status}</div>
                     {!!app.adminComment && <div className="mt-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "rgba(251,191,36,0.35)", color: "#FBBF24" }}>Замечание Центра Управления: {app.adminComment}</div>}
                   </div>
                   {(app.status === "needs_rework" || app.status === "draft") && (
@@ -1586,7 +1735,7 @@ function DocumentCard({ title, fileName, caption, onOpen }: { title: string; fil
       style={{ borderColor: "rgba(96,165,250,0.28)", background: "rgba(59,130,246,0.08)" }}
     >
       <span className="block text-sm font-semibold">{title}</span>
-      <span className="mt-1 block font-mono text-xs" style={{ color: "rgba(191,219,254,0.96)" }}>{fileName}</span>
+      <span className="mt-1 block text-xs" style={{ color: "rgba(191,219,254,0.96)" }}>{displayDocumentFileName(fileName)}</span>
       {caption && <span className="mt-1 block text-xs opacity-70">{caption}</span>}
       <span className="mt-2 inline-flex rounded-full px-2 py-0.5 text-[11px]" style={{ background: "rgba(52,211,153,0.14)", color: "#A7F3D0" }}>Просмотреть</span>
     </button>

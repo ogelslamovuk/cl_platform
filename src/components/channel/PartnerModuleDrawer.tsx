@@ -63,7 +63,7 @@ export default function PartnerModuleDrawer({ module, onClose, onAction }: Props
           <header className="border-b border-white/10 px-5 py-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.14em] text-slate-400">Модуль партнёра</p>
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-400">Модуль оператора</p>
                 <h3 className="mt-1 text-lg font-semibold text-white">{module.title}</h3>
               </div>
               <button

@@ -3,6 +3,7 @@ import type { AppState } from "@/lib/store";
 import { A, opResultChip } from "./adminStyles";
 import { Activity, Search } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import { formatPublicId } from "@/lib/display";
 
 interface Props { state: AppState; }
 
@@ -23,7 +24,12 @@ export default function AdminOperations({ state }: Props) {
       if (resultFilter && o.result !== resultFilter) return false;
       if (search) {
         const s = search.toLowerCase();
-        return o.opId.toLowerCase().includes(s) || (o.ticketId || '').toLowerCase().includes(s) || o.eventId.toLowerCase().includes(s);
+        return o.opId.toLowerCase().includes(s) ||
+          formatPublicId(o.opId).toLowerCase().includes(s) ||
+          (o.ticketId || '').toLowerCase().includes(s) ||
+          formatPublicId(o.ticketId || "").toLowerCase().includes(s) ||
+          o.eventId.toLowerCase().includes(s) ||
+          formatPublicId(o.eventId).toLowerCase().includes(s);
       }
       return true;
     });
@@ -34,7 +40,7 @@ export default function AdminOperations({ state }: Props) {
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search size={14} style={{ color: A.textMuted }} className="absolute left-3 top-1/2 -translate-y-1/2" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по op_id, TicketID..."
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по номеру операции или билета..."
             className="w-full h-9 pl-9 pr-3 rounded-lg text-sm outline-none"
             style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }} />
         </div>
@@ -48,7 +54,7 @@ export default function AdminOperations({ state }: Props) {
           className="h-9 px-3 rounded-lg text-sm outline-none cursor-pointer"
           style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
           <option value="">Все результаты</option>
-          <option value="ok">OK</option>
+          <option value="ok">Успешно</option>
           <option value="error">Ошибка</option>
         </select>
         <HelpTooltip text="Комбинируйте тип и результат операции, чтобы локализовать проблемные транзакции." />
@@ -65,7 +71,7 @@ export default function AdminOperations({ state }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["Время", "op_id", "Тип", "TicketID", "EventID", "Канал", "Результат", "Причина"].map((h, i) => (
+                  {["Время", "Номер операции", "Тип", "Номер билета", "Номер мероприятия", "Канал", "Результат", "Причина"].map((h, i) => (
                     <th key={i} className="text-left py-3 px-4 font-medium text-xs" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>{h}</th>
                   ))}
                 </tr>
@@ -79,14 +85,14 @@ export default function AdminOperations({ state }: Props) {
                       onMouseEnter={e => (e.currentTarget.style.background = A.rowHover)}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                       <td className="py-3 px-4 text-xs" style={{ color: A.textMuted }}>{o.ts?.replace("T", " ").slice(0, 19)}</td>
-                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.cyan }}>{o.opId}</td>
+                      <td className="py-3 px-4 text-xs" style={{ color: A.cyan }}>{formatPublicId(o.opId)}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{opTypeLabel[o.type] || o.type}</td>
-                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.textSecondary }}>{o.ticketId || "—"}</td>
-                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.textSecondary }}>{o.eventId || "—"}</td>
+                      <td className="py-3 px-4 text-xs" style={{ color: A.textSecondary }}>{o.ticketId ? formatPublicId(o.ticketId) : "—"}</td>
+                      <td className="py-3 px-4 text-xs" style={{ color: A.textSecondary }}>{o.eventId ? formatPublicId(o.eventId) : "—"}</td>
                       <td className="py-3 px-4" style={{ color: A.textSecondary }}>{o.channel}</td>
                       <td className="py-3 px-4">
                         <span style={{ background: chip.bg, color: chip.color, borderRadius: 999 }} className="text-xs px-2.5 py-0.5 font-medium">
-                          {o.result === "ok" ? "OK" : "ОТКАЗ"}
+                          {o.result === "ok" ? "Успешно" : "Отказ"}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-xs" style={{ color: A.textMuted }}>{o.reason || "—"}</td>

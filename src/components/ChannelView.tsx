@@ -59,7 +59,7 @@ function buildModuleContent(module: PartnerModule, updatedAt: string): ModuleDra
     status: "Доступен",
     badges: [module.group, "B2B"],
     updatedAt,
-    footer: "Предварительный модуль: часть данных пока работает в MOC-режиме.",
+    footer: "Предварительный модуль: часть данных пока работает в демонстрационном режиме.",
   };
 
   const tableByModule: Record<string, ModuleDrawerContent> = {
@@ -114,12 +114,12 @@ function buildModuleContent(module: PartnerModule, updatedAt: string): ModuleDra
         { label: "Статус", value: "Активен" },
         { label: "Доступ", value: "Разрешён" },
         { label: "Обновлено", value: updatedAt },
-        { label: "Среда", value: "Песочница" },
+        { label: "Среда", value: "Учебный контур" },
       ],
       rows: [
         { left: "Рабочий профиль", right: "Готов", status: "ok" },
         { left: "Данные", right: "Синхронизированы", status: "ok" },
-        { left: "Примечание", right: "MOC контент", status: "info" },
+        { left: "Примечание", right: "Данные синхронизированы", status: "info" },
       ],
       actions: [{ label: "Открыть журнал" }, { label: "Перейти к настройке", kind: "primary" }],
     },
@@ -146,13 +146,13 @@ const partnerModules: PartnerModule[] = [
   { key: "stock-sync", title: "Синхронизация остатков", group: "Интеграция" },
   { key: "credentials", title: "Учетные данные", group: "Интеграция" },
   { key: "security", title: "Безопасность", group: "Интеграция" },
-  { key: "sandbox-tools", title: "Инструменты песочницы", group: "Интеграция" },
-  { key: "partnership", title: "Партнёрство", group: "Партнёрство" },
-  { key: "contract", title: "Условия договора", group: "Партнёрство" },
-  { key: "organizers", title: "Подключенные организаторы", group: "Партнёрство" },
-  { key: "operations", title: "Доступные операции", group: "Партнёрство" },
-  { key: "limits", title: "Лимиты канала", group: "Партнёрство" },
-  { key: "manager", title: "Менеджер партнёра", group: "Партнёрство" },
+  { key: "sandbox-tools", title: "Инструменты учебного контура", group: "Интеграция" },
+  { key: "partnership", title: "Подключение оператора", group: "Оператор" },
+  { key: "contract", title: "Условия договора", group: "Оператор" },
+  { key: "organizers", title: "Подключенные организаторы", group: "Оператор" },
+  { key: "operations", title: "Доступные операции", group: "Оператор" },
+  { key: "limits", title: "Лимиты канала", group: "Оператор" },
+  { key: "manager", title: "Менеджер оператора", group: "Оператор" },
   { key: "analytics", title: "Аналитика", group: "Аналитика" },
   { key: "sales-analytics", title: "Аналитика продаж", group: "Аналитика" },
   { key: "refund-analytics", title: "Аналитика возвратов", group: "Аналитика" },
@@ -168,7 +168,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
   const [sandboxTier, setSandboxTier] = useState("");
   const [sandboxQuantity, setSandboxQuantity] = useState(1);
   const [refundTicketId, setRefundTicketId] = useState("");
-  const [buyerName, setBuyerName] = useState("Demo Buyer");
+  const [buyerName, setBuyerName] = useState("Покупатель оператора");
   const [selectedResellerCode, setSelectedResellerCode] = useState(defaultResellerCode);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<EventStatusFilter>("all");
@@ -259,7 +259,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
           ticket,
           event,
           reason,
-          label: `${ticket.ticketId} · ${event?.title || ticket.eventId} · ${ticket.tier}`,
+          label: `${formatDisplayId(ticket.ticketId)} · ${event?.title || formatDisplayId(ticket.eventId)} · ${ticket.tier}`,
         };
       })
       .filter((row) => !row.reason)
@@ -339,13 +339,13 @@ export default function ChannelView({ state, onUpdate }: Props) {
     { label: "Доступно билетов", value: ticketsAvailable.toString(), hint: "активный остаток" },
     { label: "API-запросы сегодня", value: todayOps.length.toString(), hint: `по каналу ${activeResellerCode}` },
     { label: "Ошибки запросов", value: failedRequests.toString(), hint: "требуют проверки" },
-    { label: "Доставки webhook", value: webhookDeliveries.toString(), hint: "за сегодня" },
+    { label: "Доставки веб-хуков", value: webhookDeliveries.toString(), hint: "за сегодня" },
     { label: "Начислено комиссии", value: `${Math.round(commissionAccrued).toLocaleString("ru-RU")} BYN`, hint: `ставка ${selectedReseller?.commissionPercent || 0}%` },
     { label: "Последняя синхронизация", value: formatDate(state.meta.updatedAt), hint: "состояние TicketHub" },
   ];
 
   const apiCardRows = [
-    { left: "Среда", right: "Песочница" },
+    { left: "Среда", right: "Учебный контур" },
     { left: "Тип авторизации", right: "API-ключ" },
     { left: "Статус API-ключа", right: selectedReseller?.apiConnected ? "Активен" : "Отключён" },
     { left: "Версия API", right: "v2.1" },
@@ -382,7 +382,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
 
   const handleSandboxSale = () => {
     if (!selectedReseller) {
-      toast.error("Реселлер не найден");
+      toast.error("Оператор не найден");
       return;
     }
     if (!saleAccessOpen) {
@@ -395,7 +395,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
     }
     const event = state.events.find((item) => item.eventId === sandboxEventId);
     if (!event || !isSalesChannelAllowedForEvent(state, event, selectedReseller.code)) {
-      toast.error("Реселлер не выбран в каналах продаж этого мероприятия.");
+      toast.error("Оператор не выбран в каналах продаж этого мероприятия.");
       return;
     }
     const available = tierRemaining(sandboxEventId, sandboxTier);
@@ -411,16 +411,16 @@ export default function ChannelView({ state, onUpdate }: Props) {
       buyerName,
     });
     if (!outcome.ok) {
-      toast.error(outcome.reason || "Demo-продажа не выполнена");
+      toast.error(outcome.reason || "Демонстрационная продажа не выполнена");
       return;
     }
     onUpdate({ ...state });
-    toast.success(`Продано demo-билетов: ${outcome.ticketIds.length}`);
+    toast.success(`Продано билетов: ${outcome.ticketIds.length}`);
   };
 
   const handleSandboxRefund = () => {
     if (!selectedReseller) {
-      toast.error("Реселлер не найден");
+      toast.error("Оператор не найден");
       return;
     }
     if (!saleAccessOpen) {
@@ -428,7 +428,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
       return;
     }
     if (!refundTicketId) {
-      toast.error("Нет билетов этого реселлера, доступных для возврата");
+      toast.error("Нет билетов этого оператора, доступных для возврата");
       return;
     }
     const outcome = refundTicketByReseller(state, {
@@ -436,11 +436,11 @@ export default function ChannelView({ state, onUpdate }: Props) {
       ticketId: refundTicketId,
     });
     if (!outcome.ok) {
-      toast.error(outcome.reason || "Demo-возврат не выполнен");
+      toast.error(outcome.reason || "Демонстрационный возврат не выполнен");
       return;
     }
     onUpdate({ ...state });
-    toast.success("Демо-билет возвращён через реселлера");
+    toast.success("Билет возвращён через оператора");
   };
 
   const activeModuleContent = activeModule ? buildModuleContent(activeModule, formatDate(state.meta.updatedAt)) : null;
@@ -451,7 +451,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Канал продаж / {activeResellerCode}</p>
-            <h1 className="mt-2 text-2xl font-semibold text-white">Партнёрская консоль продаж</h1>
+            <h1 className="mt-2 text-2xl font-semibold text-white">Кабинет билетного оператора</h1>
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               <span className={`rounded-full border px-2 py-1 ${selectedReseller?.status === "active" ? "border-emerald-300/40 bg-emerald-500/10 text-emerald-200" : "border-rose-300/40 bg-rose-500/10 text-rose-200"}`}>
                 {selectedReseller?.status === "active" ? "Активен" : "Отключён"}
@@ -464,11 +464,11 @@ export default function ChannelView({ state, onUpdate }: Props) {
           </div>
 
           <div className="grid w-full gap-2 text-sm text-slate-200 lg:w-auto lg:min-w-[420px] lg:grid-cols-2">
-            <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">ID канала</p><p className="mt-1 font-mono">{channelId(activeResellerCode)}</p></div>
+            <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Номер канала</p><p className="mt-1">{channelId(activeResellerCode)}</p></div>
             <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Статус API-ключа</p><p className="mt-1">{selectedReseller?.apiConnected ? "Активен" : "Отключён"}</p></div>
             <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Комиссия</p><p className="mt-1">{selectedReseller?.commissionPercent || 0}%</p></div>
             <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2"><p className="text-xs text-slate-400">Следующая выплата</p><p className="mt-1">18.04.2026</p></div>
-            <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2 lg:col-span-2"><p className="text-xs text-slate-400">Менеджер партнёра</p><p className="mt-1">Ирина Ковалева · partner@tickethub.example</p></div>
+            <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2 lg:col-span-2"><p className="text-xs text-slate-400">Менеджер оператора</p><p className="mt-1">Ирина Ковалева · operator@tickethub.example</p></div>
             <div className="rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2 lg:col-span-2">
               <p className="text-xs text-slate-400">Доступ к продаже</p>
               <p className={saleAccessOpen ? "mt-1 text-emerald-200" : "mt-1 text-amber-200"}>{saleAccessOpen ? "Доступ к продаже открыт" : saleAccessBlockReason || "Доступ к продаже закрыт"}</p>
@@ -489,11 +489,17 @@ export default function ChannelView({ state, onUpdate }: Props) {
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <article className="xl:col-span-7 rounded-xl border border-white/10 bg-slate-950/85 p-4">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">Доступные мероприятия</h2>
+              <p className="mt-1 text-xs text-slate-400">Мероприятия, доступные выбранному оператору для продажи и возвратов.</p>
+            </div>
+          </div>
           <div className="mb-3 flex flex-wrap gap-2">
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск по EventID, событию, площадке"
+              placeholder="Поиск по номеру, событию, площадке"
               className="h-10 min-w-[200px] flex-1 rounded-lg border border-white/15 bg-slate-900 px-3 text-sm text-slate-100 outline-none ring-cyan-400/40 focus:ring-2"
             />
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as EventStatusFilter)} className="h-10 rounded-lg border border-white/15 bg-slate-900 px-3 text-sm">
@@ -513,7 +519,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
           {selectedEvent && (
             <div className="mb-3 rounded-lg border border-cyan-300/20 bg-cyan-500/5 p-3 text-xs text-slate-200">
               <div className="leading-5">
-                Выбрано событие: <span className="font-semibold">{selectedEvent.title}</span> · ID: {formatDisplayId(selectedEvent.eventId)}
+                Выбрано мероприятие: <span className="font-semibold">{selectedEvent.title}</span> · номер: {formatDisplayId(selectedEvent.eventId)}
               </div>
               <div className="mt-1 text-slate-400">
                 Каналы продаж: {getEventSalesChannels(state, selectedEvent).map((code) => getSalesChannelLabel(state, code)).join(", ")}
@@ -549,7 +555,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
               </colgroup>
               <thead className="text-xs uppercase tracking-wide text-slate-400">
                 <tr className="border-b border-white/10">
-                  <th className="px-2 py-2">ID</th><th className="px-2 py-2">Событие</th><th className="px-2 py-2">Организатор</th><th className="px-2 py-2">Дата/время</th><th className="px-2 py-2">Площадка</th><th className="px-2 py-2">Остаток</th><th className="px-2 py-2">Статус</th>
+                  <th className="px-2 py-2">Номер</th><th className="px-2 py-2">Мероприятие</th><th className="px-2 py-2">Организатор</th><th className="px-2 py-2">Дата/время</th><th className="px-2 py-2">Площадка</th><th className="px-2 py-2">Остаток</th><th className="px-2 py-2">Статус</th>
                 </tr>
               </thead>
               <tbody>
@@ -568,7 +574,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
                       }}
                       className={`cursor-pointer border-b border-white/5 transition-colors ${isSelected ? "bg-cyan-500/15" : "hover:bg-slate-800/55"}`}
                     >
-                      <td className="px-2 py-2 align-top font-mono text-xs text-slate-200">{formatDisplayId(event.eventId)}</td>
+                      <td className="px-2 py-2 align-top text-xs text-slate-200">{formatDisplayId(event.eventId)}</td>
                       <td className="px-2 py-2 align-top leading-5 text-slate-100"><div className="break-words">{event.title}</div></td>
                       <td className="px-2 py-2 align-top text-xs leading-5 text-slate-300">{organizer}</td>
                       <td className="px-2 py-2 text-xs text-slate-300">{formatDate(event.dateTime)}</td>
@@ -585,7 +591,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
 
         <div className="xl:col-span-5 space-y-4">
           <article className="rounded-xl border border-white/10 bg-slate-900/85 p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">API интеграция</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">Интеграция API</h2>
             <div className="mt-3 space-y-2 text-sm">
               {apiCardRows.map((row) => (
                 <div key={row.left} className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/75 px-3 py-2">
@@ -595,10 +601,10 @@ export default function ChannelView({ state, onUpdate }: Props) {
               ))}
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-              <button onClick={() => toast.info("API-ключ тестовой среды: ********")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">Показать ключ</button>
-              <button onClick={() => toast.info("Открываем документацию партнёра")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">Документация</button>
-              <button onClick={() => toast.info("Открываем OpenAPI")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">OpenAPI</button>
-              <button onClick={() => toast.info("Настройки webhook")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">Webhook</button>
+              <button onClick={() => toast.info("Ключ учебного контура: ********")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">Показать ключ</button>
+              <button onClick={() => toast.info("Открываем документацию оператора")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">Документация</button>
+              <button onClick={() => toast.info("Открываем документацию API")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">Документация API</button>
+              <button onClick={() => toast.info("Настройки веб-хуков")} className="h-10 rounded-lg border border-white/15 bg-slate-900 text-slate-100 hover:bg-slate-800">Веб-хуки</button>
               <button onClick={() => toast.info("Учётные данные обновлены")} className="col-span-2 h-10 rounded-lg bg-cyan-400 font-medium text-slate-950 hover:bg-cyan-300">Учётные данные</button>
             </div>
           </article>
@@ -606,8 +612,8 @@ export default function ChannelView({ state, onUpdate }: Props) {
           <article className="rounded-xl border border-cyan-300/20 bg-slate-900/85 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">API-песочница / Тестовая продажа</h2>
-                <p className="mt-1 text-xs text-slate-400">Demo-продажа меняет статусы билетов и создаёт операцию продажи.</p>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">Операции оператора</h2>
+                <p className="mt-1 text-xs text-slate-400">Демонстрационная продажа меняет статусы билетов и создаёт операцию продажи.</p>
               </div>
               <select
                 value={activeResellerCode}
@@ -637,7 +643,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
             )}
             {selectedReseller && sandboxEvents.length === 0 && saleAccessOpen && (
               <div className="mt-3 rounded-lg border border-cyan-300/25 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
-                Нет опубликованных мероприятий с TicketID, где этот реселлер выбран в каналах продаж.
+                Нет опубликованных мероприятий с доступными билетами, где этот оператор выбран в каналах продаж.
               </div>
             )}
 
@@ -697,7 +703,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
                 disabled={!selectedReseller || !saleAccessOpen || !sandboxEventId || !sandboxTier}
                 className="h-11 rounded-lg bg-cyan-400 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
               >
-                Продать demo-билет через реселлера
+                Продать билет через оператора
               </button>
 
               <div className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
@@ -708,14 +714,14 @@ export default function ChannelView({ state, onUpdate }: Props) {
                     onChange={(event) => setRefundTicketId(event.target.value)}
                     className="h-10 w-full rounded-lg border border-white/15 bg-slate-950 px-3 text-sm text-slate-100 outline-none"
                   >
-                    {refundableTickets.length === 0 && <option value="">Нет билетов этого реселлера, доступных для возврата</option>}
+                    {refundableTickets.length === 0 && <option value="">Нет билетов этого оператора, доступных для возврата</option>}
                     {refundableTickets.map((row) => (
                       <option key={row.ticket.ticketId} value={row.ticket.ticketId}>{row.label}</option>
                     ))}
                   </select>
                 </label>
                 {refundableTickets.length === 0 && (
-                  <p className="mt-2 text-xs text-amber-200">Нет билетов этого реселлера, доступных для возврата</p>
+                  <p className="mt-2 text-xs text-amber-200">Нет билетов этого оператора, доступных для возврата</p>
                 )}
                 <button
                   type="button"
@@ -723,21 +729,21 @@ export default function ChannelView({ state, onUpdate }: Props) {
                   disabled={!selectedReseller || !saleAccessOpen || !refundTicketId}
                   className="mt-3 h-11 w-full rounded-lg bg-rose-400 font-semibold text-slate-950 transition hover:bg-rose-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
                 >
-                  Вернуть демо-билет через реселлера
+                  Вернуть билет через оператора
                 </button>
               </div>
             </div>
           </article>
 
           <article className="rounded-xl border border-white/10 bg-slate-950/85 p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">Последние demo-продажи реселлера</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">Последние продажи оператора</h2>
             {recentResellerSales.length === 0 ? (
-              <p className="mt-3 text-sm text-slate-500">Продаж через выбранного реселлера пока нет.</p>
+              <p className="mt-3 text-sm text-slate-500">Продаж через выбранного оператора пока нет.</p>
             ) : (
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full min-w-[720px] text-left text-xs">
                   <thead className="uppercase tracking-wide text-slate-500">
-                    <tr className="border-b border-white/10"><th className="px-2 py-2">Время</th><th className="px-2 py-2">Мероприятие</th><th className="px-2 py-2">Тариф</th><th className="px-2 py-2">TicketID</th><th className="px-2 py-2">Покупатель</th><th className="px-2 py-2">Сумма</th><th className="px-2 py-2">Статус</th></tr>
+                    <tr className="border-b border-white/10"><th className="px-2 py-2">Время</th><th className="px-2 py-2">Мероприятие</th><th className="px-2 py-2">Тариф</th><th className="px-2 py-2">Номер билета</th><th className="px-2 py-2">Покупатель</th><th className="px-2 py-2">Сумма</th><th className="px-2 py-2">Статус</th></tr>
                   </thead>
                   <tbody>
                     {recentResellerSales.map((sale) => (
@@ -745,7 +751,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
                         <td className="px-2 py-2 text-slate-300">{sale.time}</td>
                         <td className="px-2 py-2 text-slate-100">{sale.eventTitle}</td>
                         <td className="px-2 py-2 text-slate-300">{sale.tier}</td>
-                        <td className="px-2 py-2 font-mono text-cyan-100">{sale.ticketId}</td>
+                        <td className="px-2 py-2 text-cyan-100">{formatDisplayId(sale.ticketId)}</td>
                         <td className="px-2 py-2 text-slate-300">{sale.buyer}</td>
                         <td className="px-2 py-2 text-slate-100">{sale.amount} BYN</td>
                         <td className="px-2 py-2 text-emerald-200">{sale.status}</td>
@@ -760,17 +766,17 @@ export default function ChannelView({ state, onUpdate }: Props) {
       </section>
 
       <section className="rounded-xl border border-white/10 bg-slate-950/85 p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-200">Доставки webhook</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-200">Доставки веб-хуков</h2>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[920px] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-slate-400">
-              <tr className="border-b border-white/10"><th className="px-2 py-2">Время</th><th className="px-2 py-2">Событие API</th><th className="px-2 py-2">Endpoint</th><th className="px-2 py-2">Статус</th><th className="px-2 py-2">Код</th><th className="px-2 py-2">Повторы</th></tr>
+              <tr className="border-b border-white/10"><th className="px-2 py-2">Время</th><th className="px-2 py-2">Событие интеграции</th><th className="px-2 py-2">Адрес доставки</th><th className="px-2 py-2">Статус</th><th className="px-2 py-2">Код</th><th className="px-2 py-2">Повторы</th></tr>
             </thead>
             <tbody>
               {webhookRows.map((row) => (
                 <tr key={row.id} className="border-b border-white/5 text-xs">
                   <td className="px-2 py-2 text-slate-200">{row.time}</td>
-                  <td className="px-2 py-2 font-mono text-cyan-100">{row.event}</td>
+                  <td className="px-2 py-2 text-cyan-100">{row.event}</td>
                   <td className="px-2 py-2 text-slate-300">{row.endpoint}</td>
                   <td className="px-2 py-2"><span className={`rounded px-1.5 py-0.5 ${row.status === "Доставлено" ? "bg-emerald-500/15 text-emerald-200" : row.status === "Ошибка" ? "bg-rose-500/15 text-rose-200" : "bg-amber-500/15 text-amber-200"}`}>{row.status}</span></td>
                   <td className="px-2 py-2 text-slate-200">{row.code}</td>
@@ -783,7 +789,7 @@ export default function ChannelView({ state, onUpdate }: Props) {
       </section>
 
       <section className="rounded-xl border border-white/10 bg-slate-900/85 p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-200">Модули партнёра</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-200">Модули оператора</h2>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
           {partnerModules.map((module) => (
             <button key={module.key} onClick={() => setActiveModule(module)} className="rounded-lg border border-white/10 bg-slate-950/80 p-3 text-left transition hover:border-cyan-300/30 hover:bg-slate-900">

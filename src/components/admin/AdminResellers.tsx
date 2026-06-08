@@ -202,7 +202,7 @@ function DetailBlock({ title, rows }: { title: string; rows: [string, string][] 
 function buildResellerRows(reseller: Reseller, metrics: ResellerMetrics): Record<string, [string, string][]> {
   const codePart = reseller.code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "RSL";
   const contractDate = reseller.contractDate || mockDate(reseller);
-  const contractNumber = reseller.contractNumber || `TH-${codePart}-MOCK`;
+  const contractNumber = reseller.contractNumber || `TH-${codePart}-${new Date().getFullYear()}`;
   const endpoint = reseller.apiEndpoint || `https://sandbox.api.${reseller.code.toLowerCase()}.example/v2/tickethub`;
   const webhook = reseller.webhookEndpoint || `https://sandbox.${reseller.code.toLowerCase()}.example/webhooks/tickethub`;
   const sync = reseller.lastSync || metrics.lastOperation || reseller.updatedAt;
@@ -225,8 +225,8 @@ function buildResellerRows(reseller: Reseller, metrics: ResellerMetrics): Record
     registration: [
       ["Полное наименование", reseller.fullName || `ООО «${reseller.name}»`],
       ["УНП / рег. номер", reseller.registrationNumber || String(190000000 + (hashCode(reseller.code) % 9000000))],
-      ["Юридический адрес", reseller.legalAddress || "220000, г. Минск, demo-адрес партнёра"],
-      ["Контактное лицо", reseller.contactPerson || "Demo Partner Manager"],
+      ["Юридический адрес", reseller.legalAddress || "220000, г. Минск, ул. Культурная, 12"],
+      ["Контактное лицо", reseller.contactPerson || "Менеджер оператора"],
       ["Email", reseller.email || `partner@${reseller.code.toLowerCase()}.example`],
       ["Телефон", reseller.phone || "+375 (29) 000-00-00"],
     ],
@@ -238,7 +238,7 @@ function buildResellerRows(reseller: Reseller, metrics: ResellerMetrics): Record
     ],
     api: [
       ["API подключён", reseller.apiConnected ? "Да" : "Нет"],
-      ["Среда", "Песочница"],
+      ["Среда", "Учебный контур"],
       ["Версия API", "v2.1"],
       ["Адрес API", endpoint],
       ["Адрес webhook", webhook],
@@ -367,13 +367,13 @@ export default function AdminResellers({ state, onUpdate, regionScope = "all" }:
   const saveReseller = () => {
     const result = createReseller(state, form);
     if (!result.ok) {
-      toast.error(result.reason || "Не удалось добавить реселлера.");
+      toast.error(result.reason || "Не удалось добавить оператора.");
       return;
     }
     onUpdate({ ...state });
     setFormOpen(false);
     resetForm();
-    toast.success("Реселлер добавлен.");
+    toast.success("Оператор добавлен.");
   };
 
   const drawerMetrics = drawer ? metrics.get(drawer.code) || { salesTurnover: 0, soldTickets: 0, refunds: 0, redeems: 0, lastOperation: "—" } : null;
@@ -410,7 +410,7 @@ export default function AdminResellers({ state, onUpdate, regionScope = "all" }:
               <Plus size={16} />
               Добавить оператора
             </button>
-            <HelpTooltip text="Добавить нового демонстрационного оператора в существующий реестр реселлеров локального хранилища." />
+            <HelpTooltip text="Добавить нового оператора в существующий реестр локального хранилища." />
           </div>
         </div>
       </div>
@@ -448,7 +448,7 @@ export default function AdminResellers({ state, onUpdate, regionScope = "all" }:
         {visibleResellers.length === 0 ? (
           <div className="flex flex-col items-center py-12">
             <Store size={28} style={{ color: A.textMuted }} className="mb-2" />
-            <p style={{ color: A.textMuted }} className="text-sm">Реселлеры не настроены</p>
+            <p style={{ color: A.textMuted }} className="text-sm">Операторы не настроены</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

@@ -12,6 +12,7 @@ import {
   type OrganizerApplicationData,
   upsertOrganizerApplication,
 } from "@/lib/store";
+import { formatPublicId } from "@/lib/display";
 
 function emptyPerson(): IdentityRecord {
   return defaultIdentityRecord();
@@ -27,6 +28,15 @@ function mockAttachment(attachmentId: string, name: string, kind: string): Organ
   };
 }
 
+const ATTACHMENT_LABELS: Record<string, string> = {
+  "past-video": "Видеоотчёт прошедшего мероприятия.mp4",
+  "past-audio": "Аудиозапись прошедшего мероприятия.mp3",
+  "past-script": "Сценарий прошедшего мероприятия.pdf",
+  "registry-statement": "Заявление на включение в реестр.pdf",
+  "registry-appendix": "Приложение к заявлению.pdf",
+  "sample-registry": "Образец заявления.pdf",
+};
+
 function buildMockOrganizerApplicationData(): OrganizerApplicationData {
   return {
     ...defaultOrganizerApplicationData(),
@@ -40,8 +50,8 @@ function buildMockOrganizerApplicationData(): OrganizerApplicationData {
     roomTypeAndNumber: "кабинет 304",
     addressExtra: "административный корпус, вход со двора",
     contactPhone: "+375 (17) 327-45-10",
-    website: "https://culture-minsk.demo.example",
-    email: "registry@culture-minsk.demo.example",
+    website: "https://culture-minsk.by",
+    email: "registry@culture-minsk.by",
     ownershipType: "state",
     director: {
       fullName: "Морозова Елена Викторовна",
@@ -63,9 +73,9 @@ function buildMockOrganizerApplicationData(): OrganizerApplicationData {
       {
         fullName: "Минский городской исполнительный комитет",
         docType: "учредитель государственного учреждения",
-        docNumber: "FOUND-DEMO-001",
+        docNumber: "FOUND-001",
         issueDate: "2020-01-10",
-        issueAuthority: "Единый государственный регистр demo",
+        issueAuthority: "Единый государственный регистр",
       },
     ],
     activities: ["Концерты", "Фестивали", "Выставки"],
@@ -116,6 +126,14 @@ export default function OrganizerRegistrationStubPage() {
 
   const hasMissingRequiredFields = missingRequiredFields.length > 0;
   const hasMissingConfirmations = !form.confirmations.adminReviewConsent || !form.confirmations.isAccurate;
+  const applicationPublicId = formatPublicId("ORGAPP-1");
+  const requiredTotal = 17;
+  const completedRequired = Math.max(0, requiredTotal - missingRequiredFields.length);
+  const nextAction = hasMissingRequiredFields
+    ? "Заполнить обязательные сведения"
+    : hasMissingConfirmations
+      ? "Подтвердить сведения и согласие на рассмотрение"
+      : "Отправить заявку на рассмотрение";
 
   const fieldClass = (invalid: boolean) =>
     `h-10 rounded px-3 bg-[#0F1620] border ${invalid ? "border-[#EF4444]" : ""}`;
@@ -129,7 +147,7 @@ export default function OrganizerRegistrationStubPage() {
       attachmentId: `${kind}-${Date.now()}`,
       kind,
       isSample,
-      name: isSample ? `Образец: ${kind}` : `dummy-${kind}-${new Date().toLocaleTimeString()}`,
+      name: ATTACHMENT_LABELS[kind] || "Документ к заявке.pdf",
       uploadedAt: new Date().toISOString(),
     };
     if (kind.startsWith("past")) {
@@ -180,7 +198,7 @@ export default function OrganizerRegistrationStubPage() {
     setForm(buildMockOrganizerApplicationData());
     setSubmitAttempted(false);
     setMockSyncAt(new Date().toISOString());
-    toast.success("Сведения синхронизированы в demo-режиме.");
+    toast.success("Сведения синхронизированы в демонстрационном режиме.");
   };
 
   return (
@@ -189,18 +207,46 @@ export default function OrganizerRegistrationStubPage() {
       <div className="mx-auto max-w-4xl rounded-2xl border p-6 space-y-6" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
         <div>
           <h1 className="text-2xl font-bold mb-2">Заявка на статус организатора</h1>
-          <p className="text-sm" style={{ color: "rgba(245,247,250,0.72)" }}>Демонстрационная форма для включения в реестр организаторов.</p>
+          <p className="text-sm" style={{ color: "rgba(245,247,250,0.72)" }}>Форма для включения в реестр организаторов.</p>
           <p className="text-xs mt-2" style={{ color: "rgba(245,247,250,0.72)" }}>Поля, отмеченные *, обязательны.</p>
         </div>
+
+        <section className="rounded-2xl border p-4" style={{ borderColor: "rgba(96,165,250,0.24)", background: "rgba(15,22,32,0.92)" }}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: "rgba(147,197,253,0.35)", background: "rgba(96,165,250,0.12)", color: "#BFDBFE" }}>{applicationPublicId}</span>
+            <span className="rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: "rgba(242,201,76,0.35)", background: "rgba(242,201,76,0.12)", color: "#FDE68A" }}>Черновик</span>
+            <span className="rounded-full border px-3 py-1 text-xs font-semibold" style={{ borderColor: mockSyncAt ? "rgba(52,211,153,0.35)" : "rgba(148,163,184,0.28)", background: mockSyncAt ? "rgba(52,211,153,0.12)" : "rgba(148,163,184,0.10)", color: mockSyncAt ? "#BBF7D0" : "#CBD5E1" }}>
+              {mockSyncAt ? "Сведения сверены" : "Ожидает сверки"}
+            </span>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+              <div className="text-xs opacity-65">Организация</div>
+              <div className="mt-1 text-sm font-semibold">{form.legalName || "наименование не указано"}</div>
+            </div>
+            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+              <div className="text-xs opacity-65">Регион</div>
+              <div className="mt-1 text-sm font-semibold">{form.region || "регион не указан"}</div>
+            </div>
+            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+              <div className="text-xs opacity-65">Заполнено</div>
+              <div className="mt-1 text-sm font-semibold">{completedRequired} из {requiredTotal} обязательных полей</div>
+            </div>
+            <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#111A24" }}>
+              <div className="text-xs opacity-65">Следующее действие</div>
+              <div className="mt-1 text-sm font-semibold">{nextAction}</div>
+            </div>
+          </div>
+        </section>
 
         <div className="sticky top-4 z-20 rounded-2xl border p-4" style={{ borderColor: "rgba(242,201,76,0.32)", background: "rgba(15,22,32,0.96)", boxShadow: "0 16px 42px rgba(0,0,0,0.28)" }}>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <div className="text-sm font-semibold">Demo-синхронизация с публичным реестром</div>
+              <div className="text-sm font-semibold">Проверка по публичному реестру</div>
               {mockSyncAt ? (
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
                   <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(34,197,94,0.16)", color: "#BBF7D0" }}>УНП найден в публичном реестре</span>
-                  <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(59,130,246,0.16)", color: "#BFDBFE" }}>Сведения синхронизированы в demo-режиме</span>
+                  <span className="rounded-full px-2.5 py-1" style={{ background: "rgba(59,130,246,0.16)", color: "#BFDBFE" }}>Сведения синхронизированы</span>
                   <span style={{ color: "rgba(245,247,250,0.62)" }}>проверено: {mockSyncAt.replace("T", " ").slice(0, 16)}</span>
                 </div>
               ) : (
@@ -213,13 +259,13 @@ export default function OrganizerRegistrationStubPage() {
               style={{ background: "#F2C94C", color: "#111" }}
               onClick={fillMockOrganizer}
             >
-              Заполнить МОК
+              Заполнить примером
             </button>
           </div>
         </div>
 
         <section className="space-y-3">
-          <h2 className="font-semibold">Данные организации</h2>
+          <h2 className="font-semibold">Сведения об организации и юридический адрес</h2>
           <div className="grid md:grid-cols-2 gap-3">
             <div className="relative">
               <input className={`h-10 w-full rounded px-3 pr-9 bg-[#0F1620] border ${submitAttempted && missingRequiredFields.includes("legalName") ? "border-[#EF4444]" : ""}`} placeholder="Полное наименование *" value={form.legalName} onChange={(e) => setForm((p) => ({ ...p, legalName: e.target.value }))} />
@@ -281,7 +327,7 @@ export default function OrganizerRegistrationStubPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="font-semibold">Руководитель</h2>
+          <h2 className="font-semibold">Руководитель и контактные лица</h2>
           <div className="grid md:grid-cols-2 gap-3">
             <div className="relative">
               <input className={`h-10 w-full rounded px-3 pr-9 bg-[#0F1620] border ${submitAttempted && missingRequiredFields.includes("director.fullName") ? "border-[#EF4444]" : ""}`} placeholder="ФИО руководителя *" value={form.director.fullName} onChange={(e) => updateDirector({ fullName: e.target.value })} />
@@ -307,7 +353,7 @@ export default function OrganizerRegistrationStubPage() {
         </section>
 
         <section className="space-y-2">
-          <h2 className="font-semibold">Работники и учредители</h2>
+          <h2 className="font-semibold">Учредители и работники</h2>
           <div className="flex gap-2 flex-wrap">
             <div className="inline-flex items-center gap-1">
               <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => setForm((p) => ({ ...p, workers: [...p.workers, emptyPerson()] }))}>+ Добавить сотрудника</button>
@@ -318,11 +364,11 @@ export default function OrganizerRegistrationStubPage() {
               <HelpTooltip text="Добавить учредителя в заявку." />
             </div>
           </div>
-          <p className="text-xs" style={{ color: "rgba(245,247,250,0.65)" }}>Демонстрационный блок. Для подачи заявки в демонстрационном режиме заполнение не требуется.</p>
+          <p className="text-xs" style={{ color: "rgba(245,247,250,0.65)" }}>Дополнительный блок. Для подачи заявки здесь заполнение не требуется.</p>
         </section>
 
         <section className="space-y-2">
-          <h2 className="font-semibold">Вид деятельности *</h2>
+          <h2 className="font-semibold">Вид деятельности и профиль мероприятий *</h2>
           <div className="flex gap-4 text-sm">
             {[
               "Концерты",
@@ -353,37 +399,37 @@ export default function OrganizerRegistrationStubPage() {
         </section>
 
         <section className="space-y-2">
-          <h2 className="font-semibold">Ранее проведённые мероприятия (при наличии)</h2>
+          <h2 className="font-semibold">Опыт проведения мероприятий</h2>
           <div className="relative">
             <textarea className="w-full min-h-24 rounded px-3 py-2 pr-9 bg-[#0F1620] border" placeholder="Описание" value={form.pastEventsDescription} onChange={(e) => setForm((p) => ({ ...p, pastEventsDescription: e.target.value }))} />
             <div className="absolute right-2 top-3"><HelpTooltip text="Опишите прошлые мероприятия, проведённые организатором." /></div>
           </div>
           <div className="flex gap-2 flex-wrap">
             <div className="inline-flex items-center gap-1">
-              <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => addAttachment("past-video")}>Загрузить видео (тестовый файл)</button>
+              <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => addAttachment("past-video")}>Загрузить видеоотчёт</button>
               <HelpTooltip text="Добавить видеофайл с прошедшего мероприятия." />
             </div>
             <div className="inline-flex items-center gap-1">
-              <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => addAttachment("past-audio")}>Загрузить аудио (тестовый файл)</button>
+              <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => addAttachment("past-audio")}>Загрузить аудиозапись</button>
               <HelpTooltip text="Добавить аудиозапись с прошедшего мероприятия." />
             </div>
             <div className="inline-flex items-center gap-1">
-              <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => addAttachment("past-script")}>Загрузить сценарий (тестовый файл)</button>
+              <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => addAttachment("past-script")}>Загрузить сценарий</button>
               <HelpTooltip text="Добавить сценарий прошедшего мероприятия." />
             </div>
           </div>
-          <p className="text-xs" style={{ color: "rgba(245,247,250,0.65)" }}>Демонстрационный блок. Для подачи заявки в демонстрационном режиме заполнение не требуется.</p>
+          <p className="text-xs" style={{ color: "rgba(245,247,250,0.65)" }}>Дополнительный блок. Для подачи заявки здесь заполнение не требуется.</p>
         </section>
 
         <section className="space-y-2">
           <h2 className="font-semibold">Документы</h2>
           <div className="flex gap-2 flex-wrap">
             <div className="inline-flex items-center gap-1">
-              <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => addAttachment("registry-statement")}>Загрузить заявление (тестовый файл)</button>
+              <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => addAttachment("registry-statement")}>Загрузить заявление</button>
               <HelpTooltip text="Прикрепить заявление для включения в реестр." />
             </div>
             <div className="inline-flex items-center gap-1">
-              <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => addAttachment("registry-appendix")}>Загрузить приложение (тестовый файл)</button>
+              <button className="px-3 py-2 rounded bg-[#1d2a3b]" onClick={() => addAttachment("registry-appendix")}>Загрузить приложение</button>
               <HelpTooltip text="Прикрепить приложение к заявлению." />
             </div>
             <div className="inline-flex items-center gap-1">
@@ -391,7 +437,7 @@ export default function OrganizerRegistrationStubPage() {
               <HelpTooltip text="Скачать образец заявления для заполнения." />
             </div>
           </div>
-          <p className="text-xs" style={{ color: "rgba(245,247,250,0.65)" }}>Демонстрационный блок. Для подачи заявки в демонстрационном режиме заполнение не требуется.</p>
+          <p className="text-xs" style={{ color: "rgba(245,247,250,0.65)" }}>Дополнительный блок. Для подачи заявки здесь заполнение не требуется.</p>
         </section>
 
         <section className="space-y-2">
@@ -409,6 +455,7 @@ export default function OrganizerRegistrationStubPage() {
         </section>
 
         <section className="space-y-2 text-sm">
+          <h2 className="font-semibold text-base">Подтверждение и отправка</h2>
           <label className={`flex items-center gap-2 ${submitAttempted && !form.confirmations.isAccurate ? "text-[#FCA5A5]" : ""}`}>
             <input type="checkbox" checked={form.confirmations.isAccurate} onChange={(e) => setForm((p) => ({ ...p, confirmations: { ...p.confirmations, isAccurate: e.target.checked } }))} />
             Подтверждаю достоверность сведений *

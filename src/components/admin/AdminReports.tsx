@@ -785,9 +785,9 @@ export default function AdminReports({ state }: Props) {
     },
     {
       key: "resellers",
-      heading: "Реселлеры",
-      description: "Оборот продаж, комиссия реселлера, доли Минкульта и платформы, возвраты, погашения и ошибки.",
-      metric: `${formatNumber(resellerRows.length)} реселлеров`,
+      heading: "Билетные операторы",
+      description: "Оборот продаж, комиссия оператора, доли Минкульта и платформы, возвраты, погашения и ошибки.",
+      metric: `${formatNumber(resellerRows.length)} операторов`,
       icon: Handshake,
       accent: A.statusOk,
     },
@@ -994,20 +994,20 @@ export default function AdminReports({ state }: Props) {
 
       {selectedReport === "resellers" && (
         <ReportSection
-        heading="Реселлеры"
-        description="Показывает комиссионную модель по каждому demo-реселлеру без расчёта налогов и выплат."
+        heading="Билетные операторы"
+        description="Показывает комиссионную модель по каждому оператору без расчёта налогов и выплат."
         icon={Handshake}
         accent={A.statusOk}
         tooltip={SALES_TURNOVER_TOOLTIP}
       >
         {resellerRows.length === 0 ? (
-          <EmptyState icon={Handshake} text="Нет реселлеров для отчёта. После инициализации demo-данных здесь появится комиссионная аналитика." />
+          <EmptyState icon={Handshake} text="Нет операторов для отчёта. После загрузки демо-данных здесь появится комиссионная аналитика." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1480px] text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["Реселлер", "Код", "Допуск", "Тип подключения", "Соглашение", "Интеграция", "Статус", "Оборот продаж", "Комиссия реселлера", "Доля Минкульта", "Доля платформы", "Остаток комиссии реселлера", "Продано билетов", "Возвраты", "Погашения", "Ошибки"].map((header) => (
+                  {["Оператор", "Код", "Допуск", "Тип подключения", "Соглашение", "Интеграция", "Статус", "Оборот продаж", "Комиссия оператора", "Доля Минкульта", "Доля платформы", "Остаток комиссии оператора", "Продано билетов", "Возвраты", "Погашения", "Ошибки"].map((header) => (
                     <th key={header} className="px-4 py-3 text-left text-xs font-medium" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>
                       {header}
                     </th>

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import type { Application, AppState } from "@/lib/store";
 import { createApplication, submitApplication } from "@/lib/store";
 import { toast } from "sonner";
+import { formatDisplayId } from "@/lib/display";
 
 interface Props {
   state: AppState;
@@ -144,7 +145,7 @@ export default function OrganizerView({ state, onUpdate }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left">
-                  <th className="py-2 px-2 font-medium">APP ID</th>
+                  <th className="py-2 px-2 font-medium">Номер заявки</th>
                   <th className="py-2 px-2 font-medium">Название</th>
                   <th className="py-2 px-2 font-medium">Площадка</th>
                   <th className="py-2 px-2 font-medium">Дата/время</th>
@@ -156,7 +157,7 @@ export default function OrganizerView({ state, onUpdate }: Props) {
               <tbody>
                 {filtered.map((a) => (
                   <tr key={a.appId} className="border-b border-border/50">
-                    <td className="py-2 px-2 font-mono text-xs">{a.appId}</td>
+                    <td className="py-2 px-2 text-xs font-semibold">{formatDisplayId(a.appId)}</td>
                     <td className="py-2 px-2">{a.title}</td>
                     <td className="py-2 px-2">{a.venue}</td>
                     <td className="py-2 px-2">{a.dateTime?.replace("T", " ")}</td>
@@ -192,14 +193,14 @@ export default function OrganizerView({ state, onUpdate }: Props) {
             </div>
             <dl className="space-y-3 text-sm">
               {([
-                ["APP ID", drawerApp.appId],
+                ["Номер заявки", formatDisplayId(drawerApp.appId)],
                 ["Название", drawerApp.title],
                 ["Площадка", drawerApp.venue],
                 ["Дата/время", drawerApp.dateTime?.replace("T", " ")],
                 ["Вместимость", String(drawerApp.capacity)],
                 ["Статус", statusLabel[drawerApp.status]],
-                ...(drawerApp.licenseId ? [["LicenseID", drawerApp.licenseId]] : []),
-                ...(drawerApp.eventId ? [["EventID", drawerApp.eventId]] : []),
+                ...(drawerApp.licenseId ? [["Номер удостоверения", formatDisplayId(drawerApp.licenseId)]] : []),
+                ...(drawerApp.eventId ? [["Номер мероприятия", formatDisplayId(drawerApp.eventId)]] : []),
               ] as [string, string][]).map(([k, v]) => (
                 <div key={k}>
                   <dt className="font-medium opacity-60">{k}</dt>

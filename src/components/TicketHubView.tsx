@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import type { AppState } from "@/lib/store";
 import { publishEvent, issueMarks } from "@/lib/store";
 import { toast } from "sonner";
+import { formatDisplayId, getOperationTypeLabel } from "@/lib/display";
 
 interface Props {
   state: AppState;
@@ -27,15 +28,15 @@ export default function TicketHubView({ state, onUpdate, initialTab }: Props) {
 
   const handlePublish = (eventId: string) => {
     publishEvent(state, eventId);
-    toast.success(`Событие ${eventId} опубликовано`);
+    toast.success(`Мероприятие ${formatDisplayId(eventId)} опубликовано`);
     onUpdate({ ...state });
   };
 
   const handleIssue = () => {
     if (!confirmIssue) return;
     const count = issueMarks(state, confirmIssue);
-    if (count > 0) toast.success(`Выпущено ${count} марок для ${confirmIssue}`);
-    else toast.error("Марки уже выпущены или событие не найдено");
+    if (count > 0) toast.success(`Выпущено ${count} контрольных марок для ${formatDisplayId(confirmIssue)}`);
+    else toast.error("Марки уже выпущены или мероприятие не найдено");
     setConfirmIssue(null);
     onUpdate({ ...state });
   };
@@ -62,7 +63,7 @@ export default function TicketHubView({ state, onUpdate, initialTab }: Props) {
   const uniqueTiers = [...new Set(state.tickets.map((t) => t.tier))];
 
   const tabs = [
-    { key: "events" as const, label: "События" },
+    { key: "events" as const, label: "Мероприятия" },
     { key: "tickets" as const, label: "Билеты" },
     { key: "ops" as const, label: "Операции" },
   ];
@@ -84,27 +85,27 @@ export default function TicketHubView({ state, onUpdate, initialTab }: Props) {
         {tab === "events" && (
           <>
             {state.events.length === 0 ? (
-              <p className="text-center py-8 opacity-60">Нет событий</p>
+              <p className="text-center py-8 opacity-60">Нет мероприятий</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border text-left">
-                      <th className="py-2 px-2 font-medium">EventID</th>
-                      <th className="py-2 px-2 font-medium">LicenseID</th>
+                      <th className="py-2 px-2 font-medium">Номер мероприятия</th>
+                      <th className="py-2 px-2 font-medium">Номер удостоверения</th>
                       <th className="py-2 px-2 font-medium">Название</th>
                       <th className="py-2 px-2 font-medium">Дата/время</th>
                       <th className="py-2 px-2 font-medium">Статус</th>
-                      <th className="py-2 px-2 font-medium">Capacity</th>
-                      <th className="py-2 px-2 font-medium">Remaining</th>
+                      <th className="py-2 px-2 font-medium">Вместимость</th>
+                      <th className="py-2 px-2 font-medium">Остаток</th>
                       <th className="py-2 px-2 font-medium">Действия</th>
                     </tr>
                   </thead>
                   <tbody>
                     {state.events.map((e) => (
                       <tr key={e.eventId} className="border-b border-border/50">
-                        <td className="py-2 px-2 font-mono text-xs">{e.eventId}</td>
-                        <td className="py-2 px-2 font-mono text-xs">{e.licenseId}</td>
+                        <td className="py-2 px-2 text-xs font-semibold">{formatDisplayId(e.eventId)}</td>
+                        <td className="py-2 px-2 text-xs">{formatDisplayId(e.licenseId)}</td>
                         <td className="py-2 px-2">{e.title}</td>
                         <td className="py-2 px-2">{e.dateTime?.replace("T", " ")}</td>
                         <td className="py-2 px-2">
@@ -136,8 +137,8 @@ export default function TicketHubView({ state, onUpdate, initialTab }: Props) {
             <div className="flex gap-3 mb-4 flex-wrap">
               <select className="border border-border rounded-md px-3 py-2 text-sm bg-card"
                 value={tktFilter.event} onChange={(e) => setTktFilter({ ...tktFilter, event: e.target.value })}>
-                <option value="">Все события</option>
-                {uniqueEvents.map((ev) => <option key={ev} value={ev}>{ev}</option>)}
+                <option value="">Все мероприятия</option>
+                {uniqueEvents.map((ev) => <option key={ev} value={ev}>{formatDisplayId(ev)}</option>)}
               </select>
               <select className="border border-border rounded-md px-3 py-2 text-sm bg-card"
                 value={tktFilter.status} onChange={(e) => setTktFilter({ ...tktFilter, status: e.target.value })}>
@@ -157,9 +158,9 @@ export default function TicketHubView({ state, onUpdate, initialTab }: Props) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border text-left">
-                      <th className="py-2 px-2 font-medium">TicketID</th>
-                      <th className="py-2 px-2 font-medium">EventID</th>
-                      <th className="py-2 px-2 font-medium">Tier</th>
+                      <th className="py-2 px-2 font-medium">Номер билета</th>
+                      <th className="py-2 px-2 font-medium">Номер мероприятия</th>
+                      <th className="py-2 px-2 font-medium">Категория</th>
                       <th className="py-2 px-2 font-medium">Статус</th>
                       <th className="py-2 px-2 font-medium">Канал</th>
                       <th className="py-2 px-2 font-medium">Покупатель</th>
@@ -169,8 +170,8 @@ export default function TicketHubView({ state, onUpdate, initialTab }: Props) {
                   <tbody>
                     {filteredTickets.map((t) => (
                       <tr key={t.ticketId} className="border-b border-border/50">
-                        <td className="py-2 px-2 font-mono text-xs">{t.ticketId}</td>
-                        <td className="py-2 px-2 font-mono text-xs">{t.eventId}</td>
+                        <td className="py-2 px-2 text-xs font-semibold">{formatDisplayId(t.ticketId)}</td>
+                        <td className="py-2 px-2 text-xs">{formatDisplayId(t.eventId)}</td>
                         <td className="py-2 px-2">{t.tier}</td>
                         <td className="py-2 px-2">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tktStatusBadge[t.status]}`}>
@@ -200,12 +201,12 @@ export default function TicketHubView({ state, onUpdate, initialTab }: Props) {
               <select className="border border-border rounded-md px-3 py-2 text-sm bg-card"
                 value={opFilter.type} onChange={(e) => setOpFilter({ ...opFilter, type: e.target.value })}>
                 <option value="">Все типы</option>
-                {["sell", "refund", "redeem", "verify"].map((t) => <option key={t} value={t}>{t}</option>)}
+                {["sell", "refund", "redeem", "verify"].map((t) => <option key={t} value={t}>{getOperationTypeLabel(t)}</option>)}
               </select>
               <select className="border border-border rounded-md px-3 py-2 text-sm bg-card"
                 value={opFilter.result} onChange={(e) => setOpFilter({ ...opFilter, result: e.target.value })}>
                 <option value="">Все результаты</option>
-                <option value="ok">OK</option>
+                <option value="ok">Успешно</option>
                 <option value="error">Ошибка</option>
               </select>
             </div>
@@ -217,10 +218,10 @@ export default function TicketHubView({ state, onUpdate, initialTab }: Props) {
                   <thead>
                     <tr className="border-b border-border text-left">
                       <th className="py-2 px-2 font-medium">Время</th>
-                      <th className="py-2 px-2 font-medium">op_id</th>
+                      <th className="py-2 px-2 font-medium">Номер операции</th>
                       <th className="py-2 px-2 font-medium">Тип</th>
-                      <th className="py-2 px-2 font-medium">TicketID</th>
-                      <th className="py-2 px-2 font-medium">EventID</th>
+                      <th className="py-2 px-2 font-medium">Номер билета</th>
+                      <th className="py-2 px-2 font-medium">Номер мероприятия</th>
                       <th className="py-2 px-2 font-medium">Канал</th>
                       <th className="py-2 px-2 font-medium">Результат</th>
                       <th className="py-2 px-2 font-medium">Причина</th>
@@ -230,14 +231,14 @@ export default function TicketHubView({ state, onUpdate, initialTab }: Props) {
                     {filteredOps.map((o) => (
                       <tr key={o.opId} className="border-b border-border/50">
                         <td className="py-2 px-2 text-xs">{o.ts?.replace("T", " ").slice(0, 19)}</td>
-                        <td className="py-2 px-2 font-mono text-xs">{o.opId}</td>
-                        <td className="py-2 px-2">{o.type}</td>
-                        <td className="py-2 px-2 font-mono text-xs">{o.ticketId || "—"}</td>
-                        <td className="py-2 px-2 font-mono text-xs">{o.eventId || "—"}</td>
+                        <td className="py-2 px-2 text-xs font-semibold">{formatDisplayId(o.opId)}</td>
+                        <td className="py-2 px-2">{getOperationTypeLabel(o.type)}</td>
+                        <td className="py-2 px-2 text-xs">{formatDisplayId(o.ticketId)}</td>
+                        <td className="py-2 px-2 text-xs">{formatDisplayId(o.eventId)}</td>
                         <td className="py-2 px-2">{o.channel}</td>
                         <td className="py-2 px-2">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${opResultBadge[o.result]}`}>
-                            {o.result === "ok" ? "OK" : "ОТКАЗ"}
+                            {o.result === "ok" ? "Успешно" : "Отказ"}
                           </span>
                         </td>
                         <td className="py-2 px-2 text-xs">{o.reason || "—"}</td>
@@ -260,7 +261,7 @@ export default function TicketHubView({ state, onUpdate, initialTab }: Props) {
             <div className="relative bg-card rounded-lg p-6 shadow-xl max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
               <h3 className="font-semibold mb-3">Выпустить марки?</h3>
               <p className="text-sm opacity-70 mb-4">
-                Будет создано {evt?.capacity} TicketID по вместимости для {confirmIssue}. Продолжить?
+                Будет создано {evt?.capacity} контрольных марок по вместимости для {formatDisplayId(confirmIssue)}. Продолжить?
               </p>
               <div className="flex gap-3 justify-end">
                 <button onClick={() => setConfirmIssue(null)}

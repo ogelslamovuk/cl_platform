@@ -8,7 +8,7 @@
   <rect width="1200" height="675" fill="url(#bg2)"/>
   <circle cx="940" cy="140" r="120" fill="#A78BFA" fill-opacity="0.35"/>
   <circle cx="250" cy="560" r="180" fill="#22D3EE" fill-opacity="0.22"/>
-  <text x="80" y="140" fill="#E5E7EB" font-family="Arial, sans-serif" font-size="44" font-weight="700">TicketHub Demo</text>
-  <text x="80" y="210" fill="#C7D2FE" font-family="Arial, sans-serif" font-size="32" font-weight="600">Постер мероприятия #2</text>
-  <text x="80" y="300" fill="#BFDBFE" font-family="Arial, sans-serif" font-size="24">Локальный demo asset</text>
+  <text x="80" y="140" fill="#E5E7EB" font-family="Arial, sans-serif" font-size="44" font-weight="700">Культурная афиша</text>
+  <text x="80" y="210" fill="#C7D2FE" font-family="Arial, sans-serif" font-size="32" font-weight="600">Фестиваль народной песни</text>
+  <text x="80" y="300" fill="#BFDBFE" font-family="Arial, sans-serif" font-size="24">Гомель · Дворец культуры</text>
 </svg>

@@ -1,13 +1,19 @@
 import { ArrowRight, Building2, ClipboardCheck, RefreshCcw, ShieldCheck, Store, Ticket } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { useStorageSync } from "@/hooks/useStorageSync";
 import { generateDemoData, resetDemoData } from "@/lib/demoEngine";
 import { getPlatformCommissionPercent } from "@/lib/finance";
-import { setPlatformCommissionPercent } from "@/lib/store";
+import {
+  getFeeBaseUnitAmount,
+  getFeeCalculationMode,
+  setFeeCalculationMode,
+  setPlatformCommissionPercent,
+  type FeeCalculationMode,
+} from "@/lib/store";
 import platformLogo from "../../logo.jpg";
 
 type Accent = { border: string; glow: string; iconBg: string; iconColor: string; shadow: string };
@@ -35,6 +41,28 @@ const panelBase: React.CSSProperties = {
   border: "1px solid rgba(255,255,255,0.08)",
   boxShadow: "0 24px 64px rgba(0,0,0,0.36)",
 };
+
+const currentRulesRows = [
+  ["1-150", "3 БВ"],
+  ["151-300", "10 БВ"],
+  ["301-500", "30 БВ"],
+  ["501-1000", "50 БВ"],
+  ["1001-1500", "80 БВ"],
+  ["1501-2000", "100 БВ"],
+  ["2001-3000", "150 БВ"],
+  ["свыше 3000", "200 БВ"],
+  ["нет проектной вместимости, но реализуются билеты", "3 БВ"],
+];
+
+const expandedCalculationRows = [
+  ["Вместимость", "по шкале госпошлины", "по действующей шкале"],
+  ["Площадка", "открытая / нестандартная площадка", "+10% к базовому начислению"],
+  ["Исполнители", "иностранные участники", "+2 БВ"],
+  ["Состав участников", "более 20 участников", "+1 БВ за каждые 10 участников"],
+  ["Билетные операторы", "больше одного оператора", "+1 БВ за оператора"],
+  ["Схема зала", "закреплённые места / сложная схема", "+1 БВ"],
+  ["Постсобытийная сверка", "включена", "+1 БВ"],
+];
 
 function AccentIcon({ icon: Icon, accent }: { icon: LucideIcon; accent: Accent }) {
   return (
@@ -88,6 +116,8 @@ function ToolCard({ tool }: { tool: Tool }) {
 export default function ProtoPage() {
   const { state, update, setState } = useStorageSync();
   const commissionPercent = getPlatformCommissionPercent(state);
+  const feeMode = getFeeCalculationMode(state);
+  const baseUnitAmount = getFeeBaseUnitAmount(state);
   const [draftCommissionPercent, setDraftCommissionPercent] = useState(String(commissionPercent));
 
   useEffect(() => {
@@ -99,16 +129,22 @@ export default function ProtoPage() {
     update({ ...state });
   };
 
+  const selectFeeMode = (mode: FeeCalculationMode) => {
+    setFeeCalculationMode(state, mode);
+    update({ ...state });
+    toast.success("Порядок начисления платежей обновлён");
+  };
+
   const quickCards: Card[] = [
     { title: "Кабинет организатора", description: "Управление мероприятиями, билетами и продажами", route: "/organizer", icon: Building2, accent: accents.violet },
     { title: "Центр управления", description: "Контроль мероприятий, лицензий, билетов, данных и процессов", route: "/admin", icon: ShieldCheck, accent: accents.blue },
-    { title: "Кабинет реселлера", description: "Работа с мероприятиями, билетами и каналами распространения", route: "/channel", icon: Store, accent: accents.emerald },
+    { title: "Кабинет оператора", description: "Работа с мероприятиями, билетами и каналами распространения", route: "/channel", icon: Store, accent: accents.emerald },
     { title: "B2C Афиша", description: "Публичная витрина мероприятий, поиск событий и покупка билетов", route: "/demo", icon: Ticket, accent: accents.violet },
   ];
 
   const tools: Tool[] = [
     { title: "Сбросить демо", description: "Очистить текущие данные и вернуть систему к базовому состоянию", icon: RefreshCcw, accent: accents.violet, action: () => { setState({ ...resetDemoData() }); toast.success("Демо сброшено"); } },
-    { title: "Загрузить mock-данные", description: "Загрузить типовые данные по мероприятиям, билетам и пользователям", icon: ClipboardCheck, accent: accents.blue, action: () => { setState({ ...generateDemoData() }); toast.success("Mock-данные загружены"); } },
+    { title: "Загрузить демо-данные", description: "Загрузить типовые данные по мероприятиям, билетам и пользователям", icon: ClipboardCheck, accent: accents.blue, action: () => { setState({ ...generateDemoData() }); toast.success("Демо-данные загружены"); } },
   ];
 
   return (
@@ -136,7 +172,7 @@ export default function ProtoPage() {
         <section className="mt-6 rounded-[34px] px-6 py-7 md:px-8 md:py-9" style={panelBase}>
           <h1 className="text-[34px] font-semibold leading-[1.04] tracking-[-0.04em] md:text-[52px]">Инструменты прототипа</h1>
           <p className="mt-5 text-[16px] leading-8 text-[rgba(213,223,246,0.82)] md:text-[18px]">Быстрый вход в основные роли и демо-инструменты платформы.</p>
-          <div className="mt-6 flex flex-wrap gap-3">{["Демо-среда", "Быстрый вход", "Тестовые данные"].map((chip) => <span key={chip} className="rounded-full border px-4 py-2 text-[13px]" style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>{chip}</span>)}</div>
+          <div className="mt-6 flex flex-wrap gap-3">{["Демо-среда", "Быстрый вход", "Типовые данные"].map((chip) => <span key={chip} className="rounded-full border px-4 py-2 text-[13px]" style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>{chip}</span>)}</div>
         </section>
 
         <section className="mt-5 rounded-[28px] px-5 py-5 md:px-6 md:py-6" style={panelBase}>
@@ -185,6 +221,84 @@ export default function ProtoPage() {
             <p className="mt-3 text-[14px] leading-6 text-[rgba(203,213,225,0.78)]">
               Используется для расчёта начислений организатора по проданным билетам.
             </p>
+            <div className="mt-6 border-t pt-5" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h4 className="text-[18px] font-semibold leading-7">Порядок начисления платежей</h4>
+                  <p className="mt-1 max-w-3xl text-[14px] leading-6 text-[rgba(203,213,225,0.74)]">
+                    Выберите, как прототип рассчитывает начисления в заявках на мероприятия.
+                  </p>
+                </div>
+                <div className="inline-grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {[
+                    { value: "currentRules" as const, label: "По действующим правилам" },
+                    { value: "expandedCalculation" as const, label: "Расширенный расчёт" },
+                  ].map((option) => {
+                    const active = feeMode === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => selectFeeMode(option.value)}
+                        className="min-h-11 rounded-[12px] border px-4 text-[13px] font-semibold transition"
+                        style={{
+                          borderColor: active ? "rgba(242,201,76,0.62)" : "rgba(255,255,255,0.12)",
+                          background: active ? "rgba(242,201,76,0.16)" : "rgba(255,255,255,0.03)",
+                          color: active ? "#FDE68A" : "#E5E7EB",
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <p className="mt-3 text-[13px] leading-6 text-[rgba(203,213,225,0.68)]">
+                Настройка влияет только на демонстрационные начисления в прототипе и не подключает реальные платежи.
+              </p>
+
+              <div className="mt-4 overflow-hidden rounded-[16px] border" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#07101D" }}>
+                {feeMode === "currentRules" ? (
+                  <div>
+                    <div className="flex flex-col gap-1 border-b px-4 py-3 md:flex-row md:items-center md:justify-between" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                      <div className="text-[15px] font-semibold">Шкала госпошлины</div>
+                      <div className="text-[13px] text-[rgba(203,213,225,0.72)]">Базовая величина: {baseUnitAmount} BYN</div>
+                    </div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_140px] text-[13px]">
+                      <div className="border-b px-4 py-2 font-semibold text-[rgba(233,238,255,0.84)]" style={{ borderColor: "rgba(255,255,255,0.08)" }}>Проектная вместимость / билеты</div>
+                      <div className="border-b px-4 py-2 font-semibold text-[rgba(233,238,255,0.84)]" style={{ borderColor: "rgba(255,255,255,0.08)" }}>Ставка</div>
+                      {currentRulesRows.map(([range, rate]) => (
+                        <Fragment key={range}>
+                          <div className="border-b px-4 py-2 text-[rgba(203,213,225,0.78)]" style={{ borderColor: "rgba(255,255,255,0.06)" }}>{range}</div>
+                          <div className="border-b px-4 py-2 font-semibold text-[#FDE68A]" style={{ borderColor: "rgba(255,255,255,0.06)" }}>{rate}</div>
+                        </Fragment>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="border-b px-4 py-3" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                      <div className="text-[15px] font-semibold">Демо-тарифы расширенного расчёта</div>
+                      <p className="mt-1 text-[13px] leading-5 text-[rgba(203,213,225,0.72)]">
+                        Расширенный расчёт — демонстрационный сценарий для показа детализации начислений; он не является действующим правилом расчёта госпошлины.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-[0.9fr_1.1fr_1fr] text-[13px]">
+                      {["Параметр", "Условие", "Начисление"].map((header) => (
+                        <div key={header} className="border-b px-4 py-2 font-semibold text-[rgba(233,238,255,0.84)]" style={{ borderColor: "rgba(255,255,255,0.08)" }}>{header}</div>
+                      ))}
+                      {expandedCalculationRows.map(([parameter, condition, charge]) => (
+                        <Fragment key={parameter}>
+                          <div className="border-b px-4 py-2 text-[rgba(203,213,225,0.78)]" style={{ borderColor: "rgba(255,255,255,0.06)" }}>{parameter}</div>
+                          <div className="border-b px-4 py-2 text-[rgba(203,213,225,0.78)]" style={{ borderColor: "rgba(255,255,255,0.06)" }}>{condition}</div>
+                          <div className="border-b px-4 py-2 font-semibold text-[#FDE68A]" style={{ borderColor: "rgba(255,255,255,0.06)" }}>{charge}</div>
+                        </Fragment>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </section>
       </div>

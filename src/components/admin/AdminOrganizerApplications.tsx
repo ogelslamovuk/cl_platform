@@ -5,6 +5,7 @@ import { A } from "./adminStyles";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import MockDocumentPreview, { type MockDocumentPreviewData } from "@/components/MockDocumentPreview";
 import { getScopedRegionFilterOptions, isInAdminScope, normalizeRegion, type AdminRegionScope } from "./adminScope";
+import { formatDisplayId } from "@/lib/display";
 
 interface Props { state: AppState; onUpdate: (s: AppState) => void; regionScope?: AdminRegionScope; }
 type StatusFilter = "submitted" | "approved" | "rejected" | "needs_rework" | "all";
@@ -19,10 +20,20 @@ function CardHelp({ text }: { text: string }) {
 
 const statusLabel: Record<string, string> = {
   draft: "Черновик",
-  submitted: "Отправлена",
-  approved: "Одобрена",
+  submitted: "На рассмотрении",
+  approved: "Включён в реестр",
   rejected: "Отклонена",
-  needs_rework: "На доработке",
+  needs_rework: "Требует доработки",
+};
+
+const documentKindLabel: Record<string, string> = {
+  "past-materials": "Материалы опыта",
+  charter: "Устав",
+  registry: "Регистрационные сведения",
+  "past-program": "Программа",
+  "past-material": "Материалы",
+  "registry-statement": "Заявление",
+  "registry-appendix": "Приложение",
 };
 
 export default function AdminOrganizerApplications({ state, onUpdate, regionScope = "all" }: Props) {
@@ -90,7 +101,7 @@ export default function AdminOrganizerApplications({ state, onUpdate, regionScop
           <thead>
             <tr style={{ background: A.tableHeaderBg }}>
               {[
-                "ID",
+                "Номер заявки",
                 "Дата подачи",
                 "Организация",
                 "Регион",
@@ -109,7 +120,7 @@ export default function AdminOrganizerApplications({ state, onUpdate, regionScop
               const organizerDocs = [...r.data.documents, ...r.data.pastMaterials];
               return (
               <tr key={r.organizerApplicationId} style={{ borderTop: `1px solid ${A.border}` }}>
-                <td className="py-2 px-3 font-mono text-xs">{r.organizerApplicationId}</td>
+                <td className="py-2 px-3 text-xs font-semibold">{formatDisplayId(r.organizerApplicationId)}</td>
                 <td className="py-2 px-3">{r.submittedAt ? r.submittedAt.slice(0, 16).replace("T", " ") : "—"}</td>
                 <td className="py-2 px-3">{r.data.legalName}</td>
                 <td className="py-2 px-3">{normalizeRegion(r.data.region)}</td>
@@ -121,7 +132,7 @@ export default function AdminOrganizerApplications({ state, onUpdate, regionScop
                       type="button"
                       onClick={() => setPreviewDoc({
                         title: "Документ руководителя",
-                        fileName: "director_id_mock.pdf",
+                        fileName: "Документ руководителя.pdf",
                         kind: "identity",
                         rows: [["ФИО", r.data.director.fullName], ["Тип", r.data.director.docType], ["Номер", r.data.director.docNumber], ["Организация", r.data.legalName]],
                       })}
@@ -136,7 +147,7 @@ export default function AdminOrganizerApplications({ state, onUpdate, regionScop
                         type="button"
                         onClick={() => setPreviewDoc({
                           title: "Документ работника",
-                          fileName: "worker_id_mock.pdf",
+                          fileName: "Документ работника.pdf",
                           kind: "identity",
                           rows: [["ФИО", worker.fullName], ["Тип", worker.docType], ["Номер", worker.docNumber], ["Организация", r.data.legalName]],
                         })}
@@ -154,12 +165,12 @@ export default function AdminOrganizerApplications({ state, onUpdate, regionScop
                           title: document.name,
                           fileName: document.name,
                           kind: "participation",
-                          rows: [["Файл", document.name], ["Тип", document.kind], ["Статус", document.isSample ? "mock-образец" : "приложен"], ["Заявка", r.organizerApplicationId]],
+                          rows: [["Файл", document.name], ["Тип", documentKindLabel[document.kind] || document.kind], ["Статус", document.isSample ? "образец приложен" : "приложен"], ["Заявка", formatDisplayId(r.organizerApplicationId)]],
                         })}
                         className="rounded border px-2 py-1 text-[11px]"
                         style={{ borderColor: A.border, background: A.surfaceBg, color: A.textPrimary }}
                       >
-                        {document.kind}
+                        {documentKindLabel[document.kind] || document.kind}
                       </button>
                     ))}
                   </div>
