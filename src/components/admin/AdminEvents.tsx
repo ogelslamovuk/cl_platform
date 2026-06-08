@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { A, statusChip } from "./adminStyles";
 import { Calendar, Search, X, Ticket, Globe } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import { formatDisplayId, getTicketStatusLabel } from "@/lib/display";
 
 interface Props { state: AppState; onUpdate: (s: AppState) => void; }
 
@@ -20,23 +21,23 @@ export default function AdminEvents({ state, onUpdate }: Props) {
   const filtered = state.events.filter(e => {
     if (!search) return true;
     const s = search.toLowerCase();
-    return e.eventId.toLowerCase().includes(s) || e.title.toLowerCase().includes(s) || e.venue.toLowerCase().includes(s);
+    return e.eventId.toLowerCase().includes(s) || formatDisplayId(e.eventId).toLowerCase().includes(s) || e.title.toLowerCase().includes(s) || e.venue.toLowerCase().includes(s);
   });
 
   const handlePublish = (eventId: string) => {
     const ok = publishEvent(state, eventId);
     if (!ok) {
-      toast.error("Публикация доступна только для approved события");
+      toast.error("Публикация доступна только для одобренного мероприятия");
       return;
     }
-    toast.success(`Событие ${eventId} опубликовано`);
+    toast.success(`Мероприятие ${formatDisplayId(eventId)} опубликовано`);
     onUpdate({ ...state });
   };
 
   const handleIssue = () => {
     if (!confirmIssue) return;
     const count = issueMarks(state, confirmIssue);
-    if (count > 0) toast.success(`Выпущено ${count} марок для ${confirmIssue}`);
+    if (count > 0) toast.success(`Выпущено ${count} контрольных марок для ${formatDisplayId(confirmIssue)}`);
     else toast.error("Марки уже выпущены");
     setConfirmIssue(null);
     onUpdate({ ...state });
@@ -58,25 +59,25 @@ export default function AdminEvents({ state, onUpdate }: Props) {
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search size={14} style={{ color: A.textMuted }} className="absolute left-3 top-1/2 -translate-y-1/2" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск событий..."
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск мероприятий..."
             className="w-full h-9 pl-9 pr-3 rounded-lg text-sm outline-none"
             style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }} />
         </div>
-        <HelpTooltip text="Поиск работает по EventID, названию и площадке мероприятия." />
+        <HelpTooltip text="Поиск работает по номеру мероприятия, названию и площадке." />
       </div>
 
       <div style={{ background: A.cardBg, border: `1px solid ${A.border}`, borderRadius: 16, boxShadow: A.cardShadow }} className="overflow-hidden">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center py-12">
             <Calendar size={28} style={{ color: A.textMuted }} className="mb-2" />
-            <p style={{ color: A.textMuted }} className="text-sm">Нет событий</p>
+            <p style={{ color: A.textMuted }} className="text-sm">Нет мероприятий</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["EventID", "LicenseID", "Название", "Площадка", "Дата", "Возраст", "Вместимость", "Остаток", "Статус", "Действия"].map((h, i) => (
+                  {["Номер мероприятия", "Номер удостоверения", "Название", "Площадка", "Дата", "Возраст", "Вместимость", "Остаток", "Статус", "Действия"].map((h, i) => (
                     <th key={i} className="text-left py-3 px-4 font-medium text-xs" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>{h}</th>
                   ))}
                 </tr>
@@ -91,8 +92,8 @@ export default function AdminEvents({ state, onUpdate }: Props) {
                       onClick={() => setDrawer(e)}
                       onMouseEnter={ev => (ev.currentTarget.style.background = A.rowHover)}
                       onMouseLeave={ev => (ev.currentTarget.style.background = 'transparent')}>
-                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.cyan }}>{e.eventId}</td>
-                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.textMuted }}>{e.licenseId}</td>
+                      <td className="py-3 px-4 text-xs font-semibold" style={{ color: A.cyan }}>{formatDisplayId(e.eventId)}</td>
+                      <td className="py-3 px-4 text-xs" style={{ color: A.textMuted }}>{formatDisplayId(e.licenseId)}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{e.title}</td>
                       <td className="py-3 px-4" style={{ color: A.textSecondary }}>{e.venue}</td>
                       <td className="py-3 px-4" style={{ color: A.textSecondary }}>{e.dateTime?.replace("T", " ").slice(0, 16)}</td>
@@ -114,7 +115,7 @@ export default function AdminEvents({ state, onUpdate }: Props) {
                         {e.status === "published" && !hasTickets(e.eventId) && (
                           <button onClick={() => setConfirmIssue(e.eventId)} className="text-xs font-medium px-2.5 py-1 rounded-lg transition-colors"
                             style={{ background: A.statusOkBg, color: A.statusOk }}>
-                            <Ticket size={12} className="inline mr-1" />Выпустить марки / TicketID
+                            <Ticket size={12} className="inline mr-1" />Выпустить контрольные марки
                           </button>
                         )}
                       </td>
@@ -135,14 +136,14 @@ export default function AdminEvents({ state, onUpdate }: Props) {
             style={{ background: A.glassGradient + ', ' + A.sidebarBg, borderLeft: `1px solid ${A.borderGlass}` }}
             onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 z-10 flex items-center justify-between p-5" style={{ background: A.topbarBg, backdropFilter: 'blur(16px)', borderBottom: `1px solid ${A.border}` }}>
-              <h3 style={{ color: A.textPrimary }} className="text-base font-semibold">Событие {drawer.eventId}</h3>
+              <h3 style={{ color: A.textPrimary }} className="text-base font-semibold">Мероприятие {formatDisplayId(drawer.eventId)}</h3>
               <button onClick={() => setDrawer(null)} style={{ color: A.textMuted }}><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
-              {([["Название", drawer.title], ["Площадка", drawer.venue], ["Дата", drawer.dateTime?.replace("T", " ")], ["Возрастная категория", getComplianceByEvent(drawer.eventId)?.data.ageCategory || "—"], ["Вместимость", String(drawer.capacity)], ["Остаток", String(drawer.remaining)], ["LicenseID", drawer.licenseId], ["Заявка", drawer.complianceApplicationId || drawer.appId || "—"]] as [string, string][]).map(([k, v]) => (
+              {([["Название", drawer.title], ["Площадка", drawer.venue], ["Дата", drawer.dateTime?.replace("T", " ")], ["Возрастная категория", getComplianceByEvent(drawer.eventId)?.data.ageCategory || "—"], ["Вместимость", String(drawer.capacity)], ["Остаток", String(drawer.remaining)], ["Номер удостоверения", formatDisplayId(drawer.licenseId)], ["Заявка", formatDisplayId(drawer.complianceApplicationId || drawer.appId)]] as [string, string][]).map(([k, v]) => (
                 <div key={k}>
                   <div style={{ color: A.textMuted }} className="text-xs font-medium mb-1">{k}</div>
-                  <div style={{ color: A.textPrimary }} className="text-sm font-mono">{v}</div>
+                  <div style={{ color: A.textPrimary }} className="text-sm">{v}</div>
                 </div>
               ))}
               {(() => {
@@ -187,7 +188,7 @@ export default function AdminEvents({ state, onUpdate }: Props) {
                     <div className="grid grid-cols-2 gap-2">
                       {Object.entries(counts).map(([k, v]) => (
                         <div key={k} className="text-xs py-1.5 px-2 rounded-lg" style={{ background: A.surfaceBg, color: A.textSecondary }}>
-                          <span style={{ color: A.textPrimary }} className="font-semibold mr-1">{v}</span>{k}
+                          <span style={{ color: A.textPrimary }} className="font-semibold mr-1">{v}</span>{getTicketStatusLabel(k)}
                         </div>
                       ))}
                     </div>
@@ -222,7 +223,7 @@ export default function AdminEvents({ state, onUpdate }: Props) {
             <div className="relative max-w-sm w-full p-6 rounded-2xl" onClick={e => e.stopPropagation()}
               style={{ background: A.glassGradient + ', ' + A.cardBg, border: `1px solid ${A.borderGlass}`, boxShadow: A.cardShadow }}>
               <h3 style={{ color: A.textPrimary }} className="font-semibold mb-3">Выпустить марки?</h3>
-              <p style={{ color: A.textSecondary }} className="text-sm mb-5">Будет создано {evt?.capacity} TicketID для {confirmIssue}</p>
+              <p style={{ color: A.textSecondary }} className="text-sm mb-5">Будет создано {evt?.capacity} контрольных марок для {formatDisplayId(confirmIssue)}</p>
               <div className="flex gap-3 justify-end">
                 <button onClick={() => setConfirmIssue(null)} className="px-4 h-9 rounded-xl text-sm font-medium"
                   style={{ border: `1px solid ${A.borderLight}`, color: A.textPrimary }}>Отмена</button>

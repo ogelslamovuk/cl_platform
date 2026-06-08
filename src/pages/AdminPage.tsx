@@ -160,7 +160,7 @@ export default function AdminPage() {
         <div className="px-4 py-3" style={{ borderTop: `1px solid ${A.border}` }}>
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full" style={{ background: A.statusOk }} />
-            <span className="text-[11px]" style={{ color: A.textMuted }}>Sync: {syncTime}</span>
+            <span className="text-[11px]" style={{ color: A.textMuted }}>Обновлено: {syncTime}</span>
           </div>
         </div>
       </aside>
@@ -185,7 +185,6 @@ export default function AdminPage() {
                 onChange={(event) => setAdminRegionScope(event.target.value as AdminRegionScope)}
                 className="bg-transparent text-xs outline-none"
                 style={{ color: A.textPrimary }}
-                title="Режим доступа администратора"
               >
                 <option value="all">Республиканский уровень / Супер-админ</option>
                 <option value="Могилёвская область">Региональный сотрудник · Могилёвская область</option>

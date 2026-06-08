@@ -3,10 +3,12 @@ import type { AppState, Ticket } from "@/lib/store";
 import { A, tktStatusChip } from "./adminStyles";
 import { Ticket as TicketIcon, Search, X } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import { formatPublicId } from "@/lib/display";
 
 interface Props { state: AppState; }
 
 const tktStatusLabel: Record<string, string> = { issued: "Выпущен", sold: "Продан", refunded: "Возврат", redeemed: "Погашен" };
+const opTypeLabel: Record<string, string> = { sell: "Продажа", refund: "Возврат", redeem: "Погашение", verify: "Проверка" };
 
 export default function AdminTickets({ state }: Props) {
   const [search, setSearch] = useState("");
@@ -26,7 +28,9 @@ export default function AdminTickets({ state }: Props) {
         const s = search.toLowerCase();
         return (
           t.ticketId.toLowerCase().includes(s) ||
+          formatPublicId(t.ticketId).toLowerCase().includes(s) ||
           t.eventId.toLowerCase().includes(s) ||
+          formatPublicId(t.eventId).toLowerCase().includes(s) ||
           (event?.title || "").toLowerCase().includes(s) ||
           (t.tier || "").toLowerCase().includes(s)
         );
@@ -40,7 +44,7 @@ export default function AdminTickets({ state }: Props) {
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search size={14} style={{ color: A.textMuted }} className="absolute left-3 top-1/2 -translate-y-1/2" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по TicketID..."
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по номеру билета..."
             className="w-full h-9 pl-9 pr-3 rounded-lg text-sm outline-none"
             style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }} />
         </div>
@@ -56,7 +60,7 @@ export default function AdminTickets({ state }: Props) {
           <option value="">Все события</option>
           {uniqueEvents.map(eventId => {
             const event = eventsById.get(eventId);
-            const label = event?.title ? `${event.title} · ${event.date}` : eventId;
+            const label = event?.title ? `${event.title} · ${event.dateTime?.replace("T", " ").slice(0, 16)}` : formatPublicId(eventId);
             return <option key={eventId} value={eventId}>{label}</option>;
           })}
         </select>
@@ -74,7 +78,7 @@ export default function AdminTickets({ state }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["TicketID", "Мероприятие", "EventID", "Тариф", "Стоимость", "Статус", "Канал", "Покупатель", "Обновлён"].map((h, i) => (
+                  {["Номер билета", "Мероприятие", "Номер мероприятия", "Тариф", "Стоимость", "Статус", "Канал", "Покупатель", "Обновлён"].map((h, i) => (
                     <th key={i} className="text-left py-3 px-4 font-medium text-xs" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>{h}</th>
                   ))}
                 </tr>
@@ -91,9 +95,9 @@ export default function AdminTickets({ state }: Props) {
                       onClick={() => setDrawer(t)}
                       onMouseEnter={e => (e.currentTarget.style.background = A.rowHover)}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.cyan }}>{t.ticketId}</td>
+                      <td className="py-3 px-4 text-xs" style={{ color: A.cyan }}>{formatPublicId(t.ticketId)}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{event?.title || "—"}</td>
-                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.textMuted }}>{t.eventId}</td>
+                      <td className="py-3 px-4 text-xs" style={{ color: A.textMuted }}>{formatPublicId(t.eventId)}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{t.tier}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{ticketPrice}</td>
                       <td className="py-3 px-4">
@@ -126,17 +130,17 @@ export default function AdminTickets({ state }: Props) {
             style={{ background: A.glassGradient + ', ' + A.sidebarBg, borderLeft: `1px solid ${A.borderGlass}` }}
             onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 z-10 flex items-center justify-between p-5" style={{ background: A.topbarBg, backdropFilter: 'blur(16px)', borderBottom: `1px solid ${A.border}` }}>
-              <h3 style={{ color: A.textPrimary }} className="text-base font-semibold">{drawer.ticketId}</h3>
+              <h3 style={{ color: A.textPrimary }} className="text-base font-semibold">{formatPublicId(drawer.ticketId)}</h3>
               <button onClick={() => setDrawer(null)} style={{ color: A.textMuted }}><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
               <div className="flex items-center gap-2">
                 {(() => { const c = tktStatusChip(drawer.status); return <span style={{ background: c.bg, color: c.color, borderRadius: 999 }} className="text-xs px-3 py-1 font-semibold">{tktStatusLabel[drawer.status]}</span>; })()}
               </div>
-              {([["Мероприятие", event?.title || "—"], ["EventID", drawer.eventId], ["Тариф", drawer.tier], ["Стоимость", ticketPrice], ["Канал", drawer.soldByChannel || "—"], ["Покупатель", drawer.soldToUserId || "—"], ["Создан", drawer.createdAt?.replace("T", " ").slice(0, 16)], ["Обновлён", drawer.updatedAt?.replace("T", " ").slice(0, 16)]] as [string, string][]).map(([k, v]) => (
+              {([["Мероприятие", event?.title || "—"], ["Номер мероприятия", formatPublicId(drawer.eventId)], ["Тариф", drawer.tier], ["Стоимость", ticketPrice], ["Канал", drawer.soldByChannel || "—"], ["Покупатель", drawer.soldToUserId || "—"], ["Создан", drawer.createdAt?.replace("T", " ").slice(0, 16)], ["Обновлён", drawer.updatedAt?.replace("T", " ").slice(0, 16)]] as [string, string][]).map(([k, v]) => (
                 <div key={k}>
                   <div style={{ color: A.textMuted }} className="text-xs font-medium mb-1">{k}</div>
-                  <div style={{ color: A.textPrimary }} className="text-sm font-mono">{v}</div>
+                  <div style={{ color: A.textPrimary }} className="text-sm">{v}</div>
                 </div>
               ))}
               {/* Related ops */}
@@ -149,8 +153,8 @@ export default function AdminTickets({ state }: Props) {
                     <div className="space-y-1.5">
                       {relOps.map(o => (
                         <div key={o.opId} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg" style={{ background: A.surfaceBg }}>
-                          <span style={{ color: A.textPrimary }}>{o.type}</span>
-                          <span style={{ color: o.result === 'ok' ? A.statusOk : A.statusError }}>{o.result === 'ok' ? 'OK' : 'ОТКАЗ'}</span>
+                          <span style={{ color: A.textPrimary }}>{opTypeLabel[o.type] || o.type}</span>
+                          <span style={{ color: o.result === 'ok' ? A.statusOk : A.statusError }}>{o.result === 'ok' ? 'Успешно' : 'Отказ'}</span>
                         </div>
                       ))}
                     </div>

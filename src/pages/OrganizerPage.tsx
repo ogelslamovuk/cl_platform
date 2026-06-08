@@ -302,7 +302,7 @@ export default function OrganizerPage() {
 
   const openUnpCheck = () => {
     if (!isOrganizerApproved) {
-      toast.success(`УНП подтвержден: ${organizer.unp || "—"}. Сведения синхронизированы в demo-режиме.`);
+      toast.success(`УНП подтвержден: ${organizer.unp || "—"}. Сведения синхронизированы в демонстрационном режиме.`);
       return;
     }
     toast.success(`УНП подтвержден: ${organizer.unp}. Организатор зарегистрирован в реестре. Данные актуальны на 15.04.2026.`);

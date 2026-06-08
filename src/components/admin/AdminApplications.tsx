@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { A, appStatusChip, statusChip } from "./adminStyles";
 import { FileText, Search, ShieldCheck, AlertTriangle, X, CheckCircle, XCircle, Clock } from "lucide-react";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import { formatDisplayId } from "@/lib/display";
 
 interface Props {
   state: AppState;
@@ -19,13 +20,11 @@ const statusLabel: Record<string, string> = {
   draft: "Черновик", submitted: "Отправлена", approved: "Одобрена", rejected: "Отклонена",
 };
 
-// Mock registry / fee data for approve gating
+// Локальные проверки для демонстрационного согласования заявки.
 function checkRegistry(app: Application): boolean {
-  // Mock: apps with "Концерт" in title pass registry
   return app.title.toLowerCase().includes("концерт") || app.title.toLowerCase().includes("фестиваль") || app.title.toLowerCase().includes("спектакль");
 }
 function checkFeePaid(app: Application): boolean {
-  // Mock: apps with capacity <= 500 have fee paid
   return app.capacity <= 500;
 }
 
@@ -35,7 +34,7 @@ function matchesApplicationFilters(app: Application, filterStatus: string, block
   if (filterStatus && app.status !== filterStatus) return false;
   if (!query) return true;
   const s = query.toLowerCase();
-  return app.appId.toLowerCase().includes(s) || app.title.toLowerCase().includes(s) || app.venue.toLowerCase().includes(s);
+  return app.appId.toLowerCase().includes(s) || formatDisplayId(app.appId).toLowerCase().includes(s) || app.title.toLowerCase().includes(s) || app.venue.toLowerCase().includes(s);
 }
 
 export default function AdminApplications({ state, onUpdate, title, subtitle, fixedStatus, hideKpi }: Props) {
@@ -68,10 +67,10 @@ export default function AdminApplications({ state, onUpdate, title, subtitle, fi
     const { app, action } = confirm;
     if (action === "approve") {
       const res = approveApplication(state, app.appId);
-      if (res) toast.success(`Одобрено. LicenseID=${res.licenseId}, EventID=${res.eventId}`);
+      if (res) toast.success(`Одобрено. Удостоверение ${formatDisplayId(res.licenseId)}, мероприятие ${formatDisplayId(res.eventId)}`);
     } else {
       rejectApplication(state, app.appId);
-      toast.success(`Заявка ${app.appId} отклонена`);
+      toast.success(`Заявка ${formatDisplayId(app.appId)} отклонена`);
     }
     setConfirm(null);
     setDrawerApp(null);
@@ -130,11 +129,11 @@ export default function AdminApplications({ state, onUpdate, title, subtitle, fi
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search size={14} style={{ color: A.textMuted }} className="absolute left-3 top-1/2 -translate-y-1/2" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по ID, названию, площадке..."
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск по номеру, названию, площадке..."
             className="w-full h-9 pl-9 pr-3 rounded-lg text-sm outline-none"
             style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }} />
         </div>
-        <HelpTooltip text="Поиск работает по ID заявки, названию мероприятия и площадке." />
+        <HelpTooltip text="Поиск работает по номеру заявки, названию мероприятия и площадке." />
         {!fixedStatus && (
           <>
             <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setKpiFilter(""); }}
@@ -163,7 +162,7 @@ export default function AdminApplications({ state, onUpdate, title, subtitle, fi
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
-                  {["APP ID", "Мероприятие", "Площадка", "Дата", "Вместимость", "УНП", "Пошлина", "Статус", ""].map((h, i) => (
+                  {["Номер заявки", "Мероприятие", "Площадка", "Дата", "Вместимость", "УНП", "Пошлина", "Статус", ""].map((h, i) => (
                     <th key={i} className="text-left py-3 px-4 font-medium text-xs" style={{ color: A.textSecondary, borderBottom: `1px solid ${A.border}` }}>{h}</th>
                   ))}
                 </tr>
@@ -181,19 +180,19 @@ export default function AdminApplications({ state, onUpdate, title, subtitle, fi
                       onClick={() => setDrawerApp(a)}
                       onMouseEnter={e => (e.currentTarget.style.background = A.rowHover)}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <td className="py-3 px-4 font-mono text-xs" style={{ color: A.cyan }}>{a.appId}</td>
+                      <td className="py-3 px-4 text-xs font-semibold" style={{ color: A.cyan }}>{formatDisplayId(a.appId)}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{a.title}</td>
                       <td className="py-3 px-4" style={{ color: A.textSecondary }}>{a.venue}</td>
                       <td className="py-3 px-4" style={{ color: A.textSecondary }}>{a.dateTime?.replace("T", " ").slice(0, 16)}</td>
                       <td className="py-3 px-4" style={{ color: A.textPrimary }}>{a.capacity}</td>
                       <td className="py-3 px-4">
                         <span style={{ background: regChip.bg, color: regChip.color, borderRadius: 999 }} className="text-xs px-2 py-0.5 font-medium">
-                          {regOk ? "OK" : "FAIL"}
+                          {regOk ? "Проверено" : "Не найден"}
                         </span>
                       </td>
                       <td className="py-3 px-4">
                         <span style={{ background: feeChip.bg, color: feeChip.color, borderRadius: 999 }} className="text-xs px-2 py-0.5 font-medium">
-                          {feeOk ? "PAID" : "UNPAID"}
+                          {feeOk ? "Оплачено" : "Ожидает"}
                         </span>
                       </td>
                       <td className="py-3 px-4">
@@ -222,7 +221,7 @@ export default function AdminApplications({ state, onUpdate, title, subtitle, fi
             onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="sticky top-0 z-10 flex items-center justify-between p-5" style={{ background: A.topbarBg, backdropFilter: 'blur(16px)', borderBottom: `1px solid ${A.border}` }}>
-              <h3 style={{ color: A.textPrimary }} className="text-base font-semibold">Заявка {drawerApp.appId}</h3>
+              <h3 style={{ color: A.textPrimary }} className="text-base font-semibold">Заявка {formatDisplayId(drawerApp.appId)}</h3>
               <button onClick={() => setDrawerApp(null)} style={{ color: A.textMuted }} className="hover:opacity-80"><X size={18} /></button>
             </div>
             <div className="p-5 space-y-5">
@@ -265,17 +264,17 @@ export default function AdminApplications({ state, onUpdate, title, subtitle, fi
                       <div className="text-xs font-semibold" style={{ color: A.textSecondary }}>Проверки</div>
                       <div className="flex items-center gap-2">
                         {regOk ? <CheckCircle size={14} style={{ color: A.statusOk }} /> : <XCircle size={14} style={{ color: A.statusError }} />}
-                        <span style={{ color: regOk ? A.statusOk : A.statusError }} className="text-sm">УНП: {regOk ? "OK — в реестре" : "FAIL — не найден в реестре"}</span>
+                        <span style={{ color: regOk ? A.statusOk : A.statusError }} className="text-sm">УНП: {regOk ? "проверен в реестре" : "не найден в реестре"}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {feeOk ? <CheckCircle size={14} style={{ color: A.statusOk }} /> : <XCircle size={14} style={{ color: A.statusWarn }} />}
-                        <span style={{ color: feeOk ? A.statusOk : A.statusWarn }} className="text-sm">Пошлина: {feeOk ? "PAID" : "UNPAID"}</span>
+                        <span style={{ color: feeOk ? A.statusOk : A.statusWarn }} className="text-sm">Пошлина: {feeOk ? "оплачена" : "ожидает оплаты"}</span>
                       </div>
                     </div>
                     {!canApprove && (
                       <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: A.statusErrorBg }}>
                         <AlertTriangle size={14} style={{ color: A.statusError }} />
-                        <span style={{ color: A.statusError }} className="text-xs">Approve заблокирован: {!regOk ? "УНП не в реестре" : ""}{!regOk && !feeOk ? ", " : ""}{!feeOk ? "пошлина не оплачена" : ""}</span>
+                        <span style={{ color: A.statusError }} className="text-xs">Одобрение заблокировано: {!regOk ? "УНП не в реестре" : ""}{!regOk && !feeOk ? ", " : ""}{!feeOk ? "пошлина не оплачена" : ""}</span>
                       </div>
                     )}
                     <div className="flex gap-3 pt-2">
@@ -296,8 +295,8 @@ export default function AdminApplications({ state, onUpdate, title, subtitle, fi
               {drawerApp.status === "approved" && drawerApp.licenseId && (
                 <div style={{ background: A.statusOkBg, borderRadius: 12 }} className="p-4 space-y-2">
                   <div className="flex items-center gap-2"><CheckCircle size={14} style={{ color: A.statusOk }} /><span style={{ color: A.statusOk }} className="text-sm font-semibold">Одобрена</span></div>
-                  <div style={{ color: A.textSecondary }} className="text-xs">LicenseID: <span className="font-mono" style={{ color: A.textPrimary }}>{drawerApp.licenseId}</span></div>
-                  <div style={{ color: A.textSecondary }} className="text-xs">EventID: <span className="font-mono" style={{ color: A.textPrimary }}>{drawerApp.eventId}</span></div>
+                  <div style={{ color: A.textSecondary }} className="text-xs">Номер удостоверения: <span style={{ color: A.textPrimary }}>{formatDisplayId(drawerApp.licenseId)}</span></div>
+                  <div style={{ color: A.textSecondary }} className="text-xs">Номер мероприятия: <span style={{ color: A.textPrimary }}>{formatDisplayId(drawerApp.eventId)}</span></div>
                 </div>
               )}
             </div>
@@ -314,7 +313,7 @@ export default function AdminApplications({ state, onUpdate, title, subtitle, fi
             <h3 style={{ color: A.textPrimary }} className="font-semibold mb-3">
               {confirm.action === "approve" ? "Одобрить заявку?" : "Отклонить заявку?"}
             </h3>
-            <p style={{ color: A.textSecondary }} className="text-sm mb-5">{confirm.app.title} ({confirm.app.appId})</p>
+            <p style={{ color: A.textSecondary }} className="text-sm mb-5">{confirm.app.title} ({formatDisplayId(confirm.app.appId)})</p>
             <div className="flex gap-3 justify-end">
               <button onClick={() => setConfirm(null)} className="px-4 h-9 rounded-xl text-sm font-medium"
                 style={{ border: `1px solid ${A.borderLight}`, color: A.textPrimary }}>Отмена</button>

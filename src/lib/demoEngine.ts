@@ -349,7 +349,7 @@ const DEMO_APPS: DemoAppSeed[] = [
     hallId: "hall_ncca_minsk",
     layoutId: "layout_ncca_minsk",
     category: "Концерты",
-    description: "Международная культурная программа с белорусскими коллективами и приглашённым demo-ансамблем.",
+    description: "Международная культурная программа с белорусскими коллективами и приглашённым ансамблем.",
     daysOffset: 36,
     time: "19:00",
     poster: DEMO_POSTERS.siabroustvaKultur,
@@ -1127,12 +1127,12 @@ function ensureOrganizerApplications(state: AppState): void {
         website: "https://minskconcert.demo.example",
         email: "minskconcert@demo.example",
         ownershipType: "state",
-        director: { fullName: "Савицкий Андрей Викторович", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" },
-        workers: [{ fullName: "Горбач Мария Александровна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }, { fullName: "Курило Павел Иванович", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }],
+        director: { fullName: "Савицкий Андрей Викторович", docType: "паспорт", docNumber: "BY-240115-01", issueDate: "2024-01-15", issueAuthority: "орган регистрации" },
+        workers: [{ fullName: "Горбач Мария Александровна", docType: "паспорт", docNumber: "BY-240115-02", issueDate: "2024-01-15", issueAuthority: "орган регистрации" }, { fullName: "Курило Павел Иванович", docType: "паспорт", docNumber: "BY-240115-03", issueDate: "2024-01-15", issueAuthority: "орган регистрации" }],
         founders: [],
         activities: ["концертная деятельность", "фестивали", "городские культурные программы"],
         activityOther: "координация городских культурных площадок",
-        pastEventsDescription: "Городские концерты, фестивали народного творчества и программы ко Дню Независимости в demo-периоде.",
+        pastEventsDescription: "Городские концерты, фестивали народного творчества и программы ко Дню Независимости за предыдущий сезон.",
         pastMaterials: [attachment("ORGAPP-001-MAT-1", "Фотоотчёт городского концерта.pdf", "past-materials", "2026-04-01T09:10:00")],
         documents: [attachment("ORGAPP-001-DOC-1", "Устав учреждения.pdf", "charter", "2026-04-01T09:12:00"), attachment("ORGAPP-001-DOC-2", "Выписка из реестра.pdf", "registry", "2026-04-01T09:13:00")],
         confirmations: { isAccurate: true, adminReviewConsent: true },
@@ -1145,7 +1145,7 @@ function ensureOrganizerApplications(state: AppState): void {
       status: "approved",
       submittedAt: "2026-04-02T10:00:00",
       reviewedAt: "2026-04-04T12:00:00",
-      adminComment: "Государственная организация культуры включена в демонстрационный реестр.",
+        adminComment: "Государственная организация культуры включена в реестр.",
       data: {
         legalName: "Государственное учреждение «Белорусская государственная ордена Трудового Красного Знамени филармония»",
         registrationNumber: "100600222",
@@ -1160,8 +1160,8 @@ function ensureOrganizerApplications(state: AppState): void {
         website: "https://philharmonic.demo.example",
         email: "philharmonic@culture-demo.example",
         ownershipType: "state",
-        director: { fullName: "Ковалёва Марина Сергеевна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" },
-        workers: [{ fullName: "Семенюк Ирина Олеговна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }, { fullName: "Мартынов Денис Викторович", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }],
+        director: { fullName: "Ковалёва Марина Сергеевна", docType: "паспорт", docNumber: "BY-240115-04", issueDate: "2024-01-15", issueAuthority: "орган регистрации" },
+        workers: [{ fullName: "Семенюк Ирина Олеговна", docType: "паспорт", docNumber: "BY-240115-05", issueDate: "2024-01-15", issueAuthority: "орган регистрации" }, { fullName: "Мартынов Денис Викторович", docType: "паспорт", docNumber: "BY-240115-06", issueDate: "2024-01-15", issueAuthority: "орган регистрации" }],
         founders: [],
         activities: ["академическая музыка", "народная музыка", "конкурсы исполнителей"],
         activityOther: "концертное сопровождение государственных культурных программ",
@@ -1193,9 +1193,9 @@ function ensureOrganizerApplications(state: AppState): void {
         website: "https://culture-initiative.demo.example",
         email: "office@culture-initiative.example",
         ownershipType: "private",
-        director: { fullName: "Лисовская Наталья Павловна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" },
-        workers: [{ fullName: "Бондарь Артём Игоревич", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }, { fullName: "Гринкевич Ольга Юрьевна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }],
-        founders: [{ fullName: "Лисовская Наталья Павловна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }],
+        director: { fullName: "Лисовская Наталья Павловна", docType: "паспорт", docNumber: "BY-240115-07", issueDate: "2024-01-15", issueAuthority: "орган регистрации" },
+        workers: [{ fullName: "Бондарь Артём Игоревич", docType: "паспорт", docNumber: "BY-240115-08", issueDate: "2024-01-15", issueAuthority: "орган регистрации" }, { fullName: "Гринкевич Ольга Юрьевна", docType: "паспорт", docNumber: "BY-240115-09", issueDate: "2024-01-15", issueAuthority: "орган регистрации" }],
+        founders: [{ fullName: "Лисовская Наталья Павловна", docType: "паспорт", docNumber: "BY-240115-10", issueDate: "2024-01-15", issueAuthority: "орган регистрации" }],
         activities: ["выставочные программы", "театральные фестивали", "ремесленные проекты"],
         activityOther: "партнёрские проекты с музеями и домами культуры",
         pastEventsDescription: "Выставочные программы, театральные форумы и фестивали ремёсел в областных центрах.",
@@ -1226,9 +1226,9 @@ function ensureOrganizerApplications(state: AppState): void {
         website: "https://fest-scene.demo.example",
         email: "registry@fest-scene.example",
         ownershipType: "private",
-        director: { fullName: "Руденко Олег Николаевич", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" },
-        workers: [{ fullName: "Климова Елена Андреевна", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }, { fullName: "Сташкевич Роман Петрович", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }],
-        founders: [{ fullName: "Руденко Олег Николаевич", docType: "demo ID", docNumber: "demo-record", issueDate: "2024-01-15", issueAuthority: "Demo registry office" }],
+        director: { fullName: "Руденко Олег Николаевич", docType: "паспорт", docNumber: "BY-240115-11", issueDate: "2024-01-15", issueAuthority: "орган регистрации" },
+        workers: [{ fullName: "Климова Елена Андреевна", docType: "паспорт", docNumber: "BY-240115-12", issueDate: "2024-01-15", issueAuthority: "орган регистрации" }, { fullName: "Сташкевич Роман Петрович", docType: "паспорт", docNumber: "BY-240115-13", issueDate: "2024-01-15", issueAuthority: "орган регистрации" }],
+        founders: [{ fullName: "Руденко Олег Николаевич", docType: "паспорт", docNumber: "BY-240115-14", issueDate: "2024-01-15", issueAuthority: "орган регистрации" }],
         activities: ["детские культурные программы", "областные праздники", "хореографические шоу"],
         activityOther: "техническое сопровождение сценических программ",
         pastEventsDescription: "Праздничные программы домов культуры, детские спектакли и хореографические концерты.",
@@ -1313,12 +1313,12 @@ function buildComplianceData(state: AppState, seed: DemoComplianceSeed): EventCo
   const venue = eventSeed ? state.venueRegistry.find((item) => item.venueId === eventSeed.venueId) : null;
   const hall = eventSeed && venue ? venue.halls.find((item) => item.hallId === eventSeed.hallId) : null;
   const basePerformers: EventComplianceData["performers"] = [
-    { name: "Ансамбль «Спадчына»", performerType: "group", country: "Беларусь", representative: "Demo Culture Office", comment: "Белорусские исполнители, demo-сценарий", documentName: "participant_id_mock.pdf", documentStatus: "mock-документ участника приложен" },
+    { name: "Ансамбль «Спадчына»", performerType: "group", country: "Беларусь", representative: "Координатор программы", comment: "Белорусские исполнители, документы приложены", documentName: "Список исполнителей.pdf", documentStatus: "документ участника приложен" },
   ];
   const performers = hasForeignPerformers
     ? [
         ...basePerformers,
-        { name: "Ensemble Baltic Folk", performerType: "group" as const, country: "Литва", representative: "Demo Culture Agency", comment: "Иностранные исполнители, demo-сценарий", documentName: "foreign_entry_permit_mock.pdf", documentStatus: "mock-виза / разрешение приложены" },
+        { name: "Ensemble Baltic Folk", performerType: "group" as const, country: "Литва", representative: "Культурное агентство", comment: "Иностранные исполнители, разрешительные документы приложены", documentName: "Разрешение на въезд.pdf", documentStatus: "виза / разрешение приложены" },
       ]
     : basePerformers;
   const approvalMode = seed.approvalMode || "certificate_required";
@@ -1338,8 +1338,8 @@ function buildComplianceData(state: AppState, seed: DemoComplianceSeed): EventCo
     posterPath: eventSeed?.poster || DEMO_POSTERS.vasilkovyKraj,
     salesChannels: eventSeed?.salesChannels ? [...eventSeed.salesChannels] : ["OWN"],
     dateSlots: eventSeed ? [toDateTime(eventSeed.daysOffset, eventSeed.time)] : ["2026-06-01T19:00"],
-    venueName: venue?.name || eventSeed?.venue || "Demo venue",
-    venueAddress: venue?.address || (eventSeed ? eventSeed.city + ", demo-адрес площадки" : "г. Минск, demo-адрес площадки"),
+    venueName: venue?.name || eventSeed?.venue || "Культурная площадка",
+    venueAddress: venue?.address || (eventSeed ? eventSeed.city + ", адрес площадки уточняется" : "г. Минск, адрес площадки уточняется"),
     venueId: eventSeed?.venueId,
     hallId: eventSeed?.hallId,
     layoutId: eventSeed?.capacityOnly ? undefined : eventSeed?.layoutId,
@@ -1352,23 +1352,23 @@ function buildComplianceData(state: AppState, seed: DemoComplianceSeed): EventCo
     plannedTicketsForSale: capacity,
     ticketTiers: tiers,
     ageCategory: seed.age,
-    ageComment: "Возрастная категория определена по содержанию demo-программы и информационной продукции.",
+    ageComment: "Возрастная категория определена по содержанию программы и информационной продукции.",
     approvalMode,
     approvalBasis,
     eventDocuments: [
-      attachment(seed.id + "-program", "program_outline_mock.pdf", "event-program", submittedAt),
-      attachment(seed.id + "-venue", "venue_contract_mock.pdf", "venue-contract", submittedAt),
-      attachment(seed.id + "-participation", "participation_confirmation_mock.pdf", "participation-confirmation", submittedAt),
-      attachment(seed.id + "-poster", "poster_layout_mock.pdf", "poster-layout", submittedAt),
+      attachment(seed.id + "-program", "Программа мероприятия.pdf", "event-program", submittedAt),
+      attachment(seed.id + "-venue", "Договор с площадкой.pdf", "venue-contract", submittedAt),
+      attachment(seed.id + "-participation", "Список исполнителей.pdf", "participation-confirmation", submittedAt),
+      attachment(seed.id + "-poster", "Афиша мероприятия.pdf", "poster-layout", submittedAt),
     ],
     venueContractStatus: "приложен",
     salesStartDate: "2026-05-12",
     feeExempt: Boolean(seed.feeExempt),
-    feeExemptReason: seed.feeExempt ? "Мероприятие проводится в рамках государственной культурной demo-программы; применено освобождение от пошлины." : "Освобождение от пошлины не применяется.",
+    feeExemptReason: seed.feeExempt ? "Мероприятие проводится в рамках государственной культурной программы; применено освобождение от пошлины." : "Освобождение от пошлины не применяется.",
     feePaid: Boolean(seed.feePaid),
-    paymentAttachments: seed.feePaid ? [attachment(seed.id + "-payment", "Платёжное поручение demo.pdf", "fee-payment", submittedAt)] : [],
+    paymentAttachments: seed.feePaid ? [attachment(seed.id + "-payment", "Квитанция об оплате пошлины.pdf", "fee-payment", submittedAt)] : [],
     paymentComment: seed.feePaid
-      ? "Пошлина оплачена по demo-платёжному поручению."
+      ? "Пошлина оплачена по платёжному поручению."
       : seed.feeExempt
         ? "Пошлина не начисляется по заявленному основанию освобождения."
         : "Оплата будет подтверждена после административной проверки.",
@@ -1518,7 +1518,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       adminComment: "Заявка с иностранными исполнителями ожидает проверки состава участников.",
       title: "Международная программа «Сяброўства культур»",
       age: "12+",
-      program: "Белорусский музыкальный блок, выступление приглашённого demo-ансамбля, совместный финал и встреча культурных координаторов.",
+      program: "Белорусский музыкальный блок, выступление приглашённого ансамбля, совместный финал и встреча культурных координаторов.",
       hasForeignPerformers: true,
       feePaid: true,
       executiveCommitteeNotified: true,
@@ -1607,7 +1607,7 @@ function ensureCertificatesForPublishedEvents(state: AppState): void {
         status: "approved",
         submittedAt: event.createdAt,
         reviewedAt: event.updatedAt,
-        adminComment: "Заявка согласована в рамках demo-сценария опубликованного мероприятия.",
+        adminComment: "Заявка согласована по опубликованному мероприятию.",
         certificateNumber,
         certificateDate,
         title: event.title,
@@ -1642,7 +1642,7 @@ function ensureCertificatesForPublishedEvents(state: AppState): void {
     compliance.data.posterPath = event.poster || compliance.data.posterPath;
     compliance.data.salesChannels = event.salesChannels || compliance.data.salesChannels || ["OWN"];
     compliance.data.venueName = event.venue || compliance.data.venueName;
-    compliance.data.venueAddress = state.venueRegistry.find((venue) => venue.venueId === event.venueId)?.address || compliance.data.venueAddress || event.city + ", demo-адрес площадки";
+    compliance.data.venueAddress = state.venueRegistry.find((venue) => venue.venueId === event.venueId)?.address || compliance.data.venueAddress || event.city + ", адрес площадки уточняется";
     compliance.data.venueId = event.venueId;
     compliance.data.hallId = event.hallId;
     compliance.data.layoutId = event.layoutId;
@@ -1652,14 +1652,14 @@ function ensureCertificatesForPublishedEvents(state: AppState): void {
     compliance.data.ticketTiers = event.tiers.map((tier) => ({ ...tier }));
     compliance.data.program ||= "Основная культурная программа, сценический блок и заключительная часть.";
     compliance.data.salesStartDate ||= "2026-05-12";
-    compliance.data.ageComment ||= "Возрастная категория подтверждена для demo-сценария.";
+    compliance.data.ageComment ||= "Возрастная категория подтверждена по программе мероприятия.";
     compliance.data.approvalBasis ||= "Публичное культурно-зрелищное мероприятие с реализацией билетов.";
     compliance.data.eventDocuments = compliance.data.eventDocuments?.length ? compliance.data.eventDocuments : [
-      attachment(compliance.eventComplianceApplicationId + "-program", "program_outline_mock.pdf", "event-program", compliance.submittedAt || event.createdAt),
-      attachment(compliance.eventComplianceApplicationId + "-venue", "venue_contract_mock.pdf", "venue-contract", compliance.submittedAt || event.createdAt),
+      attachment(compliance.eventComplianceApplicationId + "-program", "Программа мероприятия.pdf", "event-program", compliance.submittedAt || event.createdAt),
+      attachment(compliance.eventComplianceApplicationId + "-venue", "Договор с площадкой.pdf", "venue-contract", compliance.submittedAt || event.createdAt),
     ];
     compliance.data.venueContractStatus ||= "приложен";
-    compliance.data.paymentComment ||= compliance.data.feePaid ? "Пошлина оплачена по demo-платёжному поручению." : "Оплата не требуется или ожидает подтверждения.";
+    compliance.data.paymentComment ||= compliance.data.feePaid ? "Пошлина оплачена по платёжному поручению." : "Оплата не требуется или ожидает подтверждения.";
     compliance.data.notificationsAttachment = compliance.data.notificationsAttachment?.length ? compliance.data.notificationsAttachment : [attachment(compliance.eventComplianceApplicationId + "-notice", "Уведомление исполкома.pdf", "executive-notice", compliance.submittedAt || event.createdAt)];
     compliance.feePaymentConfirmedByAdmin = compliance.feePaymentConfirmedByAdmin || compliance.data.feePaid || compliance.data.feeExempt;
     event.complianceApplicationId = compliance.eventComplianceApplicationId;
@@ -1690,9 +1690,9 @@ function findSeedEvent(state: AppState, seedIndex: number) {
 
 function ensureDemoTicketOperations(state: AppState): void {
   const sellTargets = [
-    { resellerCode: "ByCard", eventIndex: 0, tierIndex: 1, target: 4, buyer: "Demo Buyer ByCard" },
-    { resellerCode: "TicketPro", eventIndex: 2, tierIndex: 0, target: 3, buyer: "Demo Buyer TicketPro" },
-    { resellerCode: "Bezkassira", eventIndex: 4, tierIndex: 1, target: 3, buyer: "Demo Buyer bezkassira.by" },
+    { resellerCode: "ByCard", eventIndex: 0, tierIndex: 1, target: 4, buyer: "Покупатель ByCard" },
+    { resellerCode: "TicketPro", eventIndex: 2, tierIndex: 0, target: 3, buyer: "Покупатель TicketPro" },
+    { resellerCode: "Bezkassira", eventIndex: 4, tierIndex: 1, target: 3, buyer: "Покупатель bezkassira.by" },
   ];
 
   for (const target of sellTargets) {

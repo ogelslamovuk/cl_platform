@@ -117,13 +117,13 @@ export default function AdminRegistryEvents({ state, onUpdate, regionScope = "al
       toast.error("Публикация доступна только для одобренного мероприятия");
       return;
     }
-    toast.success(`Мероприятие ${eventId} опубликовано`);
+    toast.success(`Мероприятие ${formatDisplayId(eventId)} опубликовано`);
     onUpdate({ ...state });
   };
   const handleIssue = () => {
     if (!confirmIssue) return;
     const count = issueMarks(state, confirmIssue);
-    if (count > 0) toast.success(`Выпущено ${count} марок / TicketID`);
+    if (count > 0) toast.success(`Выпущено ${count} контрольных марок`);
     else toast.error("Марки уже выпущены");
     setConfirmIssue(null);
     onUpdate({ ...state });
@@ -142,7 +142,7 @@ export default function AdminRegistryEvents({ state, onUpdate, regionScope = "al
             style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2">
-            <HelpTooltip text="Поиск работает по EventID, названию мероприятия и площадке." />
+            <HelpTooltip text="Поиск работает по номеру мероприятия, названию и площадке." />
           </div>
         </div>
         <select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)} className="h-9 rounded-lg px-3 text-sm outline-none" style={{ background: A.surfaceBg, border: `1px solid ${A.border}`, color: A.textPrimary }}>
@@ -193,7 +193,7 @@ export default function AdminRegistryEvents({ state, onUpdate, regionScope = "al
               <thead>
                 <tr style={{ background: A.tableHeaderBg }}>
                   {[
-                    "ID",
+                    "Номер",
                     "Название",
                     "Организатор",
                     "Дата",
@@ -243,7 +243,7 @@ export default function AdminRegistryEvents({ state, onUpdate, regionScope = "al
                         )}
                         {event.status === "published" && !hasTickets(event.eventId) && (
                           <button type="button" onClick={() => setConfirmIssue(event.eventId)} className="rounded-lg px-2.5 py-1 text-xs font-medium" style={{ background: A.statusOkBg, color: A.statusOk }}>
-                            <Ticket size={12} className="inline mr-1" />Выпустить марки / TicketID
+                            <Ticket size={12} className="inline mr-1" />Выпустить контрольные марки
                           </button>
                         )}
                       </td>
@@ -280,7 +280,7 @@ export default function AdminRegistryEvents({ state, onUpdate, regionScope = "al
                 ) : (
                   <div className="rounded-lg border p-3 text-sm" style={{ borderColor: A.border, background: A.surfaceBg }}>
                     <div className="font-semibold" style={{ color: A.textPrimary }}>Без схемы мест</div>
-                    <div className="mt-1 text-xs" style={{ color: A.textSecondary }}>Контроль выполняется по общей вместимости, входным параметрам и количеству выпущенных TicketID.</div>
+                    <div className="mt-1 text-xs" style={{ color: A.textSecondary }}>Контроль выполняется по общей вместимости, входным параметрам и количеству выпущенных контрольных марок.</div>
                   </div>
                 );
               })()}
@@ -361,8 +361,8 @@ export default function AdminRegistryEvents({ state, onUpdate, regionScope = "al
               onClick={(e) => e.stopPropagation()}
               style={{ background: A.glassGradient + ", " + A.cardBg, border: `1px solid ${A.borderGlass}`, boxShadow: A.cardShadow }}
             >
-              <h3 style={{ color: A.textPrimary }} className="mb-3 font-semibold">Выпустить марки / TicketID?</h3>
-              <p style={{ color: A.textSecondary }} className="mb-5 text-sm">Будет создано {event?.capacity || 0} TicketID для {confirmIssue}</p>
+              <h3 style={{ color: A.textPrimary }} className="mb-3 font-semibold">Выпустить контрольные марки?</h3>
+              <p style={{ color: A.textSecondary }} className="mb-5 text-sm">Будет создано {event?.capacity || 0} контрольных марок для {formatDisplayId(confirmIssue)}</p>
               <div className="flex justify-end gap-3">
                 <button type="button" onClick={() => setConfirmIssue(null)} className="h-9 rounded-xl px-4 text-sm" style={{ border: `1px solid ${A.borderLight}`, color: A.textPrimary }}>
                   Отмена

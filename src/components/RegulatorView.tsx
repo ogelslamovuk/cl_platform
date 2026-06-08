@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import type { Application, AppState } from "@/lib/store";
 import { approveApplication, rejectApplication } from "@/lib/store";
 import { toast } from "sonner";
+import { formatDisplayId } from "@/lib/display";
 
 interface Props {
   state: AppState;
@@ -29,10 +30,10 @@ export default function RegulatorView({ state, onUpdate }: Props) {
     const { app, action } = confirmAction;
     if (action === "approve") {
       const res = approveApplication(state, app.appId);
-      if (res) toast.success(`Одобрено. LicenseID=${res.licenseId}, EventID=${res.eventId}`);
+      if (res) toast.success(`Одобрено. Удостоверение ${formatDisplayId(res.licenseId)}, мероприятие ${formatDisplayId(res.eventId)}`);
     } else {
       rejectApplication(state, app.appId);
-      toast.success(`Заявка ${app.appId} отклонена`);
+      toast.success(`Заявка ${formatDisplayId(app.appId)} отклонена`);
     }
     setConfirmAction(null);
     setDrawerApp(null);
@@ -59,7 +60,7 @@ export default function RegulatorView({ state, onUpdate }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left">
-                  <th className="py-2 px-2 font-medium">APP ID</th>
+                  <th className="py-2 px-2 font-medium">Номер заявки</th>
                   <th className="py-2 px-2 font-medium">Название</th>
                   <th className="py-2 px-2 font-medium">Площадка</th>
                   <th className="py-2 px-2 font-medium">Дата/время</th>
@@ -71,7 +72,7 @@ export default function RegulatorView({ state, onUpdate }: Props) {
               <tbody>
                 {filtered.map((a) => (
                   <tr key={a.appId} className="border-b border-border/50">
-                    <td className="py-2 px-2 font-mono text-xs">{a.appId}</td>
+                    <td className="py-2 px-2 text-xs font-semibold">{formatDisplayId(a.appId)}</td>
                     <td className="py-2 px-2">{a.title}</td>
                     <td className="py-2 px-2">{a.venue}</td>
                     <td className="py-2 px-2">{a.dateTime?.replace("T", " ")}</td>
@@ -106,7 +107,7 @@ export default function RegulatorView({ state, onUpdate }: Props) {
             </div>
             <dl className="space-y-3 text-sm mb-6">
               {([
-                ["APP ID", drawerApp.appId],
+                ["Номер заявки", formatDisplayId(drawerApp.appId)],
                 ["Название", drawerApp.title],
                 ["Площадка", drawerApp.venue],
                 ["Дата/время", drawerApp.dateTime?.replace("T", " ")],
@@ -143,7 +144,7 @@ export default function RegulatorView({ state, onUpdate }: Props) {
             <h3 className="font-semibold mb-3">
               {confirmAction.action === "approve" ? "Одобрить заявку?" : "Отклонить заявку?"}
             </h3>
-            <p className="text-sm opacity-70 mb-4">{confirmAction.app.title} ({confirmAction.app.appId})</p>
+            <p className="text-sm opacity-70 mb-4">{confirmAction.app.title} ({formatDisplayId(confirmAction.app.appId)})</p>
             <div className="flex gap-3 justify-end">
               <button onClick={() => setConfirmAction(null)}
                 className="px-4 h-10 rounded-xl border border-border text-sm font-medium">Отмена</button>
