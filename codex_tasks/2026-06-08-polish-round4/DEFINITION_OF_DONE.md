@@ -1,4 +1,4 @@
-# Definition of Done — polish round 3
+# Definition of Done — polish round 4
 
 The task is done only when all sections below are passed.
 
@@ -25,7 +25,10 @@ The task is done only when all sections below are passed.
 - [ ] Admin dashboard shows tasks requiring decisions and latest decisions.
 - [ ] Admin tables are more readable and have clearer statuses/actions.
 - [ ] Forms are grouped into understandable sections.
-- [ ] Event application shows mock fee/payment status.
+- [ ] `/proto` has selector `Порядок начисления платежей`: `По действующим правилам` / `Расширенный расчёт`.
+- [ ] `/proto` shows the current BV scale and expanded demo surcharge/coefficient table depending on selector.
+- [ ] Event application shows mock fee/payment status with visible calculation basis and formula.
+- [ ] Step 8 `Пошлинные платежи` explains the 420 BYN / 10 BV case where applicable.
 - [ ] Operator cabinet is business-like and not dominated by raw developer/API labels.
 - [ ] Empty states are present where relevant.
 
@@ -60,7 +63,7 @@ The task is done only when all sections below are passed.
 - [ ] PR created.
 - [ ] PR merged to `main`.
 - [ ] GitHub Pages deploy completed.
-- [ ] Live smoke-check passed on required routes.
+- [ ] Live smoke-check passed on required routes, including `/proto` financial settings and the event application Step 8 fee block.
 
 ## 6. Required final report
 

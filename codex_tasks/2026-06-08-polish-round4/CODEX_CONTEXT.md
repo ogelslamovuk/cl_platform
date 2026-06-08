@@ -1,4 +1,4 @@
-# Context for polish round 3
+# Context for polish round 4
 
 ## Project
 
@@ -22,6 +22,25 @@
 Ничего не должно стать хуже. Только обогащать, прояснять и усиливать текущий demo-flow.
 ```
 
+
+
+## Round 4 addition: fee calculation selector and fee transparency
+
+User-approved addition before Codex launch:
+
+- strengthen Step 8 `Пошлинные платежи` in the event application;
+- do not leave unexplained totals like `Начислено 420 BYN · 10 базовых величин`;
+- add a fee calculation selector to `/proto` financial settings;
+- use two labels: `По действующим правилам` and `Расширенный расчёт`;
+- default: `По действующим правилам`;
+- in Step 8 show calculation basis, formula, total, status and detailed breakdown; do not highlight the selected option name there;
+- for `420 BYN · 10 БВ`, explain: `10 × 42 BYN = 420 BYN`;
+- expanded calculation is a demo scenario with expanded line-item charges by event parameters, not a legal claim;
+- no Dubai/DTCM terms in UI;
+- no real payment gateway.
+
+Full requirements are in `FEE_MODEL_UI_REQUIREMENTS.md`.
+
 ## Approved product scope from audit discussion
 
 Делать:
@@ -36,7 +55,7 @@
 8. Заполнить раздел `Контроль` осмысленными demo-нарушениями.
 9. Желательно: улучшить админский dashboard.
 10. Желательно: разделить длинные формы на секции.
-11. Желательно: добавить mock-блок госпошлины.
+11. Добавить понятный mock-блок госпошлины: расчёт, основание, формула, детализация и статус оплаты.
 12. Желательно: привести кабинет билетного оператора к деловому стилю.
 13. Желательно: добавить нормальные empty states.
 
@@ -68,9 +87,9 @@
 
 DTCM/Dubai — только продуктовый референс, не UI-термины.
 
-## Fee reference for demo block
+## Fee reference for demo block / current-rules calculation
 
-Использовать как mock-логику отображения госпошлины, без реальной оплаты:
+Использовать как mock-логику отображения госпошлины для режима `По действующим правилам`, без реальной оплаты:
 
 - 1–150 мест / билетов — 3 БВ;
 - 151–300 — 10 БВ;

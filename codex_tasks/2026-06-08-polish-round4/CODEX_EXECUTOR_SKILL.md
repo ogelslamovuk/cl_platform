@@ -1,10 +1,10 @@
-# Codex executor skill for polish round 3
+# Codex executor skill for polish round 4
 
 ## 1. Role
 
 You are not the product owner. You are the implementation executor.
 
-Product direction is fixed in this package. Your job is to inspect the current code, implement within scope, self-check, build, deploy and live-check.
+Product direction is fixed in this package, including `FEE_MODEL_UI_REQUIREMENTS.md`. Your job is to inspect the current code, implement within scope, self-check, build, deploy and live-check.
 
 ## 2. Hard principle
 
@@ -126,3 +126,18 @@ Do not stop at local build or PR.
 For this package, the result is complete only after GitHub Pages deploy and live smoke-check.
 
 If repository permissions prevent merge/deploy, report this as a hard blocker with exact evidence.
+
+## 13. Fee model UI rule
+
+For round 4, `FEE_MODEL_UI_REQUIREMENTS.md` is mandatory.
+
+Implement the `/proto` selector `Порядок начисления платежей` and Step 8 `Пошлинные платежи` explanation exactly as a demo-first UI enrichment:
+
+- default `По действующим правилам`;
+- optional `Расширенный расчёт`;
+- show tariff/pricing visualization on `/proto`;
+- in Step 8, do not prominently show the selector option name; show amount, basis, formula and source parameters;
+- show why 420 BYN / 10 BV is charged when applicable;
+- no real payment gateway;
+- no Dubai/DTCM UI terms;
+- all new visible text Russian.

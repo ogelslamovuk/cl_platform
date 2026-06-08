@@ -1,4 +1,4 @@
-# Polish round 3: UI/UX demo credibility and non-regression enrichment
+# Polish round 4: UI/UX demo credibility, fee transparency and non-regression enrichment
 
 ## Goal
 
@@ -21,7 +21,9 @@
 - раздел `Контроль` содержит осмысленные бизнес-кейсы нарушений;
 - админские таблицы читаются лучше;
 - формы структурированы по секциям;
-- госпошлина показана как mock-элемент demo-flow;
+- госпошлина показана как mock-элемент demo-flow с понятным расчётом;
+- на `/proto` есть переключатель порядка начисления платежей: `По действующим правилам` / `Расширенный расчёт`;
+- шаг 8 `Пошлинные платежи` объясняет, почему начислена сумма, включая пример `10 × 42 BYN = 420 BYN`;
 - кабинет билетного оператора выглядит как бизнес-интерфейс, а не developer dashboard;
 - GitHub Pages обновлены и live smoke-check пройден.
 
@@ -30,7 +32,7 @@
 Выполнить `CODEX_TASK.md` из папки:
 
 ```text
-codex_tasks/2026-06-08-polish-round3/
+codex_tasks/2026-06-08-polish-round4/
 ```
 
 ## Out of scope
@@ -58,4 +60,4 @@ implementation → self-check → npm run build → smoke-check → PR → merge
 
 ## Definition of Done
 
-См. `DEFINITION_OF_DONE.md` и `ACCEPTANCE_CHECKLIST.md`.
+См. `DEFINITION_OF_DONE.md`, `ACCEPTANCE_CHECKLIST.md` и `FEE_MODEL_UI_REQUIREMENTS.md`.

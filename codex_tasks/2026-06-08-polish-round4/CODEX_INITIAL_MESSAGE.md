@@ -3,9 +3,9 @@
 Сначала прочитай:
 1. `SKILLS.md` в корне репозитория.
 2. `CL_PLATFORM_CONTEXT.md`, если он есть в репозитории.
-3. Все файлы task package из папки `codex_tasks/2026-06-08-polish-round3/`.
+3. Все файлы task package из папки `codex_tasks/2026-06-08-polish-round4/`.
 
-Выполни задачу строго по `CODEX_TASK.md`, `CODEX_CONTEXT.md`, `CODEX_EXECUTOR_SKILL.md` и `DEFINITION_OF_DONE.md`.
+Выполни задачу строго по `CODEX_TASK.md`, `CODEX_CONTEXT.md`, `CODEX_EXECUTOR_SKILL.md`, `FEE_MODEL_UI_REQUIREMENTS.md` и `DEFINITION_OF_DONE.md`.
 
 Не задавай уточняющих вопросов. Не выходи за scope. Ничего не ухудшай: текущий demo-flow должен стать только богаче, понятнее и убедительнее.
 

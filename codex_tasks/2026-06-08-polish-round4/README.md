@@ -1,9 +1,9 @@
-# cl_platform — polish round 3 task package
+# cl_platform — polish round 4 task package
 
 Папка для репозитория:
 
 ```text
-codex_tasks/2026-06-08-polish-round3/
+codex_tasks/2026-06-08-polish-round4/
 ```
 
 Порядок запуска:
@@ -13,3 +13,10 @@ codex_tasks/2026-06-08-polish-round3/
 3. В Codex отправить содержимое `CODEX_INITIAL_MESSAGE.md`.
 4. Codex должен автономно довести работу до PR → merge → GitHub Pages deploy → live smoke-check.
 5. Результат не считается готовым до успешной live-проверки GitHub Pages.
+
+
+Дополнительный файл round 4:
+
+```text
+FEE_MODEL_UI_REQUIREMENTS.md
+```

@@ -1,4 +1,4 @@
-# UI audit excerpt used for polish round 3
+# UI audit excerpt used for polish round 4
 
 The audit was treated as input, not as absolute truth.
 
@@ -14,6 +14,7 @@ The audit was treated as input, not as absolute truth.
 - Admin tables need readability/status improvements.
 - Forms need clearer grouping.
 - Fee/payment visibility improves legal/procedural credibility.
+- Step 8 `Пошлинные платежи` must not show unexplained totals like `420 BYN · 10 базовых величин`.
 - Operator/channel page should look more like a business portal and less like a developer console.
 
 ## Rejected or deferred audit items
@@ -35,3 +36,13 @@ Focus on urgent polish for presentation:
 ```
 
 Therefore implementation must enrich existing screens and data, not replace or destabilize them.
+
+
+## Round 4 user addition
+
+User explicitly added that Step 8 `Пошлинные платежи` needs stronger UI explanation and that `/proto` financial settings should include a selector `Порядок начисления платежей` with two options:
+
+- `По действующим правилам`;
+- `Расширенный расчёт`.
+
+The UI must explain where the amount comes from. Working screens must show result, basis and calculation, not highlight the selector option as a separate product model. Do not expose this as `по максимуму` or Dubai/DTCM terminology.

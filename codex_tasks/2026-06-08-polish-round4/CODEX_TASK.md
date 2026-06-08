@@ -1,4 +1,4 @@
-# CODEX_TASK — polish round 3
+# CODEX_TASK — polish round 4
 
 ## Goal
 
@@ -18,7 +18,7 @@ After this iteration, the platform should feel more like a serious Belarus-orien
 - meaningful control/risk events;
 - readable admin tables;
 - structured application forms;
-- visible mock fee/payment status;
+- visible mock fee/payment status with transparent calculation;
 - business-like operator cabinet;
 - no raw technical mock labels in the main UI.
 
@@ -429,17 +429,67 @@ Each section should have:
 - current fields preserved;
 - save/submit actions preserved.
 
-## Mock fee block
+## Financial model selector and transparent fee block
 
-Add `Госпошлина` block to event application view.
+This part is mandatory for round 4. Follow `FEE_MODEL_UI_REQUIREMENTS.md`.
+
+### `/proto` financial settings
+
+In the existing financial settings area on `/proto`, add a compact selector labelled `Порядок начисления платежей`:
+
+- `По действующим правилам` — default;
+- `Расширенный расчёт`.
+
+The selector must affect the demo fee display in event application Step 8.
+
+Below the selector, show a compact tariff/pricing visualization for the selected option: current BV scale for `По действующим правилам`, and demo surcharge/coefficient table for `Расширенный расчёт`.
+
+Do not rename it as `по максимуму`, `Dubai`, `DTCM`, `арабская модель` or similar.
+
+### Event application Step 8: `Пошлинные платежи`
+
+Strengthen the existing fee block so it explains the total.
 
 Show:
 
 - calculation basis;
 - capacity/ticket range;
 - rate in base units;
+- base unit amount used in demo;
+- formula;
+- total in BYN;
 - status: `Не требуется`, `Ожидает оплаты`, `Оплачено`;
-- mock receipt if paid.
+- mock receipt if paid;
+- action `Показать расчёт`.
+
+For the current example `420 BYN · 10 базовых величин`, the UI must explain:
+
+```text
+10 базовых величин × 42 BYN = 420 BYN
+```
+
+And show why the 10 BV tier was selected, for example:
+
+```text
+Диапазон: 151–300 мест / входных билетов.
+Ставка для диапазона: 10 базовых величин.
+```
+
+### Expanded calculation
+
+When `Расширенный расчёт` is selected in `/proto`, Step 8 must show an expanded demo breakdown with several line items by event parameters, but must not prominently label the working screen with the selector option name.
+
+Example line items:
+
+- `Базовое рассмотрение заявки`;
+- `Проверка площадки и вместимости`;
+- `Проверка схемы зала / билетной модели`;
+- `Проверка состава исполнителей`;
+- `Проверка материалов и документов`;
+- `Контроль билетных каналов`;
+- `Постсобытийная сверка продаж`.
+
+This is a demo scenario. Do not present it as current law.
 
 Do not implement real payment.
 
@@ -532,6 +582,10 @@ Before delivery, verify:
 18. Smoke-check target routes locally.
 19. Deploy to GitHub Pages.
 20. Live smoke-check target routes.
+21. `/proto` has fee calculation selector: `По действующим правилам` / `Расширенный расчёт`.
+22. Event application Step 8 explains fee calculation, including the `10 × 42 BYN = 420 BYN` case where applicable.
+23. Expanded calculation shows expanded demo line-item charges without Dubai/DTCM UI terms.
+
 
 ## Delivery requirements
 

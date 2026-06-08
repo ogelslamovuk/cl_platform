@@ -47,3 +47,13 @@ For each route:
 - `/admin`: dashboard has decision/control context.
 - `/channel`: operator cabinet looks business-like.
 - organizer/application route: forms/status context are not broken.
+
+
+## Round 4 fee-model smoke
+
+Additional required checks:
+
+- `/proto`: fee calculation selector is visible and does not break existing financial settings.
+- Event application route containing Step 8 `Пошлинные платежи`: calculation explanation is visible/available.
+- Switching to `Расширенный расчёт` shows expanded line-item demo charges.
+- No real payment UI is introduced beyond mock status/action.

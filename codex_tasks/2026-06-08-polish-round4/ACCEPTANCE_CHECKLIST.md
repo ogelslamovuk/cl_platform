@@ -1,4 +1,4 @@
-# Acceptance Checklist — polish round 3
+# Acceptance Checklist — polish round 4
 
 Use this checklist before final report.
 
@@ -55,8 +55,15 @@ Use this checklist before final report.
 - [ ] Organizer form is grouped into sections.
 - [ ] Event application form is grouped into sections.
 - [ ] Save/submit behavior is preserved.
-- [ ] Event application includes `Госпошлина` block.
+- [ ] `/proto` includes selector `Порядок начисления платежей`: `По действующим правилам` / `Расширенный расчёт`.
+- [ ] `/proto` shows tariff/pricing visualization for the selected option.
+- [ ] Event application includes strengthened `Пошлинные платежи` / `Госпошлина` block.
+- [ ] Fee block explains calculation basis, capacity/ticket range, BV rate, base unit amount and formula.
+- [ ] The `420 BYN · 10 базовых величин` case is explained as `10 × 42 BYN = 420 BYN` where applicable.
+- [ ] `Расширенный расчёт` shows expanded demo line items and surcharge/coefficient table on `/proto`.
+- [ ] Step 8 does not prominently show the selector option name; it shows amount, basis and calculation.
 - [ ] Fee block is mock-only and does not implement real payment.
+- [ ] No Dubai/DTCM/ePermit/NEN terms appear in visible UI.
 
 ## G. Operator cabinet
 
@@ -73,3 +80,12 @@ Use this checklist before final report.
 - [ ] PR merged.
 - [ ] GitHub Pages deployed.
 - [ ] Live smoke routes passed.
+
+
+## I. Round 4 fee-model smoke
+
+- [ ] `/proto`: fee calculation selector is visible near financial settings.
+- [ ] Switching model changes Step 8 fee explanation in demo data.
+- [ ] Step 8 `Пошлинные платежи`: `Показать расчёт` opens or expands detailed calculation.
+- [ ] Current-rules calculation shows BV capacity table logic.
+- [ ] Expanded calculation is clearly framed as demo model, not current legislation.
