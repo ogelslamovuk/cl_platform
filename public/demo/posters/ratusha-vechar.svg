@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1350" viewBox="0 0 900 1350" role="img" aria-labelledby="title desc">
+  <title id="title">Тёплый вечер у ратуши</title>
+  <desc id="desc">Камерный спектакль</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4c1d95"/><stop offset="1" stop-color="#1e1b4b"/></linearGradient>
+  </defs>
+  <rect width="900" height="1350" fill="url(#bg)"/>
+  <path d="M260 760 L450 470 L640 760 Z" fill="#fef3c7" opacity="0.18"/>
+  <rect x="282" y="520" width="336" height="270" rx="24" fill="#f8fafc" opacity="0.88"/>
+  <path d="M318 520 L450 382 L582 520 Z" fill="#f59e0b" opacity="0.86"/>
+  <g fill="#312e81" opacity="0.72">
+    <rect x="342" y="594" width="58" height="100" rx="8"/>
+    <rect x="422" y="594" width="58" height="100" rx="8"/>
+    <rect x="502" y="594" width="58" height="100" rx="8"/>
+  </g>
+  <g fill="#ffffff" opacity="0.88">
+    <path d="M270 858 C330 812 392 812 450 858 C508 812 570 812 630 858 C570 934 330 934 270 858 Z"/>
+  </g>
+  <rect x="64" y="70" width="772" height="1210" rx="34" fill="none" stroke="#fef3c7" stroke-opacity="0.32" stroke-width="3"/>
+  <text x="86" y="146" fill="#fef3c7" font-family="Inter, Arial, sans-serif" font-size="31" font-weight="800" letter-spacing="3">КАМЕРНЫЙ СПЕКТАКЛЬ</text>
+  <text x="86" y="1006" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="76" font-weight="850"><tspan x="86" dy="0">Тёплый вечер</tspan><tspan x="86" dy="88">у ратуши</tspan></text>
+  <rect x="86" y="1162" width="210" height="10" rx="5" fill="#f59e0b"/>
+  <text x="86" y="1224" fill="#ede9fe" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="650">Театр камерной формы</text>
+  <text x="86" y="1266" fill="#ffffff" fill-opacity="0.72" font-family="Inter, Arial, sans-serif" font-size="24">полная реализация билетов</text>
+</svg>

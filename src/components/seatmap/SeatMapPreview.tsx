@@ -110,7 +110,7 @@ export default function SeatMapPreview({
           }}
           interactive={selectable}
           variant={variant}
-          height={variant === "dark" ? 390 : 500}
+          height={variant === "dark" ? 390 : 560}
           compact
           className="mt-3"
         />
