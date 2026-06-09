@@ -244,7 +244,6 @@ export default function OrganizerEventCompliancePage() {
   const [documentPreview, setDocumentPreview] = useState<DocumentPreview>(null);
   const [performerDraft, setPerformerDraft] = useState({ name: "", country: "Беларусь" });
   const [adminReviewComment, setAdminReviewComment] = useState("");
-  const [feeDetailsOpen, setFeeDetailsOpen] = useState(false);
   const salesOperators = useMemo(() => state.resellers, [state.resellers]);
   const approvedVenues = useMemo(() => state.venueRegistry.filter((venue) => venue.status === "approved"), [state.venueRegistry]);
   const selectedVenue = getVenueRegistryRecord(state, form.venueId);
@@ -1415,7 +1414,7 @@ export default function OrganizerEventCompliancePage() {
           {activeStep === 7 && (
             <div className="space-y-4">
               <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#111A24" }}>
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
                   <div>
                     <div className="inline-flex items-center gap-1 text-xs uppercase tracking-wide opacity-75">Пошлинные платежи <HelpTooltip text={COMPLIANCE_FEE_TOOLTIP} /></div>
                     <h3 className="mt-2 text-xl font-semibold">Расчёт по заявке {applicationPublicId}</h3>
@@ -1423,55 +1422,19 @@ export default function OrganizerEventCompliancePage() {
                       Начисление показано как часть демонстрационного процесса: без платёжного шлюза, с понятным основанием и формулой для проверки перед подачей.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    className="h-10 rounded-lg px-3 text-sm font-semibold"
-                    style={{ background: "#1d2a3b", color: "#F5F7FA" }}
-                    onClick={() => setFeeDetailsOpen((value) => !value)}
-                  >
-                    {feeDetailsOpen ? "Скрыть расчёт" : "Показать расчёт"}
-                  </button>
                 </div>
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {[
-                    ["Статус", paymentStatus],
-                    ["Начислено", feeBreakdown.isExempt ? "Госпошлина не требуется" : formatMoney(feeAmount)],
-                    ["Основание", feeBreakdown.isExempt ? (feeBreakdown.exemptionReason || "заявлено освобождение") : feeBreakdown.rangeLabel],
-                    ["Ставка", feeBreakdown.isExempt ? "0 БВ" : `${feeBreakdown.rateBaseUnits} БВ`],
-                    ["Расчёт", feeBreakdown.formula],
-                    ["Следующее действие", nextAction],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
-                      <div className="text-xs opacity-65">{label}</div>
-                      <div className="mt-1 text-sm font-semibold leading-5">{value}</div>
+                <div className="rounded-xl border p-3" style={{ borderColor: "rgba(96,165,250,0.24)", background: "#0F1620" }}>
+                  <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                    <div className="text-sm font-semibold">Детализация расчёта</div>
+                    <div className="text-xs opacity-65">Базовая величина: {feeBreakdown.baseUnitAmountBYN} BYN</div>
+                  </div>
+                  {feeBreakdown.isExempt ? (
+                    <div className="mt-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "rgba(52,211,153,0.35)", background: "rgba(52,211,153,0.10)", color: "#BBF7D0" }}>
+                      {feeBreakdown.exemptionReason || "По заявке указано основание освобождения от госпошлины."}
                     </div>
-                  ))}
-                </div>
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {[
-                    ["Площадка", form.venueName || "не выбрана"],
-                    ["Формат", eventTypePath.join(" / ") || "тип не выбран"],
-                    ["Проектная вместимость", feeBreakdown.basisLabel],
-                    ["Категория мероприятия", form.approvalMode === "certificate_required" ? "требуется удостоверение" : "без удостоверения"],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(255,255,255,0.10)", background: "#0F1620" }}>
-                      <div className="text-xs opacity-65">{label}</div>
-                      <div className="mt-1 font-semibold">{value}</div>
-                    </div>
-                  ))}
-                </div>
-                {feeDetailsOpen && (
-                  <div className="rounded-xl border p-3" style={{ borderColor: "rgba(96,165,250,0.24)", background: "#0F1620" }}>
-                    <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                      <div className="text-sm font-semibold">Детализация расчёта</div>
-                      <div className="text-xs opacity-65">Базовая величина: {feeBreakdown.baseUnitAmountBYN} BYN</div>
-                    </div>
-                    {feeBreakdown.isExempt ? (
-                      <div className="mt-3 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "rgba(52,211,153,0.35)", background: "rgba(52,211,153,0.10)", color: "#BBF7D0" }}>
-                        {feeBreakdown.exemptionReason || "По заявке указано основание освобождения от госпошлины."}
-                      </div>
-                    ) : (
-                      <div className="mt-3 overflow-hidden rounded-lg border" style={{ borderColor: "rgba(255,255,255,0.10)" }}>
+                  ) : (
+                    <div className="mt-3 overflow-x-auto rounded-lg border" style={{ borderColor: "rgba(255,255,255,0.10)" }}>
+                      <div className="min-w-[720px]">
                         <div className="grid grid-cols-[1.1fr_1fr_0.7fr_0.7fr] bg-[#111A24] text-xs font-semibold">
                           <div className="px-3 py-2">Позиция</div>
                           <div className="px-3 py-2">Параметр</div>
@@ -1490,14 +1453,25 @@ export default function OrganizerEventCompliancePage() {
                           Итого: {feeBreakdown.formula}
                         </div>
                       </div>
-                    )}
-                    {feeBreakdown.mode === "expandedCalculation" && (
-                      <p className="mt-3 text-xs leading-5 opacity-65">
-                        Детализированные позиции используются только для демонстрации прозрачной структуры начислений в прототипе.
-                      </p>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
+                  {feeBreakdown.mode === "expandedCalculation" && (
+                    <p className="mt-3 text-xs leading-5 opacity-65">
+                      Детализированные позиции используются только для демонстрации прозрачной структуры начислений в прототипе.
+                    </p>
+                  )}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {[
+                    ["Статус", paymentStatus],
+                    ["Начислено", feeBreakdown.isExempt ? "Госпошлина не требуется" : formatMoney(feeAmount)],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.035)" }}>
+                      <div className="text-[11px] uppercase tracking-wide opacity-55">{label}</div>
+                      <div className="mt-1 text-sm font-semibold leading-5">{value}</div>
+                    </div>
+                  ))}
+                </div>
                 <div className="rounded-xl border p-3" style={{ borderColor: "rgba(255,255,255,0.12)", background: "#0F1620" }}>
                   <div className="inline-flex items-center gap-1 text-xs opacity-75">Текущий баланс <HelpTooltip text="Баланс финансового счёта организатора, доступный для оплаты обязательных пошлин." /></div>
                   <div className="mt-2 text-xl font-semibold">{formatMoney(organizerFinancialAccount.balance)}</div>
@@ -1622,48 +1596,6 @@ export default function OrganizerEventCompliancePage() {
           )}
         </div>
 
-        {!isAdminMode && (
-        <section className="space-y-2">
-          <h2 className="font-semibold">Мои заявки</h2>
-          {myApps.length === 0 ? <div className="text-sm opacity-70">Пока нет заявок.</div> : (
-            <div className="space-y-2">
-              {myApps.map((app) => (
-                <div key={app.eventComplianceApplicationId} className="rounded border p-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between" style={{ borderColor: "rgba(255,255,255,0.12)" }}>
-                  <div>
-                    <div className="font-medium">{app.data.title || "Без названия"}</div>
-                    <div className="text-xs opacity-70">{formatPublicId(app.eventComplianceApplicationId)} · {complianceStatusLabel[app.status] || app.status}</div>
-                    {!!app.adminComment && <div className="mt-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "rgba(251,191,36,0.35)", color: "#FBBF24" }}>Замечание Центра Управления: {app.adminComment}</div>}
-                  </div>
-                  {(app.status === "needs_rework" || app.status === "draft") && (
-                    <span className="inline-flex items-center gap-1">
-                      <button
-                        className="px-3 py-2 rounded bg-[#1d2a3b]"
-                        onClick={() => {
-                          setEditingId(app.eventComplianceApplicationId);
-                          setForm({
-                            ...app.data,
-                            eventTypePath: app.data.eventTypePath || [],
-                            dateSlots: app.data.dateSlots?.length ? app.data.dateSlots : [""],
-                            performers: app.data.performers || [],
-                            ticketTiers: app.data.ticketTiers?.length ? app.data.ticketTiers : DEFAULT_COMPLIANCE_TICKET_TIERS.map((tier) => ({ ...tier })),
-                            venueContractStatus: app.data.venueContractStatus || "требуется",
-                            interagencyChecks: ensureChecks(app.data.interagencyChecks),
-                          });
-                          setActiveStep(Math.min(Math.max(app.data.wizardLastStep || 0, 0), WIZARD_STEPS.length - 1));
-                          setTierErrors([]);
-                        }}
-                      >
-                        {app.status === "draft" ? "Продолжить" : "Доработать"}
-                      </button>
-                      <HelpTooltip text={app.status === "draft" ? "Продолжить редактирование черновика заявки." : "Внести правки по замечанию Центра Управления."} />
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-        )}
       </div>
       <MockDocumentPreview preview={documentPreview} onClose={() => setDocumentPreview(null)} />
       <SeatMapModal
