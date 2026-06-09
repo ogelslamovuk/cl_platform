@@ -164,8 +164,8 @@ export default function AdminEventComplianceApplications({ state, regionScope = 
                   <td className="px-4 py-3" style={{ color: A.textSecondary }}>{organizerNameById.get(row.organizerId) || row.organizerId}</td>
                   <td className="px-4 py-3" style={{ color: A.textSecondary }}>{regionCity.region} · {regionCity.city}</td>
                   <td className="px-4 py-3" style={{ color: A.textSecondary }}>{formatDate(row.data.dateSlots?.[0])}</td>
-                  <td className="px-4 py-3">
-                    <span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: chip.bg, color: chip.color }}>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold leading-none" style={{ background: chip.bg, color: chip.color }}>
                       {statusLabel[row.status] || row.status}
                     </span>
                   </td>
@@ -181,10 +181,10 @@ export default function AdminEventComplianceApplications({ state, regionScope = 
                         event.stopPropagation();
                         openApplication(row.eventComplianceApplicationId);
                       }}
-                      className="h-8 rounded-lg px-3 text-xs font-semibold"
+                      className="h-8 whitespace-nowrap rounded-lg px-3 text-xs font-semibold"
                       style={{ background: A.selectedBg, color: A.textPrimary }}
                     >
-                      Открыть 9 этапов
+                      Открыть
                     </button>
                   </td>
                 </tr>
