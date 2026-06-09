@@ -1,0 +1,23 @@
+# Acceptance checklist
+
+- [ ] Root SKILLS.md was read before editing.
+- [ ] CL_PLATFORM_CONTEXT.md was considered.
+- [ ] Only owning files for this task were edited.
+- [ ] No routes were changed.
+- [ ] No auth/roles/sidebar/header/menu/branding changes were made.
+- [ ] No store/localStorage changes were made.
+- [ ] No fee calculation business logic was changed.
+- [ ] No DTCM/Dubai/NEN visible UI terms were added.
+- [ ] The repeated bottom "Мои заявки" block is removed from all 9-step application detail stages.
+- [ ] Standalone application list pages remain intact.
+- [ ] Step 8 "Пошлинные платежи" shows "Детализация расчёта" directly under the step title/description.
+- [ ] Step 8 calculation details are always visible.
+- [ ] Step 8 has no "Скрыть расчёт" / "Показать расчёт" button.
+- [ ] Step 8 no longer shows the removed top summary card grid.
+- [ ] Step 8 shows only compact secondary "Статус" and "Начислено" summary after the calculation details and before balance/payment controls.
+- [ ] Existing calculated amounts and demo payment status values are preserved.
+- [ ] In Центр Управления → Заявки мероприятий, action button text is "Открыть".
+- [ ] The "На проверке" badge is clean, compact, readable, and not visually broken.
+- [ ] All new visible UI text is Russian.
+- [ ] npm run build passes.
+- [ ] Final report includes changed files, self-check, build result, and unified diff/patch.
