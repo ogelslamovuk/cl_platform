@@ -110,23 +110,23 @@ type DemoAppSeed = {
 };
 
 const DEMO_POSTERS = {
-  vasilkovyKraj: "/demo/posters/vasilkovy-kraj.svg",
-  rodnayaZyamlya: "/demo/posters/rodnaya-zyamlya.svg",
-  scenaBelarusi: "/demo/posters/scena-belarusi.svg",
-  kazkiPalessya: "/demo/posters/kazki-palessya.svg",
-  belarusUSertsy: "/demo/posters/belarus-u-sertsy.svg",
-  slutskiePoyasa: "/demo/posters/slutskie-poyasa.svg",
-  zvonyNesvizha: "/demo/posters/zvony-nesvizha.svg",
-  kolaTradycyj: "/demo/posters/kola-tradycyj.svg",
-  spadchynaSuchasnast: "/demo/posters/spadchyna-suchasnast.svg",
-  kupalskiVianok: "/demo/posters/kupalski-vianok.svg",
-  novyyaImiony: "/demo/posters/novyya-imiony.svg",
-  siabroustvaKultur: "/demo/posters/siabroustva-kultur.svg",
-  dnyaprovskiyaHalasy: "/demo/posters/dnyaprovskiya-halasy.svg",
-  grodzenskiyaAbrysy: "/demo/posters/grodzenskiya-abrysy.svg",
-  balshayaScenaGala: "/demo/posters/balshaya-scena-gala.svg",
-  kamernaPesnya: "/demo/posters/kamerna-pesnya.svg",
-  ratushaVechar: "/demo/posters/ratusha-vechar.svg",
+  mikhailStasov: "/demo/posters/poster-mikhail-stasov-vernus-k-tebe.png",
+  vasilkovyKraj: "/demo/posters/poster-vasilkovy-kraj.png",
+  belarusUSertsy: "/demo/posters/poster-belarus-u-sertsy.png",
+  pesnyaRodnayZyamli: "/demo/posters/poster-pesnya-rodnay-zyamli.png",
+  slyozyNaAsfalte: "/demo/posters/poster-slyozy-na-asfalte.png",
+  kazkiPalessya: "/demo/posters/poster-kazki-palessya.png",
+  andreBoticelli: "/demo/posters/poster-andre-boticelli-violonchel-pri-svechah.png",
+  kolaTradycyj: "/demo/posters/poster-kola-tradycyj.png",
+  grodzenskiyaAbrysy: "/demo/posters/poster-grodzenskiya-abrysy.png",
+  spadchynaSuchasnast: "/demo/posters/poster-spadchyna-i-suchasnast.png",
+  kupalskiVyanok: "/demo/posters/poster-kupalski-vyanok.png",
+  jimmyThornton: "/demo/posters/poster-jimmy-thornton-only-hits-live.png",
+  novyyaImiony: "/demo/posters/poster-novyya-imiony.png",
+  syabroustvaKultur: "/demo/posters/poster-syabroustva-kultur.png",
+  slutskiePoyasa: "/demo/posters/poster-slutskie-poyasa.png",
+  gorodGovorit: "/demo/posters/poster-gorod-govorit.png",
+  simfoniyaKino: "/demo/posters/poster-simfoniya-kino.png",
 } as const;
 
 const ALL_ACTIVE_RESELLER_CHANNELS = ["OWN", "ByCard", "TicketPro", "Bezkassira"];
@@ -150,7 +150,7 @@ const DEMO_APPS: DemoAppSeed[] = [
   },
   {
     organizerId: "demo_org_philharmonic",
-    title: "Концерт «Песня роднай зямлі»",
+    title: "Национальный концерт «Песня роднай зямлі»",
     venue: "Белорусская государственная филармония",
     city: "Минск",
     venueId: "venue_demo_philharmonic",
@@ -160,36 +160,36 @@ const DEMO_APPS: DemoAppSeed[] = [
     description: "Торжественная программа белорусской академической и народной музыки с участием солистов и хора.",
     daysOffset: 10,
     time: "19:00",
-    poster: DEMO_POSTERS.rodnayaZyamlya,
+    poster: DEMO_POSTERS.pesnyaRodnayZyamli,
     tiers: [{ name: "Партер", price: 75, quantity: 120 }, { name: "Балкон", price: 55, quantity: 80 }, { name: "Ложа", price: 95, quantity: 40 }],
     salesChannels: ["OWN", "ByCard", "TicketPro"],
   },
   {
     organizerId: "demo_org_cultural_initiative",
-    title: "Театральный форум «Сцэна Беларусі»",
+    title: "Премьера спектакля «Слёзы на асфальте»",
     venue: "Национальный академический драматический театр имени Якуба Коласа",
     city: "Витебск",
     venueId: "venue_vitebsk_kolas",
     hallId: "hall_vitebsk_kolas",
     layoutId: "layout_vitebsk_kolas",
     category: "Театр",
-    description: "Форум региональных театральных постановок и творческих встреч с профессиональными коллективами.",
+    description: "Современная драматическая премьера с эмоциональным театральным сюжетом, обсуждением постановки и встречей с труппой.",
     daysOffset: 12,
     time: "18:30",
-    poster: DEMO_POSTERS.scenaBelarusi,
+    poster: DEMO_POSTERS.slyozyNaAsfalte,
     tiers: [{ name: "Партер", price: 48, quantity: 110 }, { name: "Амфитеатр", price: 38, quantity: 70 }, { name: "Балкон", price: 28, quantity: 36 }],
     salesChannels: ["OWN", "TicketPro", "Bezkassira"],
   },
   {
     organizerId: "demo_org_fest_scene",
-    title: "Детская программа «Казкі Палесся»",
+    title: "Детское шоу «Казкі Палесся»",
     venue: "Гомельский городской центр культуры",
     city: "Гомель",
     venueId: "venue_gomel_culture_demo",
     hallId: "hall_gomel_culture_demo",
     layoutId: "layout_gomel_culture_demo",
     category: "Детям",
-    description: "Познавательная детская программа по мотивам белорусских сказок, музыки и народных игр.",
+    description: "Семейная интерактивная программа по мотивам белорусских сказок, музыки и народных игр.",
     daysOffset: 14,
     time: "12:00",
     poster: DEMO_POSTERS.kazkiPalessya,
@@ -198,14 +198,14 @@ const DEMO_APPS: DemoAppSeed[] = [
   },
   {
     organizerId: "demo_org_minskconcert",
-    title: "Концерт мастеров искусств «Беларусь у сэрцы»",
+    title: "Гала-концерт «Беларусь у сэрцы»",
     venue: "Дворец Республики",
     city: "Минск",
     venueId: "venue_palace_demo_chamber",
     hallId: "hall_palace_demo_chamber",
     layoutId: "layout_palace_demo_chamber",
     category: "Концерты",
-    description: "Большой концерт мастеров искусств с симфоническим оркестром, хором и сценической программой.",
+    description: "Большой официальный гала-концерт с артистами, хором, балетом и торжественной сценической программой.",
     daysOffset: 17,
     time: "19:30",
     poster: DEMO_POSTERS.belarusUSertsy,
@@ -230,14 +230,14 @@ const DEMO_APPS: DemoAppSeed[] = [
   },
   {
     organizerId: "demo_org_philharmonic",
-    title: "Музыкальный вечер «Звоны Нясвіжа»",
+    title: "Андре Ботичелли — «Виолончель при свечах»",
     venue: "Замковый комплекс «Несвиж»",
     city: "Несвиж",
     category: "Концерты",
-    description: "Камерный музыкальный вечер в историко-культурном пространстве Несвижского замка.",
+    description: "Премиальный сольный концерт вымышленного виолончелиста в историческом интерьере Несвижского замка.",
     daysOffset: 21,
     time: "20:00",
-    poster: DEMO_POSTERS.zvonyNesvizha,
+    poster: DEMO_POSTERS.andreBoticelli,
     tiers: [{ name: "Камерный зал", price: 68, quantity: 90 }, { name: "Гостевой сектор", price: 84, quantity: 50 }],
     venueId: "venue_nesvizh_castle",
     hallId: "hall_nesvizh_castle",
@@ -246,14 +246,14 @@ const DEMO_APPS: DemoAppSeed[] = [
   },
   {
     organizerId: "demo_org_fest_scene",
-    title: "Хореографическая программа «Кола традыцый»",
+    title: "Танцевальная программа «Кола традыцый»",
     venue: "Гродненский областной драматический театр",
     city: "Гродно",
     venueId: "venue_grodno_drama",
     hallId: "hall_grodno_drama",
     layoutId: "layout_grodno_drama",
-    category: "Шоу",
-    description: "Сценическая хореографическая программа с народными танцами, современным светом и живой музыкой.",
+    category: "Танцы",
+    description: "Сценическая танцевальная программа с народной пластикой, современным светом, динамикой и костюмами.",
     daysOffset: 24,
     time: "18:00",
     poster: DEMO_POSTERS.kolaTradycyj,
@@ -278,14 +278,14 @@ const DEMO_APPS: DemoAppSeed[] = [
   },
   {
     organizerId: "demo_org_cultural_initiative",
-    title: "Выставочная программа «Спадчына і сучаснасць»",
+    title: "Музейная программа «Спадчына і сучаснасць»",
     venue: "Брестский областной краеведческий музей",
     city: "Брест",
     venueId: "venue_brest_museum",
     hallId: "hall_brest_museum",
     layoutId: "layout_brest_museum",
-    category: "Выставки",
-    description: "Музейная программа о преемственности культурного наследия, архивных материалах и современном искусстве.",
+    category: "Музеи",
+    description: "Культурно-просветительская музейная программа о наследии, экспозиции и современном взгляде на историю.",
     daysOffset: 26,
     time: "11:00",
     poster: DEMO_POSTERS.spadchynaSuchasnast,
@@ -294,33 +294,33 @@ const DEMO_APPS: DemoAppSeed[] = [
   },
   {
     organizerId: "demo_org_fest_scene",
-    title: "Областной праздник «Купальскі вянок»",
+    title: "Праздник «Купальскі вянок»",
     venue: "Парк Подниколье",
     city: "Могилёв",
     venueId: "venue_podnikolie_park",
     hallId: "hall_podnikolie_open",
     capacityOnly: true,
     category: "Фестивали",
-    description: "Областной праздник с фольклорной сценой, ремесленными подворьями и вечерней купальской программой.",
+    description: "Фольклорный open-air праздник с венками, вечерней сценой, ремесленными подворьями и семейной программой.",
     daysOffset: 30,
     time: "17:00",
-    poster: DEMO_POSTERS.kupalskiVianok,
+    poster: DEMO_POSTERS.kupalskiVyanok,
     tiers: [{ name: "Основной вход", price: 28, quantity: 1000 }, { name: "Семейная зона", price: 40, quantity: 500 }],
     salesChannels: ALL_ACTIVE_RESELLER_CHANNELS,
   },
   {
     organizerId: "demo_org_philharmonic",
-    title: "Камерный концерт «Дняпроўскія галасы»",
+    title: "Джимми Торнтон — «Only Hits Live»",
     venue: "Могилёвский областной дворец культуры",
     city: "Могилёв",
     venueId: "venue_mogilev_culture_palace",
     hallId: "hall_mogilev_culture_palace",
     layoutId: "layout_mogilev_culture_palace",
     category: "Концерты",
-    description: "Региональная камерная программа с вокальным ансамблем, инструментальными миниатюрами и вечерним блоком у Днепра.",
+    description: "Сольный концерт вымышленной рок-легенды с гитарными хитами, сценическим дымом и вечерней концертной атмосферой.",
     daysOffset: 31,
     time: "19:00",
-    poster: DEMO_POSTERS.dnyaprovskiyaHalasy,
+    poster: DEMO_POSTERS.jimmyThornton,
     tiers: [{ name: "Партер", price: 44, quantity: 96 }, { name: "Балкон", price: 32, quantity: 72 }, { name: "Льготный", price: 20, quantity: 24 }],
     salesChannels: ["OWN", "ByCard", "Bezkassira"],
   },
@@ -352,7 +352,7 @@ const DEMO_APPS: DemoAppSeed[] = [
     description: "Международная культурная программа с белорусскими коллективами и приглашённым ансамблем.",
     daysOffset: 36,
     time: "19:00",
-    poster: DEMO_POSTERS.siabroustvaKultur,
+    poster: DEMO_POSTERS.syabroustvaKultur,
     tiers: [{ name: "Партер", price: 64, quantity: 150 }, { name: "Балкон", price: 48, quantity: 100 }, { name: "Галерея", price: 32, quantity: 50 }],
     salesChannels: ["OWN", "ByCard", "TicketPro"],
   },
@@ -365,11 +365,11 @@ const TODAY_DEMO_EVENT_ID = "demo_event_today";
 const TODAY_DEMO_APP_ID = "demo_app_today";
 const TODAY_DEMO_CAPACITY = 50;
 const TODAY_DEMO_SOLD = 47;
-const TODAY_DEMO_TIER = { name: "Камерный зал", price: 45, quantity: TODAY_DEMO_CAPACITY };
+const TODAY_DEMO_TIER = { name: "Клубный зал", price: 38, quantity: TODAY_DEMO_CAPACITY };
 const SOLD_OUT_DEMO_EVENT_ID = "demo_event_sold_out";
 const SOLD_OUT_DEMO_APP_ID = "demo_app_sold_out";
-const SOLD_OUT_DEMO_CAPACITY = 36;
-const SOLD_OUT_DEMO_TIER = { name: "Малый зал", price: 32, quantity: SOLD_OUT_DEMO_CAPACITY };
+const SOLD_OUT_DEMO_CAPACITY = 240;
+const SOLD_OUT_DEMO_TIER = { name: "Основной зал", price: 110, quantity: SOLD_OUT_DEMO_CAPACITY };
 const APPROVED_UNPUBLISHED_EVENT_ID = "demo_event_approved_unpublished";
 const APPROVED_UNPUBLISHED_APP_ID = "demo_app_approved_unpublished";
 const APPROVED_UNPUBLISHED_TIER = { name: "Основной билет", price: 40, quantity: 120 };
@@ -384,6 +384,19 @@ const OLD_DEMO_PHRASES = [
   ["Aurum", "Quartet"].join(" "),
   "\u0421\u0435\u0432\u0435\u0440\u043d\u044b\u0439 \u0421\u0432\u0435\u0442 \u0418\u0432\u0435\u043d\u0442",
   "\u0413\u043e\u0440\u043e\u0434\u0441\u043a\u0430\u044f \u0410\u0444\u0438\u0448\u0430",
+  "Театральный форум «Сцэна Беларусі»",
+  "Музыкальный вечер «Звоны Нясвіжа»",
+  "Камерный концерт «Дняпроўскія галасы»",
+  "Концерт мастеров искусств «Беларусь у сэрцы»",
+  "Концерт «Песня роднай зямлі»",
+  "Детская программа «Казкі Палесся»",
+  "Хореографическая программа «Кола традыцый»",
+  "Выставочная программа «Спадчына і сучаснасць»",
+  "Областной праздник «Купальскі вянок»",
+  "Спектакль «Тёплый вечер у ратуши»",
+  "Камерный концерт «Песня роднай зямлі»",
+  "Вечер симфонической музыки",
+  "Гала-концерт в Большой концертной сцене",
 ];
 
 const DEMO_ORGANIZER_DOCUMENT_TEMPLATES: Array<Omit<AppState["organizerDocuments"][number], "organizerId" | "updatedAt">> = [
@@ -400,8 +413,21 @@ function hasOldDemoPhrase(value: string | null | undefined): boolean {
 }
 
 function cleanupLegacyDemoData(state: AppState): void {
-  const legacyEventIds = new Set(state.events.filter((event) => hasOldDemoPhrase(event.title)).map((event) => event.eventId));
-  const legacyAppIds = new Set(state.applications.filter((app) => hasOldDemoPhrase(app.title)).map((app) => app.appId));
+  const legacyEventIds = new Set<string>();
+  for (const event of state.events) {
+    if (hasOldDemoPhrase(event.title)) legacyEventIds.add(event.eventId);
+  }
+  const legacyAppIds = new Set<string>();
+  for (const app of state.applications) {
+    if (!hasOldDemoPhrase(app.title)) continue;
+    legacyAppIds.add(app.appId);
+    if (app.eventId) legacyEventIds.add(app.eventId);
+  }
+  for (const app of state.eventComplianceApplications) {
+    if (!hasOldDemoPhrase(app.data.title)) continue;
+    if (app.linkedEventId) legacyEventIds.add(app.linkedEventId);
+    if (app.linkedLegacyAppId) legacyAppIds.add(app.linkedLegacyAppId);
+  }
   const legacyResellerCodes = new Set([["Kv", "itkiBY"].join("")]);
 
   state.events = state.events.filter((event) => !legacyEventIds.has(event.eventId));
@@ -409,7 +435,7 @@ function cleanupLegacyDemoData(state: AppState): void {
   state.tickets = state.tickets.filter((ticket) => !legacyEventIds.has(ticket.eventId) && !legacyResellerCodes.has(ticket.soldByChannel || ""));
   state.ops = state.ops.filter((op) => !legacyEventIds.has(op.eventId) && !legacyResellerCodes.has(op.channel) && op.ticketId !== "DEMO-MISSING-TICKET");
   state.demoPurchases = state.demoPurchases.filter((purchase) => !legacyEventIds.has(purchase.eventId) && !hasOldDemoPhrase(purchase.eventTitle));
-  state.eventComplianceApplications = state.eventComplianceApplications.filter((app) => !hasOldDemoPhrase(app.data.title));
+  state.eventComplianceApplications = state.eventComplianceApplications.filter((app) => !hasOldDemoPhrase(app.data.title) && !legacyEventIds.has(app.linkedEventId || ""));
   state.organizerRegistry = state.organizerRegistry.filter((row) => !OLD_DEMO_ORGANIZER_IDS.has(row.organizerId));
   state.organizerDocuments = state.organizerDocuments.filter((doc) => !OLD_DEMO_ORGANIZER_IDS.has(doc.organizerId));
   state.organizers = state.organizers.filter((organizer) => !OLD_DEMO_ORGANIZER_IDS.has(organizer.organizerId) && !hasOldDemoPhrase(organizer.name) && !hasOldDemoPhrase(organizer.fullName));
@@ -534,8 +560,8 @@ function todayDateTime(time = "20:00"): string {
 
 function ensureTodayNearSoldOutEvent(state: AppState): void {
   const now = new Date().toISOString();
-  const organizerId = "demo_org_philharmonic";
-  const eventTitle = "Камерный концерт «Песня роднай зямлі»";
+  const organizerId = "demo_org_cultural_initiative";
+  const eventTitle = "Стендап-вечер «Город говорит»";
   const tiers = [{ ...TODAY_DEMO_TIER }];
 
   let app = state.applications.find((item) => item.appId === TODAY_DEMO_APP_ID);
@@ -544,14 +570,14 @@ function ensureTodayNearSoldOutEvent(state: AppState): void {
       appId: TODAY_DEMO_APP_ID,
       organizerId,
       title: eventTitle,
-      venue: "Белорусская государственная филармония",
-      dateTime: todayDateTime(),
+      venue: "Клубная площадка",
+      dateTime: todayDateTime("20:30"),
       capacity: TODAY_DEMO_CAPACITY,
       tiers,
       city: "Минск",
-      category: "Концерты",
-      description: "Камерная программа белорусской академической и народной музыки.",
-      poster: DEMO_POSTERS.kamernaPesnya,
+      category: "Шоу",
+      description: "Клубный стендап-вечер с городскими историями, живой реакцией зрителей и почти распроданной квотой билетов.",
+      poster: DEMO_POSTERS.gorodGovorit,
       status: "approved",
       licenseId: "LIC-DEMO-TODAY",
       eventId: TODAY_DEMO_EVENT_ID,
@@ -563,14 +589,14 @@ function ensureTodayNearSoldOutEvent(state: AppState): void {
     Object.assign(app, {
       organizerId,
       title: eventTitle,
-      venue: "Белорусская государственная филармония",
-      dateTime: todayDateTime(),
+      venue: "Клубная площадка",
+      dateTime: todayDateTime("20:30"),
       capacity: TODAY_DEMO_CAPACITY,
       tiers,
       city: "Минск",
-      category: "Концерты",
-      description: "Камерная программа белорусской академической и народной музыки.",
-      poster: DEMO_POSTERS.kamernaPesnya,
+      category: "Шоу",
+      description: "Клубный стендап-вечер с городскими историями, живой реакцией зрителей и почти распроданной квотой билетов.",
+      poster: DEMO_POSTERS.gorodGovorit,
       status: "approved",
       licenseId: app.licenseId || "LIC-DEMO-TODAY",
       eventId: TODAY_DEMO_EVENT_ID,
@@ -584,14 +610,14 @@ function ensureTodayNearSoldOutEvent(state: AppState): void {
     licenseId: "LIC-DEMO-TODAY",
     appId: TODAY_DEMO_APP_ID,
     title: eventTitle,
-    venue: "Белорусская государственная филармония",
-    dateTime: todayDateTime(),
+    venue: "Клубная площадка",
+    dateTime: todayDateTime("20:30"),
     capacity: TODAY_DEMO_CAPACITY,
     tiers,
     city: "Минск",
-    category: "Концерты",
-    description: "Камерная программа белорусской академической и народной музыки.",
-    poster: DEMO_POSTERS.kamernaPesnya,
+    category: "Шоу",
+    description: "Клубный стендап-вечер с городскими историями, живой реакцией зрителей и почти распроданной квотой билетов.",
+    poster: DEMO_POSTERS.gorodGovorit,
     salesChannels: ["OWN", "ByCard", "TicketPro"],
     status: "published" as const,
     remaining: TODAY_DEMO_CAPACITY - TODAY_DEMO_SOLD,
@@ -635,8 +661,8 @@ function ensureTodayNearSoldOutEvent(state: AppState): void {
 
 function ensureSoldOutEvent(state: AppState): void {
   const now = new Date().toISOString();
-  const organizerId = "demo_org_cultural_initiative";
-  const eventTitle = "Спектакль «Тёплый вечер у ратуши»";
+  const organizerId = "demo_org_minskconcert";
+  const eventTitle = "Михаил Стасов — «Вернусь к тебе»";
   const dateTime = toDateTime(9, "19:00");
   const tiers = [{ ...SOLD_OUT_DEMO_TIER }];
 
@@ -644,14 +670,14 @@ function ensureSoldOutEvent(state: AppState): void {
     appId: SOLD_OUT_DEMO_APP_ID,
     organizerId,
     title: eventTitle,
-    venue: "Минский областной театр",
+    venue: "Дворец Республики",
     dateTime,
     capacity: SOLD_OUT_DEMO_CAPACITY,
     tiers,
     city: "Минск",
-    category: "Театр",
-    description: "Камерный театральный вечер с полностью реализованной квотой билетов.",
-    poster: DEMO_POSTERS.ratushaVechar,
+    category: "Концерты",
+    description: "Большой сольный концерт вымышленной звезды шансона и эстрады с полностью реализованной квотой билетов.",
+    poster: DEMO_POSTERS.mikhailStasov,
     status: "approved" as const,
     licenseId: "LIC-DEMO-SOLDOUT",
     eventId: SOLD_OUT_DEMO_EVENT_ID,
@@ -668,15 +694,15 @@ function ensureSoldOutEvent(state: AppState): void {
     licenseId: "LIC-DEMO-SOLDOUT",
     appId: SOLD_OUT_DEMO_APP_ID,
     title: eventTitle,
-    venue: "Минский областной театр",
+    venue: "Дворец Республики",
     dateTime,
     capacity: SOLD_OUT_DEMO_CAPACITY,
     tiers,
     city: "Минск",
-    category: "Театр",
-    description: "Камерный театральный вечер с полностью реализованной квотой билетов.",
-    poster: DEMO_POSTERS.ratushaVechar,
-    salesChannels: ["OWN", "ByCard"],
+    category: "Концерты",
+    description: "Большой сольный концерт вымышленной звезды шансона и эстрады с полностью реализованной квотой билетов.",
+    poster: DEMO_POSTERS.mikhailStasov,
+    salesChannels: ALL_ACTIVE_RESELLER_CHANNELS,
     status: "published" as const,
     remaining: 0,
     createdAt: now,
@@ -716,7 +742,7 @@ function ensureSoldOutEvent(state: AppState): void {
 function ensureApprovedUnpublishedEvent(state: AppState): void {
   const now = new Date().toISOString();
   const organizerId = "demo_org_minskconcert";
-  const eventTitle = "Вечер симфонической музыки";
+  const eventTitle = "Большой концерт «Симфония кино»";
   const dateTime = toDateTime(15, "19:30");
   const tiers = [{ ...APPROVED_UNPUBLISHED_TIER }];
   const layout = getSeatMapLayout(state, "layout_grand_theatre_v2");
@@ -739,8 +765,8 @@ function ensureApprovedUnpublishedEvent(state: AppState): void {
     tiers: tierCounts,
     city: "Минск",
     category: "Концерты",
-    description: "Одобренное мероприятие, которое ещё не опубликовано и не выпустило билеты.",
-    poster: DEMO_POSTERS.balshayaScenaGala,
+    description: "Одобренный большой концерт музыки из кино с оркестром и дирижёром, который ещё не опубликован для продаж.",
+    poster: DEMO_POSTERS.simfoniyaKino,
     status: "approved" as const,
     licenseId: "LIC-DEMO-APPROVED",
     eventId: APPROVED_UNPUBLISHED_EVENT_ID,
@@ -763,8 +789,8 @@ function ensureApprovedUnpublishedEvent(state: AppState): void {
     tiers: tierCounts,
     city: "Минск",
     category: "Концерты",
-    description: "Одобренное мероприятие, которое ещё не опубликовано и не выпустило билеты.",
-    poster: DEMO_POSTERS.balshayaScenaGala,
+    description: "Одобренный большой концерт музыки из кино с оркестром и дирижёром, который ещё не опубликован для продаж.",
+    poster: DEMO_POSTERS.simfoniyaKino,
     salesChannels: ["OWN", "ByCard", "TicketPro"],
     status: "approved" as const,
     remaining: eventSeats.filter((seat) => seat.status === "available").length,
@@ -852,15 +878,7 @@ export function generateDemoData(): AppState {
 }
 
 export function ensureSeatMapDemoFlow(state: AppState): AppState {
-  ensureDefaultResellers(state);
-  ensureSeatMapState(state);
-  ensureDemoOrganizers(state);
-  ensureOrganizerRegistry(state);
-  ensureDemoOrganizerDocuments(state);
-  ensureSeatMapDemoEvent(state);
-  ensureApprovedUnpublishedEvent(state);
-  ensureCertificatesForPublishedEvents(state);
-  ensureTicketsForPublishedEvents(state);
+  enrichDemoData(state);
   saveState(state);
   return state;
 }
@@ -954,6 +972,9 @@ function ensureSeatMapDemoEvent(state: AppState): void {
   const existing = state.events.find((event) => event.eventId === "EVT-SEAT-MAP-DEMO");
   const layout = getSeatMapLayout(state, "layout_grand_theatre_v2");
   if (!layout) return;
+  const eventTitle = "Большой концерт «Симфония кино»";
+  const eventDescription = "Большой концерт музыки из кино с оркестром, дирижёром, световой партитурой и продажей мест по схеме зала.";
+  const eventPoster = DEMO_POSTERS.simfoniyaKino;
   const tiers: PriceTier[] = [
     { name: "VIP", price: 180, quantity: 0, color: "#F59E0B" },
     { name: "Партер", price: 110, quantity: 0, color: "#2563EB" },
@@ -979,15 +1000,15 @@ function ensureSeatMapDemoEvent(state: AppState): void {
     licenseId: "LIC-SEAT-MAP-DEMO",
     appId: "EVAPP-SEAT-MAP-DEMO",
     complianceApplicationId: "EVAPP-SEAT-MAP-DEMO",
-    title: "Гала-концерт в Большой концертной сцене",
+    title: eventTitle,
     venue: "Большая концертная сцена",
     dateTime: toDateTime(16, "19:00"),
     capacity: 0,
     tiers: tierCounts,
     city: "Минск",
     category: "Концерты",
-    description: "Концертное событие с партером, боковыми секторами, балконом, ложами и продажей мест по схеме.",
-    poster: DEMO_POSTERS.balshayaScenaGala,
+    description: eventDescription,
+    poster: eventPoster,
     salesChannels: ALL_ACTIVE_RESELLER_CHANNELS,
     status: "published" as const,
     remaining: 0,
@@ -999,9 +1020,13 @@ function ensureSeatMapDemoEvent(state: AppState): void {
     updatedAt: now,
   };
   Object.assign(next, {
-    title: "Гала-концерт в Большой концертной сцене",
+    title: eventTitle,
     venue: "Большая концертная сцена",
-    description: "Концертное событие с партером, боковыми секторами, балконом, ложами и продажей мест по схеме.",
+    city: "Минск",
+    category: "Концерты",
+    description: eventDescription,
+    poster: eventPoster,
+    salesChannels: ALL_ACTIVE_RESELLER_CHANNELS,
     venueId: "venue_grand_theatre_v2",
     hallId: "hall_grand_theatre_v2",
     layoutId: "layout_grand_theatre_v2",
@@ -1037,7 +1062,7 @@ function ensureSeatMapDemoEvent(state: AppState): void {
         title: next.title,
         eventType: "концерт",
         shortDescription: next.description,
-        program: "Демо-программа для проверки схемы мест.",
+        program: "Оркестровая программа музыки из кино, вступление дирижёра, основной концертный блок и финальная сюита.",
         posterPath: next.poster,
         salesChannels: next.salesChannels,
         dateSlots: [next.dateTime],
@@ -1077,6 +1102,13 @@ function ensureSeatMapDemoEvent(state: AppState): void {
       updatedAt: now,
     });
   } else {
+    existingCompliance.data.title = next.title;
+    existingCompliance.data.eventType = "концерт";
+    existingCompliance.data.shortDescription = next.description;
+    existingCompliance.data.program = "Оркестровая программа музыки из кино, вступление дирижёра, основной концертный блок и финальная сюита.";
+    existingCompliance.data.posterPath = next.poster;
+    existingCompliance.data.salesChannels = next.salesChannels;
+    existingCompliance.data.dateSlots = [next.dateTime];
     existingCompliance.data.venueName = next.venue;
     existingCompliance.data.venueAddress = "пр-т Независимости, 25";
     existingCompliance.data.venueId = "venue_grand_theatre_v2";
@@ -1414,7 +1446,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       status: "submitted",
       submittedAt: "2026-04-19T10:00:00",
       adminComment: "Заявка принята и ожидает проверки оплаты пошлины.",
-      title: "Концерт «Песня роднай зямлі»",
+      title: "Национальный концерт «Песня роднай зямлі»",
       age: "6+",
       program: "Увертюра, блок белорусской академической музыки, выступление хора, народные песни в оркестровой обработке.",
       feePaid: true,
@@ -1426,9 +1458,9 @@ function ensureEventComplianceApplications(state: AppState): void {
       submittedAt: "2026-04-20T09:20:00",
       reviewedAt: "2026-04-21T15:10:00",
       adminComment: "Уточните проектную вместимость площадки и схему рассадки.",
-      title: "Театральный форум «Сцэна Беларусі»",
+      title: "Премьера спектакля «Слёзы на асфальте»",
       age: "12+",
-      program: "Показы спектаклей, творческая встреча с режиссёрами, обсуждение сценографии и итоговая дискуссия.",
+      program: "Премьерный показ современной драмы, встреча с постановочной группой, обсуждение сценографии и финальная дискуссия.",
       feePaid: true,
     },
     {
@@ -1438,7 +1470,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       submittedAt: "2026-04-21T13:00:00",
       reviewedAt: "2026-04-22T09:45:00",
       adminComment: "Не приложена программа мероприятия.",
-      title: "Детская программа «Казкі Палесся»",
+      title: "Детское шоу «Казкі Палесся»",
       age: "0+",
       program: "Интерактивная сказочная программа, музыкальные паузы, игровые станции и финальная встреча с артистами.",
       approvalMode: "certificate_not_required",
@@ -1452,7 +1484,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       certificateNumber: "CERT-DEMO-BY-005",
       certificateDate: "2026-04-24",
       adminComment: "Состав исполнителей и возрастная категория подтверждены.",
-      title: "Концерт мастеров искусств «Беларусь у сэрцы»",
+      title: "Гала-концерт «Беларусь у сэрцы»",
       age: "6+",
       program: "Симфонический пролог, выступления мастеров искусств, хоровой блок и торжественный финал.",
       feePaid: true,
@@ -1480,9 +1512,9 @@ function ensureEventComplianceApplications(state: AppState): void {
       certificateNumber: "CERT-DEMO-BY-007",
       certificateDate: "2026-04-25",
       adminComment: "Камерная программа согласована без дополнительных замечаний.",
-      title: "Музыкальный вечер «Звоны Нясвіжа»",
+      title: "Андре Ботичелли — «Виолончель при свечах»",
       age: "12+",
-      program: "Камерная инструментальная программа, рассказ о музыкальной традиции Несвижа и заключительное выступление ансамбля.",
+      program: "Сольная виолончельная программа при свечах, неоклассический блок, исторический комментарий и камерный финал.",
       approvalMode: "certificate_not_required",
     },
     {
@@ -1492,7 +1524,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       submittedAt: "2026-04-25T14:20:00",
       reviewedAt: "2026-04-26T16:00:00",
       adminComment: "Не подтверждены права на использование сценической площадки.",
-      title: "Хореографическая программа «Кола традыцый»",
+      title: "Танцевальная программа «Кола традыцый»",
       age: "6+",
       program: "Народные танцы, современная хореография, сценический блок о календарных традициях и финальный поклон коллективов.",
       feePaid: true,
@@ -1504,7 +1536,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       submittedAt: "2026-04-26T10:30:00",
       reviewedAt: "2026-04-27T11:45:00",
       adminComment: "Требуется уточнить состав исполнителей и возрастную категорию информационной продукции.",
-      title: "Выставочная программа «Спадчына і сучаснасць»",
+      title: "Музейная программа «Спадчына і сучаснасць»",
       age: "6+",
       program: "Экскурсионный маршрут, лекция куратора, демонстрация музейных предметов и современная художественная секция.",
       approvalMode: "notice_only",
@@ -1532,7 +1564,7 @@ function ensureEventComplianceApplications(state: AppState): void {
       certificateNumber: "CERT-DEMO-BY-011",
       certificateDate: "2026-04-29",
       adminComment: "Могилёвская областная программа согласована, площадка и уведомления подтверждены.",
-      title: "Областной праздник «Купальскі вянок»",
+      title: "Праздник «Купальскі вянок»",
       age: "0+",
       program: "Фольклорная сцена, ремесленные подворья, семейная зона и вечерний купальский блок в парке Подниколье.",
       feeExempt: true,
@@ -1556,9 +1588,9 @@ function ensureEventComplianceApplications(state: AppState): void {
       status: "submitted",
       submittedAt: "2026-04-30T10:15:00",
       adminComment: "Могилёвская камерная программа оплачена и ждёт административного решения.",
-      title: "Камерный концерт «Дняпроўскія галасы»",
+      title: "Джимми Торнтон — «Only Hits Live»",
       age: "6+",
-      program: "Вокальный блок у Днепра, инструментальные миниатюры, региональные песни в камерной обработке и заключительный ансамбль.",
+      program: "Гитарный вступительный блок, серия хитов, акустическая часть, сценический финал и встреча с поклонниками.",
       feePaid: true,
       executiveCommitteeNotified: true,
     },
@@ -1639,6 +1671,9 @@ function ensureCertificatesForPublishedEvents(state: AppState): void {
     compliance.certificateDate ||= certificateDate;
     compliance.linkedLegacyAppId ||= event.appId;
     compliance.linkedEventId = event.eventId;
+    compliance.data.title = event.title || compliance.data.title;
+    compliance.data.eventType = event.category || compliance.data.eventType;
+    compliance.data.shortDescription = event.description || compliance.data.shortDescription;
     compliance.data.posterPath = event.poster || compliance.data.posterPath;
     compliance.data.salesChannels = event.salesChannels || compliance.data.salesChannels || ["OWN"];
     compliance.data.venueName = event.venue || compliance.data.venueName;

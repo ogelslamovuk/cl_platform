@@ -12,8 +12,9 @@ interface Props {
 }
 
 const CITY_WHITELIST = ["Минск", "Брест", "Витебск", "Гомель", "Гродно", "Могилёв", "Слуцк", "Несвиж"] as const;
-const CATEGORY_WHITELIST = ["Концерты", "Театр", "Шоу", "Детям", "Фестивали", "Выставки", "Конкурсы"] as const;
+const CATEGORY_WHITELIST = ["Концерты", "Театр", "Шоу", "Детям", "Фестивали", "Выставки", "Конкурсы", "Танцы", "Музеи"] as const;
 const POSTER_PLACEHOLDER = "/placeholder.svg";
+const SHOWCASE_PRIORITY_EVENT_IDS = new Set(["demo_event_sold_out"]);
 
 type DemoEvent = EventRecord & { city: string; category: string; description: string; poster: string };
 type AgeCategory = "0+" | "6+" | "12+" | "16+" | "18+";
@@ -55,6 +56,12 @@ function getEventAvailableCount(state: AppState, event: DemoEvent): number {
     return event.eventSeats.filter((seat) => seat.status === "available").length;
   }
   return getEventIssuedCount(state, event.eventId);
+}
+
+function getShowcasePriority(event: DemoEvent): number {
+  if (SHOWCASE_PRIORITY_EVENT_IDS.has(event.eventId)) return 0;
+  if (event.title === "Михаил Стасов — «Вернусь к тебе»") return 0;
+  return 1;
 }
 
 function getEventAgeCategory(state: AppState, event: EventRecord): AgeCategory | null {
@@ -199,6 +206,8 @@ export default function B2CView({ state, onUpdate }: Props) {
         poster: event.poster || "",
       }))
       .sort((a, b) => {
+        const priorityDiff = getShowcasePriority(a) - getShowcasePriority(b);
+        if (priorityDiff !== 0) return priorityDiff;
         const aHasSeatMap = Boolean(a.eventSeats?.length);
         const bHasSeatMap = Boolean(b.eventSeats?.length);
         if (aHasSeatMap !== bHasSeatMap) return aHasSeatMap ? -1 : 1;
