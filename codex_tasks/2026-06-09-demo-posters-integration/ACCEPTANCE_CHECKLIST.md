@@ -1,0 +1,31 @@
+# Acceptance checklist
+
+- [ ] Codex read root `SKILLS.md` before editing.
+- [ ] Input poster assets were validated against `POSTER_ASSET_MANIFEST.md`.
+- [ ] Exactly 17 required PNG files were copied to `public/demo/posters/`.
+- [ ] No target demo event uses old `.svg` poster path.
+- [ ] `src/lib/demoEngine.ts` uses new PNG paths for all target events.
+- [ ] Михаил Стасов — «Вернусь к тебе» is present as the sold-out star event.
+- [ ] Михаил Стасов appears first/top-priority in B2C афиша.
+- [ ] Андре Ботичелли — «Виолончель при свечах» is present with correct poster.
+- [ ] Джимми Торнтон — «Only Hits Live» is present with correct poster.
+- [ ] Стендап-вечер «Город говорит» is present as near sold-out today event with correct poster.
+- [ ] Большой концерт «Симфония кино» is consistent in seatmap/approved-unpublished demo context and uses the symphony poster.
+- [ ] Old renamed demo events do not remain as stale duplicate B2C cards after demo data generation/enrichment.
+- [ ] B2C poster cards show the new PNG posters in the existing vertical frame without broken images or distortion.
+- [ ] B2C purchase flow still works for general admission events.
+- [ ] B2C seat selection still works for seatmap events.
+- [ ] Open-air/capacity-only events still do not open detailed seatmap.
+- [ ] Local `/main` smoke-check passed.
+- [ ] Local `/demo` smoke-check passed.
+- [ ] Local `/admin` smoke-check passed.
+- [ ] Local `/channel` smoke-check passed.
+- [ ] `npm run build` passed.
+- [ ] No pull request was created.
+- [ ] Approved changes were committed and pushed to the repository branch used for deployment.
+- [ ] Existing deployment workflow / GitHub Pages deployment completed successfully.
+- [ ] Live deployed `/main` page was smoke-checked.
+- [ ] Live deployed `/demo` page was smoke-checked.
+- [ ] Live deployed `/admin` page was smoke-checked.
+- [ ] Live deployed `/channel` page was smoke-checked.
+- [ ] Final report includes commit SHA, deployed URL(s), deployment status and post-deploy smoke-check result.
